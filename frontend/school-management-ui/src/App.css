@@ -1,0 +1,8 @@
+/* Reset the Vite template's demo styling. Real styling gets built up as
+   each module ships its UI (per master prompt §12 — preserve the
+   prototype's intended navigation/screens/forms, improve the
+   implementation). */
+
+#root {
+  min-height: 100vh;
+}

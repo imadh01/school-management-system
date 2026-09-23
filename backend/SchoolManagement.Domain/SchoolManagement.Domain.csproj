@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>SchoolManagement.Domain</RootNamespace>
+  </PropertyGroup>
+
+  <!-- Deliberately empty: Domain must not depend on ASP.NET Core or EF Core (master prompt §3) -->
+
+</Project>
