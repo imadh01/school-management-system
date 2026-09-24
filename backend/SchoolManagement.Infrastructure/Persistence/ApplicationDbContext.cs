@@ -20,6 +20,9 @@ public class ApplicationDbContext : DbContext
     public DbSet<Permission> Permissions => Set<Permission>();
     public DbSet<UserRole> UserRoles => Set<UserRole>();
     public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
+    public DbSet<AcademicYear> AcademicYears => Set<AcademicYear>();
+    public DbSet<ClassSection> ClassSections => Set<ClassSection>();
+    public DbSet<Admission> Admissions => Set<Admission>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
@@ -52,6 +55,46 @@ public class ApplicationDbContext : DbContext
         {
             RoleId = 1,   // Admin
             PermissionId = 1,
+        });
+
+        modelBuilder.Entity<Permission>().HasData(new Permission
+        {
+            Id = 2,
+            Name = "ClassSections.Create",
+            Module = "ClassSections",
+            Description = "Create new class sections.",
+        });
+
+        modelBuilder.Entity<RolePermission>().HasData(new RolePermission
+        {
+            RoleId = 1, // Admin
+            PermissionId = 2,
+        });
+
+        modelBuilder.Entity<AcademicYear>().HasData(new AcademicYear
+        {
+            Id = 1,
+            Name = "2026-2027",
+            StartDate = new DateOnly(2026, 6, 1),
+            EndDate = new DateOnly(2027, 3, 31),
+            IsCurrent = true,
+            Status = "Active",
+            CreatedAt = new DateTime(2026, 9, 23, 0, 0, 0, DateTimeKind.Utc),
+            UpdatedAt = new DateTime(2026, 9, 23, 0, 0, 0, DateTimeKind.Utc),
+        });
+
+        modelBuilder.Entity<Permission>().HasData(new Permission
+        {
+            Id = 3,
+            Name = "Admissions.Manage",
+            Module = "Admissions",
+            Description = "Create, edit, and progress admission applications through the pipeline.",
+        });
+
+        modelBuilder.Entity<RolePermission>().HasData(new RolePermission
+        {
+            RoleId = 1, // Admin
+            PermissionId = 3,
         });
     }
 }

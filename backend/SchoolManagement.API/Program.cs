@@ -1,14 +1,14 @@
-using System.Text;
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
-using Serilog;
 using SchoolManagement.API.Common;
 using SchoolManagement.API.Extensions;
 using SchoolManagement.API.Middleware;
+using SchoolManagement.Application.DTOs.Admissions;
 using SchoolManagement.Application.DTOs.Auth;
+using SchoolManagement.Application.DTOs.ClassSections;
 using SchoolManagement.Application.DTOs.Users;
 using SchoolManagement.Application.Interfaces;
 using SchoolManagement.Application.Services;
@@ -17,6 +17,8 @@ using SchoolManagement.Infrastructure.Persistence;
 using SchoolManagement.Infrastructure.Persistence.Interceptors;
 using SchoolManagement.Infrastructure.Repositories;
 using SchoolManagement.Infrastructure.Security;
+using Serilog;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -45,6 +47,19 @@ builder.Services.AddScoped<IUserService, UserService>();
 
 builder.Services.AddScoped<IValidator<LoginRequest>, LoginRequestValidator>();
 builder.Services.AddScoped<IValidator<CreateUserRequest>, CreateUserRequestValidator>();
+
+builder.Services.AddScoped<IClassSectionRepository, ClassSectionRepository>();
+builder.Services.AddScoped<IAcademicYearRepository, AcademicYearRepository>();
+builder.Services.AddScoped<IClassSectionService, ClassSectionService>();
+builder.Services.AddScoped<IValidator<CreateClassSectionRequest>, CreateClassSectionRequestValidator>();
+
+builder.Services.AddScoped<IAdmissionRepository, AdmissionRepository>();
+builder.Services.AddScoped<IAdmissionService, AdmissionService>();
+builder.Services.AddScoped<IValidator<CreateAdmissionRequest>, CreateAdmissionRequestValidator>();
+builder.Services.AddScoped<IValidator<UpdateAdmissionRequest>, UpdateAdmissionRequestValidator>();
+builder.Services.AddScoped<IValidator<ConfirmAdmissionRequest>, ConfirmAdmissionRequestValidator>();
+builder.Services.AddScoped<IValidator<EnrollAdmissionRequest>, EnrollAdmissionRequestValidator>();
+builder.Services.AddScoped<IValidator<RejectAdmissionRequest>, RejectAdmissionRequestValidator>();
 
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("Jwt"));
 var jwtSettings = builder.Configuration.GetSection("Jwt").Get<JwtSettings>()!;
@@ -104,6 +119,13 @@ builder.Services.AddAuthorization(options =>
 
     options.AddPolicy("Users.Create", policy =>
         policy.RequireClaim("permission", "Users.Create"));
+
+    options.AddPolicy("ClassSections.Create", policy =>
+    policy.RequireClaim("permission", "ClassSections.Create"));
+
+    options.AddPolicy("Admissions.Manage", policy =>
+    policy.RequireClaim("permission", "Admissions.Manage"));
+
 });
 
 builder.Services.AddCors(options =>
