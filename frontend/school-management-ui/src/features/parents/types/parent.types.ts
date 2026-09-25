@@ -56,6 +56,10 @@ export interface CreateParentRequest {
   pincode: string | null;
 }
 
+export interface UpdateParentRequest extends CreateParentRequest {
+  status: "Active" | "Inactive";
+}
+
 export type RelationType = "Father" | "Mother" | "Guardian";
 
 export interface StudentGuardianResponse {
@@ -69,6 +73,22 @@ export interface StudentGuardianResponse {
 
 export interface LinkGuardianRequest {
   parentId: number;
+  relationType: RelationType;
+  isPrimaryContact: boolean;
+}
+
+export interface LinkedStudentResponse {
+  studentId: number;
+  studentName: string;
+  admNo: string;
+  classSectionName: string;
+  rollNumber: string;
+  relationType: RelationType;
+  isPrimaryContact: boolean;
+}
+
+export interface LinkStudentRequest {
+  studentId: number;
   relationType: RelationType;
   isPrimaryContact: boolean;
 }

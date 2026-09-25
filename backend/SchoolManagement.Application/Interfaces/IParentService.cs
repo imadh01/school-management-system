@@ -8,4 +8,5 @@ public interface IParentService
     Task<ParentResponse> GetByIdAsync(int id, CancellationToken cancellationToken);
     Task<ParentResponse> CreateAsync(CreateParentRequest request, CancellationToken cancellationToken);
     Task<ParentResponse> UpdateAsync(int id, UpdateParentRequest request, CancellationToken cancellationToken);
+    Task DeleteAsync(int id, CancellationToken cancellationToken);
 }

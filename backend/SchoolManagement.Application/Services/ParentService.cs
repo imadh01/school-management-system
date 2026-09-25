@@ -85,6 +85,14 @@ public class ParentService : IParentService
         return ToResponse(parent);
     }
 
+    public async Task DeleteAsync(int id, CancellationToken cancellationToken)
+    {
+        var parent = await GetOrThrowAsync(id, cancellationToken);
+        parent.IsDeleted = true;
+        parent.DeletedAt = DateTime.UtcNow;
+        await _parentRepository.SaveChangesAsync(cancellationToken);
+    }
+
     private async Task<Parent> GetOrThrowAsync(int id, CancellationToken cancellationToken) =>
         await _parentRepository.GetByIdAsync(id, cancellationToken)
             ?? throw new NotFoundException($"Parent {id} does not exist.");

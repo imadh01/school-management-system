@@ -76,6 +76,7 @@ builder.Services.AddScoped<IStudentGuardianService, StudentGuardianService>();
 builder.Services.AddScoped<IValidator<CreateParentRequest>, CreateParentRequestValidator>();
 builder.Services.AddScoped<IValidator<UpdateParentRequest>, UpdateParentRequestValidator>();
 builder.Services.AddScoped<IValidator<LinkGuardianRequest>, LinkGuardianRequestValidator>();
+builder.Services.AddScoped<IValidator<LinkStudentRequest>, LinkStudentRequestValidator>();
 
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("Jwt"));
 var jwtSettings = builder.Configuration.GetSection("Jwt").Get<JwtSettings>()!;

@@ -1,21 +1,30 @@
-import { useState } from "react";
-import type { CreateParentRequest } from "../types/parent.types";
+import { useEffect, useState } from "react";
+import type {
+  CreateParentRequest,
+  UpdateParentRequest,
+  ParentResponse,
+} from "../types/parent.types";
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: CreateParentRequest) => Promise<void>;
+  editingParent: ParentResponse | null;
+  onCreate: (data: CreateParentRequest) => Promise<void>;
+  onUpdate: (id: number, data: UpdateParentRequest) => Promise<void>;
 }
 
-const emptyForm: CreateParentRequest = {
+type FormState = CreateParentRequest & { status: "Active" | "Inactive" };
+
+const emptyForm: FormState = {
   name: "",
   email: "",
   mobile: "",
+  status: "Active",
   occupation: "",
   nationality: "",
   countryOfResidence: "",
   timezone: "",
-  preferredLanguage: "",
+  preferredLanguage: "English",
   preferredContactMethod: "Email",
   whatsapp: "",
   emergencyOnly: false,
@@ -35,15 +44,69 @@ const emptyForm: CreateParentRequest = {
   pincode: "",
 };
 
-export function ParentModal({ isOpen, onClose, onSubmit }: Props) {
-  const [form, setForm] = useState<CreateParentRequest>(emptyForm);
+const NOTIFY_KEYS = [
+  { key: "notifyAttendance" as const, label: "Attendance" },
+  { key: "notifyExams" as const, label: "Exams" },
+  { key: "notifyFees" as const, label: "Fees" },
+  { key: "notifyNotices" as const, label: "Notices" },
+  { key: "notifyDiscipline" as const, label: "Discipline" },
+];
+
+export function ParentModal({
+  isOpen,
+  onClose,
+  editingParent,
+  onCreate,
+  onUpdate,
+}: Props) {
+  const [form, setForm] = useState<FormState>(emptyForm);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    setError(null);
+    if (editingParent) {
+      setForm({
+        name: editingParent.name,
+        email: editingParent.email ?? "",
+        mobile: editingParent.mobile,
+        status: editingParent.status,
+        occupation: editingParent.occupation ?? "",
+        nationality: editingParent.nationality ?? "",
+        countryOfResidence: editingParent.countryOfResidence ?? "",
+        timezone: editingParent.timezone ?? "",
+        preferredLanguage: editingParent.preferredLanguage ?? "English",
+        preferredContactMethod: editingParent.preferredContactMethod ?? "Email",
+        whatsapp: editingParent.whatsapp ?? "",
+        emergencyOnly: editingParent.emergencyOnly,
+        notifyAttendance: editingParent.notifyAttendance,
+        notifyExams: editingParent.notifyExams,
+        notifyFees: editingParent.notifyFees,
+        notifyNotices: editingParent.notifyNotices,
+        notifyDiscipline: editingParent.notifyDiscipline,
+        employer: editingParent.employer ?? "",
+        jobTitle: editingParent.jobTitle ?? "",
+        workEmail: editingParent.workEmail ?? "",
+        workPhone: editingParent.workPhone ?? "",
+        billingContact: editingParent.billingContact,
+        addressLine: editingParent.addressLine ?? "",
+        city: editingParent.city ?? "",
+        state: editingParent.state ?? "",
+        pincode: editingParent.pincode ?? "",
+      });
+    } else {
+      setForm(emptyForm);
+    }
+  }, [isOpen, editingParent]);
+
   if (!isOpen) return null;
 
-  const field = (key: keyof CreateParentRequest, value: string) =>
-    setForm((f) => ({ ...f, [key]: value === "" ? null : value }));
+  const field = (key: keyof FormState, value: string) =>
+    setForm((f) => ({ ...f, [key]: value }));
+
+  const toggleNotify = (key: (typeof NOTIFY_KEYS)[number]["key"]) =>
+    setForm((f) => ({ ...f, [key]: !f[key] }));
 
   const handleSubmit = async () => {
     setError(null);
@@ -53,8 +116,18 @@ export function ParentModal({ isOpen, onClose, onSubmit }: Props) {
     }
     setIsSubmitting(true);
     try {
-      await onSubmit(form);
-      setForm(emptyForm);
+      // Sanitize empty strings to null for optional fields before sending.
+      const sanitized = Object.fromEntries(
+        Object.entries(form).map(([k, v]) => [k, v === "" ? null : v]),
+      ) as unknown as FormState;
+
+      if (editingParent) {
+        await onUpdate(editingParent.id, sanitized);
+      } else {
+        const { status, ...createData } = sanitized;
+        void status;
+        await onCreate(createData);
+      }
       onClose();
     } catch {
       setError("Could not save this parent.");
@@ -64,41 +137,40 @@ export function ParentModal({ isOpen, onClose, onSubmit }: Props) {
   };
 
   return (
-    <div className="modal-backdrop">
+    <div className="modal-backdrop open">
       <div className="modal modal--wide">
         <div className="modal__header">
-          <h2>👪 Add Parent</h2>
+          <h2>{editingParent ? "✏️ Edit Parent" : "👥 Add Parent"}</h2>
           <button className="modal__close" onClick={onClose}>
             ✕
           </button>
         </div>
         <div className="modal__body">
-          <div className="modal__section-title">Identity &amp; Contact</div>
+          <div className="modal__section-title">Basics</div>
           <div className="modal__grid">
             <div className="field">
               <label>
-                Name<span className="required">*</span>
+                Full Name<span className="required">*</span>
               </label>
               <input
                 value={form.name}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, name: e.target.value }))
-                }
+                onChange={(e) => field("name", e.target.value)}
               />
             </div>
+            {editingParent && (
+              <div className="field">
+                <label>Status</label>
+                <select
+                  value={form.status}
+                  onChange={(e) => field("status", e.target.value)}
+                >
+                  <option>Active</option>
+                  <option>Inactive</option>
+                </select>
+              </div>
+            )}
             <div className="field">
-              <label>
-                Mobile<span className="required">*</span>
-              </label>
-              <input
-                value={form.mobile}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, mobile: e.target.value }))
-                }
-              />
-            </div>
-            <div className="field">
-              <label>Email</label>
+              <label>Email (unique when set)</label>
               <input
                 type="email"
                 value={form.email ?? ""}
@@ -106,29 +178,15 @@ export function ParentModal({ isOpen, onClose, onSubmit }: Props) {
               />
             </div>
             <div className="field">
-              <label>WhatsApp</label>
+              <label>
+                Mobile<span className="required">*</span> (unique)
+              </label>
               <input
-                value={form.whatsapp ?? ""}
-                onChange={(e) => field("whatsapp", e.target.value)}
+                value={form.mobile}
+                onChange={(e) => field("mobile", e.target.value)}
+                placeholder="+971 50 0000000"
               />
             </div>
-            <div className="field">
-              <label>Preferred Contact Method</label>
-              <select
-                value={form.preferredContactMethod ?? ""}
-                onChange={(e) =>
-                  field("preferredContactMethod", e.target.value)
-                }
-              >
-                <option value="Email">Email</option>
-                <option value="Mobile">Mobile</option>
-                <option value="WhatsApp">WhatsApp</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="modal__section-title">Background</div>
-          <div className="modal__grid">
             <div className="field">
               <label>Occupation</label>
               <input
@@ -136,6 +194,10 @@ export function ParentModal({ isOpen, onClose, onSubmit }: Props) {
                 onChange={(e) => field("occupation", e.target.value)}
               />
             </div>
+          </div>
+
+          <div className="modal__section-title">Identity &amp; Residence</div>
+          <div className="modal__grid">
             <div className="field">
               <label>Nationality</label>
               <input
@@ -150,12 +212,81 @@ export function ParentModal({ isOpen, onClose, onSubmit }: Props) {
                 onChange={(e) => field("countryOfResidence", e.target.value)}
               />
             </div>
+            <div className="field" style={{ gridColumn: "span 2" }}>
+              <label>Time Zone</label>
+              <input
+                value={form.timezone ?? ""}
+                onChange={(e) => field("timezone", e.target.value)}
+                placeholder="UTC"
+              />
+            </div>
+          </div>
+
+          <div className="modal__section-title">Communication</div>
+          <div className="modal__grid">
             <div className="field">
               <label>Preferred Language</label>
-              <input
-                value={form.preferredLanguage ?? ""}
+              <select
+                value={form.preferredLanguage ?? "English"}
                 onChange={(e) => field("preferredLanguage", e.target.value)}
+              >
+                <option>English</option>
+                <option>Hindi</option>
+                <option>Urdu</option>
+                <option>Arabic</option>
+                <option>Korean</option>
+              </select>
+            </div>
+            <div className="field">
+              <label>Preferred Contact Method</label>
+              <select
+                value={form.preferredContactMethod ?? "Email"}
+                onChange={(e) =>
+                  field("preferredContactMethod", e.target.value)
+                }
+              >
+                <option>Email</option>
+                <option>Phone</option>
+                <option>WhatsApp</option>
+                <option>App</option>
+              </select>
+            </div>
+            <div className="field">
+              <label>WhatsApp Number</label>
+              <input
+                value={form.whatsapp ?? ""}
+                onChange={(e) => field("whatsapp", e.target.value)}
               />
+            </div>
+            <div className="field" style={{ alignSelf: "end" }}>
+              <div className="checkbox-row" style={{ marginTop: 0 }}>
+                <input
+                  type="checkbox"
+                  id="p-emergency"
+                  checked={form.emergencyOnly}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, emergencyOnly: e.target.checked }))
+                  }
+                />
+                <label htmlFor="p-emergency">Emergency Only</label>
+              </div>
+            </div>
+          </div>
+
+          <div className="field" style={{ marginTop: 12 }}>
+            <label>Notify me about:</label>
+            <div className="tag-group">
+              {NOTIFY_KEYS.map(({ key, label }) => (
+                <button
+                  key={key}
+                  type="button"
+                  className={`tag-btn ${form[key] ? "selected" : ""}`}
+                  onClick={() => toggleNotify(key)}
+                >
+                  {form[key] ? "✓ " : ""}
+                  {label}
+                </button>
+              ))}
             </div>
           </div>
 
@@ -178,6 +309,7 @@ export function ParentModal({ isOpen, onClose, onSubmit }: Props) {
             <div className="field">
               <label>Work Email</label>
               <input
+                type="email"
                 value={form.workEmail ?? ""}
                 onChange={(e) => field("workEmail", e.target.value)}
               />
@@ -190,11 +322,25 @@ export function ParentModal({ isOpen, onClose, onSubmit }: Props) {
               />
             </div>
           </div>
+          <div className="checkbox-row">
+            <input
+              type="checkbox"
+              id="p-billing"
+              checked={form.billingContact}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, billingContact: e.target.checked }))
+              }
+            />
+            <label htmlFor="p-billing">
+              Preferred Billing Contact — send fee invoices and billing notices
+              to this parent
+            </label>
+          </div>
 
           <div className="modal__section-title">Address</div>
           <div className="modal__grid">
-            <div className="field">
-              <label>Address</label>
+            <div className="field" style={{ gridColumn: "span 2" }}>
+              <label>Street Address</label>
               <input
                 value={form.addressLine ?? ""}
                 onChange={(e) => field("addressLine", e.target.value)}
@@ -214,8 +360,8 @@ export function ParentModal({ isOpen, onClose, onSubmit }: Props) {
                 onChange={(e) => field("state", e.target.value)}
               />
             </div>
-            <div className="field">
-              <label>Pincode</label>
+            <div className="field" style={{ gridColumn: "span 2" }}>
+              <label>PIN / ZIP Code</label>
               <input
                 value={form.pincode ?? ""}
                 onChange={(e) => field("pincode", e.target.value)}
@@ -223,34 +369,10 @@ export function ParentModal({ isOpen, onClose, onSubmit }: Props) {
             </div>
           </div>
 
-          <div className="modal__section-title">Preferences</div>
-          <div className="modal__grid">
-            <div className="field">
-              <label>
-                <input
-                  type="checkbox"
-                  checked={form.billingContact}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, billingContact: e.target.checked }))
-                  }
-                  style={{ marginRight: 8 }}
-                />
-                Billing contact
-              </label>
-            </div>
-            <div className="field">
-              <label>
-                <input
-                  type="checkbox"
-                  checked={form.emergencyOnly}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, emergencyOnly: e.target.checked }))
-                  }
-                  style={{ marginRight: 8 }}
-                />
-                Emergency contact only
-              </label>
-            </div>
+          <div className="modal__note">
+            <strong>Note:</strong> Mobile number must be unique across all
+            parents. Linking to children is done separately from the Linked
+            Children action on each row.
           </div>
 
           {error && (
@@ -268,7 +390,7 @@ export function ParentModal({ isOpen, onClose, onSubmit }: Props) {
             onClick={handleSubmit}
             disabled={isSubmitting}
           >
-            {isSubmitting ? "Saving…" : "Save Parent"}
+            {isSubmitting ? "Saving…" : editingParent ? "Save Changes" : "Save"}
           </button>
           <button className="btn btn--secondary" onClick={onClose}>
             Cancel

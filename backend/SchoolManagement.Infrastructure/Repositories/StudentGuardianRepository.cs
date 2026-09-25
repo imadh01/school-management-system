@@ -20,6 +20,12 @@ public class StudentGuardianRepository : IStudentGuardianRepository
             .Where(sg => sg.StudentId == studentId)
             .ToListAsync(cancellationToken);
 
+    public Task<List<StudentGuardian>> GetForParentAsync(int parentId, CancellationToken cancellationToken) =>
+        _context.StudentGuardians
+            .Include(sg => sg.Student).ThenInclude(s => s.ClassSection).ThenInclude(c => c.AcademicYear)
+            .Where(sg => sg.ParentId == parentId)
+            .ToListAsync(cancellationToken);
+
     public Task<bool> LinkExistsAsync(int studentId, int parentId, CancellationToken cancellationToken) =>
         _context.StudentGuardians.AnyAsync(
             sg => sg.StudentId == studentId && sg.ParentId == parentId, cancellationToken);
@@ -37,6 +43,18 @@ public class StudentGuardianRepository : IStudentGuardianRepository
     public async Task RemoveLinkAsync(StudentGuardian link, CancellationToken cancellationToken)
     {
         _context.StudentGuardians.Remove(link);
+        await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task SetPrimaryAsync(int studentId, int parentId, CancellationToken cancellationToken)
+    {
+        var links = await _context.StudentGuardians
+            .Where(sg => sg.StudentId == studentId)
+            .ToListAsync(cancellationToken);
+
+        foreach (var link in links)
+            link.IsPrimaryContact = link.ParentId == parentId;
+
         await _context.SaveChangesAsync(cancellationToken);
     }
 }
