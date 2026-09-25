@@ -7,7 +7,7 @@ import type { ClassSectionResponse } from "@/features/class-sections/types/class
 
 interface Props {
   isOpen: boolean;
-  editingAdmission: AdmissionResponse | null; // null = creating new
+  editingAdmission: AdmissionResponse | null;
   classSections: ClassSectionResponse[];
   onClose: () => void;
   onSubmit: (data: CreateAdmissionRequest) => Promise<void>;
@@ -20,6 +20,7 @@ const emptyForm: CreateAdmissionRequest = {
   gender: "Male",
   dateOfBirth: "",
   appliedForClassSectionId: 0,
+  grade: "",
   admissionType: "New",
   previousSchool: "",
   phone: "",
@@ -35,6 +36,8 @@ const emptyForm: CreateAdmissionRequest = {
   city: "",
   state: "",
   pincode: "",
+  registrationFee: 0,
+  notes: "",
 };
 
 export function RegistrationModal({
@@ -57,6 +60,7 @@ export function RegistrationModal({
         gender: editingAdmission.gender,
         dateOfBirth: editingAdmission.dateOfBirth,
         appliedForClassSectionId: editingAdmission.appliedForClassSectionId,
+        grade: editingAdmission.grade,
         admissionType: editingAdmission.admissionType,
         previousSchool: editingAdmission.previousSchool,
         phone: editingAdmission.phone,
@@ -72,6 +76,8 @@ export function RegistrationModal({
         city: editingAdmission.city,
         state: editingAdmission.state,
         pincode: editingAdmission.pincode,
+        registrationFee: editingAdmission.registrationFee,
+        notes: editingAdmission.notes,
       });
     } else {
       setForm(emptyForm);
@@ -83,6 +89,12 @@ export function RegistrationModal({
 
   const field = (key: keyof CreateAdmissionRequest, value: string) =>
     setForm((f) => ({ ...f, [key]: value === "" ? null : value }));
+
+  // Academic Year is derived from the selected class, never entered directly —
+  // shown here read-only so the person can see what will be recorded.
+  const selectedClassSection = classSections.find(
+    (c) => c.id === form.appliedForClassSectionId,
+  );
 
   const handleSubmit = async () => {
     setError(null);
@@ -100,7 +112,17 @@ export function RegistrationModal({
     }
     setIsSubmitting(true);
     try {
-      await onSubmit(form);
+      // Guard against any empty-string value reaching a nullable field —
+      // normalize the whole payload once, right before it's sent, rather
+      // than trust every individual input's own handling.
+      const sanitized = Object.fromEntries(
+        Object.entries(form).map(([key, value]) => [
+          key,
+          value === "" ? null : value,
+        ]),
+      ) as CreateAdmissionRequest;
+
+      await onSubmit(sanitized);
       onClose();
     } catch {
       setError(
@@ -199,6 +221,14 @@ export function RegistrationModal({
               </select>
             </div>
             <div className="field">
+              <label>Grade</label>
+              <input
+                value={form.grade ?? ""}
+                onChange={(e) => field("grade", e.target.value)}
+                placeholder="e.g. 6"
+              />
+            </div>
+            <div className="field">
               <label>Admission Type</label>
               <select
                 value={form.admissionType}
@@ -209,6 +239,16 @@ export function RegistrationModal({
               </select>
             </div>
             <div className="field">
+              <label>Academic Year</label>
+              <input
+                value={selectedClassSection?.academicYearName ?? "—"}
+                disabled
+              />
+              <span style={{ fontSize: 11, color: "var(--muted)" }}>
+                Determined by the selected class
+              </span>
+            </div>
+            <div className="field" style={{ gridColumn: "span 2" }}>
               <label>Previous School</label>
               <input
                 value={form.previousSchool ?? ""}
@@ -259,6 +299,7 @@ export function RegistrationModal({
               <input
                 value={form.guardianRelation ?? ""}
                 onChange={(e) => field("guardianRelation", e.target.value)}
+                placeholder="e.g. Uncle"
               />
             </div>
             <div className="field">
@@ -315,6 +356,35 @@ export function RegistrationModal({
               <input
                 value={form.pincode ?? ""}
                 onChange={(e) => field("pincode", e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="modal__section-title">
+            Registration Fee &amp; Notes
+          </div>
+          <div className="modal__grid">
+            <div className="field">
+              <label>Registration Fee</label>
+              <input
+                type="number"
+                value={form.registrationFee ?? 0}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    registrationFee:
+                      e.target.value === "" ? null : Number(e.target.value),
+                  }))
+                }
+              />
+            </div>
+            <div className="field" style={{ gridColumn: "span 2" }}>
+              <label>Notes</label>
+              <textarea
+                rows={3}
+                value={form.notes ?? ""}
+                onChange={(e) => field("notes", e.target.value)}
+                placeholder="Optional notes about this application"
               />
             </div>
           </div>

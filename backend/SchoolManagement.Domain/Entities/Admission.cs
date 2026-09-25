@@ -8,6 +8,8 @@ public class Admission
     public string FirstName { get; set; } = string.Empty;
     public string? MiddleName { get; set; }
     public string LastName { get; set; } = string.Empty;
+    public int? StudentId { get; set; }
+    public Student? Student { get; set; }
     public string Gender { get; set; } = string.Empty;
     public DateOnly DateOfBirth { get; set; }
 
@@ -64,4 +66,8 @@ public class Admission
     public bool IsDeleted { get; set; }
     public DateTime? DeletedAt { get; set; }
     public int? DeletedBy { get; set; }
+
+    public string? Grade { get; set; }
+    public decimal? RegistrationFee { get; set; }
+    public string? Notes { get; set; }
 }

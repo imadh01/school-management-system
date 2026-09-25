@@ -5,7 +5,7 @@ public record AdmissionResponse(
     string FirstName, string? MiddleName, string LastName,
     string Gender, DateOnly DateOfBirth,
     string AcademicYearName,
-    int AppliedForClassSectionId, string AppliedForClassSectionName,
+    int AppliedForClassSectionId, string AppliedForClassSectionName, string? Grade,
     string AdmissionType, string? PreviousSchool,
     string Phone, string? Email, DateOnly RegistrationDate,
     string Status, string? RejectionReason,
@@ -13,9 +13,11 @@ public record AdmissionResponse(
     string? MotherName, string? MotherMobile,
     string? GuardianName, string? GuardianRelation, string? GuardianMobile,
     string? AddressLine, string? City, string? State, string? Pincode,
+    decimal? RegistrationFee, string? Notes,
     decimal? AdmissionFee, string? AdmissionFeeReference,
     string? BloodGroup, string? Religion, string? Category,
     string? MedicalNotes, string? Remarks,
     string? RollNumber, string? AdmissionNumber, DateOnly? AdmissionDate,
     string? EntryPoint, bool TransportRequired,
-    int? AllottedClassSectionId, string? AllottedClassSectionName);
+    int? AllottedClassSectionId, string? AllottedClassSectionName,
+    int? StudentId);

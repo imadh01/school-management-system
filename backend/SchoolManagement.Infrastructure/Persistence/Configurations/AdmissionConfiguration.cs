@@ -75,8 +75,17 @@ public class AdmissionConfiguration : IEntityTypeConfiguration<Admission>
 
         builder.HasQueryFilter(a => !a.IsDeleted);
 
+        builder.Property(a => a.Grade).HasMaxLength(10);
+        builder.Property(a => a.RegistrationFee).HasColumnType("decimal(10,2)");
+        builder.Property(a => a.Notes).HasMaxLength(500);
+
         // Composite index: the pipeline UI filters by status constantly, and
         // per-year filtering is the other dominant query pattern.
         builder.HasIndex(a => new { a.AcademicYearId, a.Status });
+
+        builder.HasOne(a => a.Student)
+            .WithOne(s => s.Admission)
+            .HasForeignKey<Admission>(a => a.StudentId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

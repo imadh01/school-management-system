@@ -7,6 +7,10 @@ import type {
   EnrollAdmissionRequest,
   RejectAdmissionRequest,
 } from "../types/admission.types";
+import type {
+  StudentResponse,
+  CreateStudentFromAdmissionRequest,
+} from "@/features/students/types/student.types";
 
 export const admissionService = {
   getAll: () =>
@@ -41,4 +45,11 @@ export const admissionService = {
     apiClient
       .post<AdmissionResponse>(`/admissions/${id}/reject`, request)
       .then((res) => res.data),
+
+  createStudent: (id: number, request: CreateStudentFromAdmissionRequest) =>
+    apiClient
+      .post<StudentResponse>(`/admissions/${id}/create-student`, request)
+      .then((res) => res.data),
+
+  delete: (id: number) => apiClient.delete(`/admissions/${id}`),
 };

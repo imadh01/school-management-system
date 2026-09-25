@@ -142,6 +142,62 @@
   align-self: end;
 }
 
+/* ---- Table toolbar (export buttons, page size, quick search) ---- */
+.table-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.table-toolbar__left {
+  display: flex;
+  gap: 8px;
+}
+.export-btn {
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  cursor: pointer;
+}
+.export-btn--csv {
+  background: var(--green);
+}
+.export-btn--pdf {
+  background: var(--red);
+}
+.export-btn--print {
+  background: var(--blue);
+}
+.table-toolbar__right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.pagesize {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.pagesize select {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 4px 8px;
+}
+.search-box {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 7px 14px;
+  font-size: 12.5px;
+  min-width: 200px;
+}
+
 /* ---- Table ---- */
 table {
   width: 100%;
@@ -317,4 +373,104 @@ tbody tr:hover td {
   .modal__grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* ===== Tag buttons (Dietary Requirements, House selector) — ported from students.html ===== */
+.tag-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.tag-btn {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.tag-btn.selected {
+  background: var(--blue);
+  border-color: var(--blue);
+  color: #fff;
+}
+.tag-btn.selected.house-Red {
+  background: var(--red);
+  border-color: var(--red);
+}
+.tag-btn.selected.house-Blue {
+  background: var(--blue);
+  border-color: var(--blue);
+}
+.tag-btn.selected.house-Green {
+  background: var(--green);
+  border-color: var(--green);
+}
+.tag-btn.selected.house-Yellow {
+  background: var(--amber);
+  border-color: var(--amber);
+}
+.tag-btn--restrictions.selected {
+  background: var(--green);
+  border-color: var(--green);
+  color: #fff;
+}
+
+/* ===== Misc field/layout helpers — ported from students.html ===== */
+.field-note {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+.radio-row {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  font-size: 13px;
+}
+.radio-row label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 400;
+}
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  margin-top: 12px;
+}
+.student-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--blue-bg);
+  color: var(--blue);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 12px;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+.skeleton-line {
+  height: 14px;
+  background: var(--gray-bg);
+  border-radius: 4px;
+  margin-bottom: 8px;
+}
+.info-banner {
+  background: var(--blue-bg);
+  color: var(--navy-700);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  font-size: 12.5px;
+  margin-bottom: 16px;
+}
+.modal-subject-table th,
+.modal-subject-table td {
+  padding: 8px 10px;
 }

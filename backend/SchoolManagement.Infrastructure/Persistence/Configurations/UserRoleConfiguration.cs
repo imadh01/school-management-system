@@ -26,7 +26,11 @@ public class UserRoleConfiguration : IEntityTypeConfiguration<UserRole>
             .HasForeignKey(ur => ur.RoleId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        // Reverse lookup: "who holds this role"
         builder.HasIndex(ur => ur.RoleId);
+
+        // Matches the soft-delete filter on User — a soft-deleted user's
+        // role assignments should disappear from normal queries too,
+        // consistent with the user themselves disappearing.
+        builder.HasQueryFilter(ur => !ur.User.IsDeleted);
     }
 }

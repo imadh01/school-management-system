@@ -9,6 +9,8 @@ using SchoolManagement.API.Middleware;
 using SchoolManagement.Application.DTOs.Admissions;
 using SchoolManagement.Application.DTOs.Auth;
 using SchoolManagement.Application.DTOs.ClassSections;
+using SchoolManagement.Application.DTOs.Parents;
+using SchoolManagement.Application.DTOs.Students;
 using SchoolManagement.Application.DTOs.Users;
 using SchoolManagement.Application.Interfaces;
 using SchoolManagement.Application.Services;
@@ -60,6 +62,20 @@ builder.Services.AddScoped<IValidator<UpdateAdmissionRequest>, UpdateAdmissionRe
 builder.Services.AddScoped<IValidator<ConfirmAdmissionRequest>, ConfirmAdmissionRequestValidator>();
 builder.Services.AddScoped<IValidator<EnrollAdmissionRequest>, EnrollAdmissionRequestValidator>();
 builder.Services.AddScoped<IValidator<RejectAdmissionRequest>, RejectAdmissionRequestValidator>();
+
+builder.Services.AddScoped<IStudentRepository, StudentRepository>();
+builder.Services.AddScoped<IStudentService, StudentService>();
+builder.Services.AddScoped<IValidator<CreateStudentRequest>, CreateStudentRequestValidator>();
+builder.Services.AddScoped<IValidator<CreateStudentFromAdmissionRequest>, CreateStudentFromAdmissionRequestValidator>();
+builder.Services.AddScoped<IValidator<UpdateStudentRequest>, UpdateStudentRequestValidator>();
+
+builder.Services.AddScoped<IParentRepository, ParentRepository>();
+builder.Services.AddScoped<IStudentGuardianRepository, StudentGuardianRepository>();
+builder.Services.AddScoped<IParentService, ParentService>();
+builder.Services.AddScoped<IStudentGuardianService, StudentGuardianService>();
+builder.Services.AddScoped<IValidator<CreateParentRequest>, CreateParentRequestValidator>();
+builder.Services.AddScoped<IValidator<UpdateParentRequest>, UpdateParentRequestValidator>();
+builder.Services.AddScoped<IValidator<LinkGuardianRequest>, LinkGuardianRequestValidator>();
 
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("Jwt"));
 var jwtSettings = builder.Configuration.GetSection("Jwt").Get<JwtSettings>()!;
@@ -125,6 +141,12 @@ builder.Services.AddAuthorization(options =>
 
     options.AddPolicy("Admissions.Manage", policy =>
     policy.RequireClaim("permission", "Admissions.Manage"));
+
+    options.AddPolicy("Students.Manage", policy =>
+    policy.RequireClaim("permission", "Students.Manage"));
+
+    options.AddPolicy("Parents.Manage", policy =>
+    policy.RequireClaim("permission", "Parents.Manage"));
 
 });
 

@@ -23,6 +23,10 @@ public class ApplicationDbContext : DbContext
     public DbSet<AcademicYear> AcademicYears => Set<AcademicYear>();
     public DbSet<ClassSection> ClassSections => Set<ClassSection>();
     public DbSet<Admission> Admissions => Set<Admission>();
+    public DbSet<Student> Students => Set<Student>();
+    public DbSet<Parent> Parents => Set<Parent>();
+    public DbSet<StudentGuardian> StudentGuardians => Set<StudentGuardian>();
+
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
@@ -95,6 +99,33 @@ public class ApplicationDbContext : DbContext
         {
             RoleId = 1, // Admin
             PermissionId = 3,
+        });
+
+        modelBuilder.Entity<Permission>().HasData(new Permission
+        {
+            Id = 4,
+            Name = "Students.Manage",
+            Module = "Students",
+            Description = "Create and edit student records, including converting enrolled admissions.",
+        });
+
+        modelBuilder.Entity<RolePermission>().HasData(new RolePermission
+        {
+            RoleId = 1, // Admin
+            PermissionId = 4,
+        });
+        modelBuilder.Entity<Permission>().HasData(new Permission
+        {
+            Id = 5,
+            Name = "Parents.Manage",
+            Module = "Parents",
+            Description = "Create and edit parent records, and link/unlink guardians to students.",
+        });
+
+        modelBuilder.Entity<RolePermission>().HasData(new RolePermission
+        {
+            RoleId = 1,
+            PermissionId = 5,
         });
     }
 }

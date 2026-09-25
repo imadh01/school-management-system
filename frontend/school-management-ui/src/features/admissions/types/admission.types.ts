@@ -15,6 +15,7 @@ export interface AdmissionResponse {
   academicYearName: string;
   appliedForClassSectionId: number;
   appliedForClassSectionName: string;
+  grade: string | null;
   admissionType: string;
   previousSchool: string | null;
   phone: string;
@@ -33,6 +34,8 @@ export interface AdmissionResponse {
   city: string | null;
   state: string | null;
   pincode: string | null;
+  registrationFee: number | null;
+  notes: string | null;
   admissionFee: number | null;
   admissionFeeReference: string | null;
   bloodGroup: string | null;
@@ -47,6 +50,7 @@ export interface AdmissionResponse {
   transportRequired: boolean;
   allottedClassSectionId: number | null;
   allottedClassSectionName: string | null;
+  studentId: number | null;
 }
 
 export interface CreateAdmissionRequest {
@@ -56,6 +60,7 @@ export interface CreateAdmissionRequest {
   gender: string;
   dateOfBirth: string;
   appliedForClassSectionId: number;
+  grade: string | null;
   admissionType: string;
   previousSchool: string | null;
   phone: string;
@@ -71,9 +76,10 @@ export interface CreateAdmissionRequest {
   city: string | null;
   state: string | null;
   pincode: string | null;
+  registrationFee: number | null;
+  notes: string | null;
 }
 
-// Same shape as Create — matches the backend's UpdateAdmissionRequest DTO
 export type UpdateAdmissionRequest = CreateAdmissionRequest;
 
 export interface ConfirmAdmissionRequest {

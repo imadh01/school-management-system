@@ -60,7 +60,10 @@ public class AdmissionService : IAdmissionService
             City = request.City,
             State = request.State,
             Pincode = request.Pincode,
-            RegNo = "PENDING", // placeholder until Id is assigned — see below
+            RegNo = "PENDING", // placeholder until Id is assigned — see below4
+            Grade = request.Grade,
+            RegistrationFee = request.RegistrationFee,
+            Notes = request.Notes,
         };
 
         await _admissionRepository.AddAsync(admission, cancellationToken); // Id now assigned by identity column
@@ -105,6 +108,9 @@ public class AdmissionService : IAdmissionService
         admission.City = request.City;
         admission.State = request.State;
         admission.Pincode = request.Pincode;
+        admission.Grade = request.Grade;
+        admission.RegistrationFee = request.RegistrationFee;
+        admission.Notes = request.Notes;
 
         await _admissionRepository.SaveChangesAsync(cancellationToken);
         return ToResponse(admission);
@@ -184,11 +190,27 @@ public class AdmissionService : IAdmissionService
             throw new ConflictException(
                 $"Cannot {action} application '{admission.RegNo}' — current status is '{admission.Status}', expected '{requiredStatus}'.");
     }
+    public async Task DeleteAsync(int id, CancellationToken cancellationToken)
+    {
+        var admission = await GetOrThrowAsync(id, cancellationToken);
+        admission.IsDeleted = true;
+        admission.DeletedAt = DateTime.UtcNow;
+        await _admissionRepository.SaveChangesAsync(cancellationToken);
+    }
 
     private static AdmissionResponse ToResponse(Admission a) => new(
-        a.Id, a.RegNo, a.FirstName, a.MiddleName, a.LastName, a.Gender, a.DateOfBirth,
-        a.AcademicYear.Name, a.AppliedForClassSection.DisplayName,
-        a.AdmissionType, a.PreviousSchool, a.Phone, a.Email, a.RegistrationDate,
-        a.Status, a.RejectionReason, a.AdmissionFee, a.RollNumber, a.AdmissionNumber,
-        a.AllottedClassSection?.DisplayName);
+       a.Id, a.RegNo, a.FirstName, a.MiddleName, a.LastName, a.Gender, a.DateOfBirth,
+       a.AcademicYear.Name,
+       a.AppliedForClassSectionId, a.AppliedForClassSection.DisplayName, a.Grade,
+       a.AdmissionType, a.PreviousSchool, a.Phone, a.Email, a.RegistrationDate,
+       a.Status, a.RejectionReason,
+       a.FatherName, a.FatherMobile, a.MotherName, a.MotherMobile,
+       a.GuardianName, a.GuardianRelation, a.GuardianMobile,
+       a.AddressLine, a.City, a.State, a.Pincode,
+       a.RegistrationFee, a.Notes,
+       a.AdmissionFee, a.AdmissionFeeReference, a.BloodGroup, a.Religion, a.Category,
+       a.MedicalNotes, a.Remarks,
+       a.RollNumber, a.AdmissionNumber, a.AdmissionDate, a.EntryPoint, a.TransportRequired,
+       a.AllottedClassSectionId, a.AllottedClassSection?.DisplayName,
+       a.StudentId);
 }
