@@ -4,6 +4,7 @@ import type {
   EnrollAdmissionRequest,
 } from "../types/admission.types";
 import type { ClassSectionResponse } from "@/features/class-sections/types/classSection.types";
+import { ValidationModal } from "@/components/ValidationModal";
 
 interface Props {
   admission: AdmissionResponse | null;
@@ -25,11 +26,20 @@ export function EnrollModal({
     entryPoint: "",
     transportRequired: false,
     allottedClassSectionId: 0,
+    nationality: null,
+    curriculumTrack: null,
+    englishProficiency: null,
+    ealCode: null,
+    house: null,
+    allergies: null,
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   if (!admission) return null;
+
+  const field = (key: keyof EnrollAdmissionRequest, value: string) =>
+    setForm((f) => ({ ...f, [key]: value === "" ? null : value }));
 
   const handleSubmit = async () => {
     setError(null);
@@ -154,19 +164,60 @@ export function EnrollModal({
             </label>
           </div>
 
+          <div className="modal__section-title">Additional Student Profile</div>
+          <div className="modal__note" style={{ marginTop: 0 }}>
+            Enrolling creates the student record right away — these fields
+            aren't captured during admission, so add them now if known.
+          </div>
+          <div className="modal__grid">
+            <div className="field">
+              <label>Nationality</label>
+              <input
+                value={form.nationality ?? ""}
+                onChange={(e) => field("nationality", e.target.value)}
+              />
+            </div>
+            <div className="field">
+              <label>Curriculum Track</label>
+              <input
+                value={form.curriculumTrack ?? ""}
+                onChange={(e) => field("curriculumTrack", e.target.value)}
+              />
+            </div>
+            <div className="field">
+              <label>English Proficiency</label>
+              <input
+                value={form.englishProficiency ?? ""}
+                onChange={(e) => field("englishProficiency", e.target.value)}
+              />
+            </div>
+            <div className="field">
+              <label>EAL Code</label>
+              <input
+                value={form.ealCode ?? ""}
+                onChange={(e) => field("ealCode", e.target.value)}
+              />
+            </div>
+            <div className="field">
+              <label>House</label>
+              <input
+                value={form.house ?? ""}
+                onChange={(e) => field("house", e.target.value)}
+              />
+            </div>
+            <div className="field">
+              <label>Allergies</label>
+              <input
+                value={form.allergies ?? ""}
+                onChange={(e) => field("allergies", e.target.value)}
+              />
+            </div>
+          </div>
+
           <div className="modal__note">
             This enrolls the student record but does not create a portal login —
             that stays a separate, manual step.
           </div>
-
-          {error && (
-            <div
-              className="modal__note"
-              style={{ background: "var(--red-bg)", color: "var(--red)" }}
-            >
-              {error}
-            </div>
-          )}
         </div>
         <div className="modal__footer">
           <button
@@ -181,6 +232,10 @@ export function EnrollModal({
           </button>
         </div>
       </div>
+      <ValidationModal
+        errors={error ? [error] : null}
+        onClose={() => setError(null)}
+      />
     </div>
   );
 }

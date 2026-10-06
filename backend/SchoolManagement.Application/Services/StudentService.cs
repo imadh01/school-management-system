@@ -43,6 +43,11 @@ public class StudentService : IStudentService
 
         var classSection = await GetClassSectionOrThrowAsync(request.ClassSectionId, cancellationToken);
 
+        // Business rules: the section must be active and not full.
+        ClassSectionRules.EnsureActive(classSection);
+        ClassSectionRules.EnsureHasRoom(classSection,
+            await _classSectionRepository.CountActiveStudentsAsync(classSection.Id, cancellationToken));
+
         var student = new Student
         {
             AdmNo = request.AdmNo,
@@ -164,6 +169,15 @@ public class StudentService : IStudentService
         var student = await GetOrThrowAsync(id, cancellationToken);
         var classSection = await GetClassSectionOrThrowAsync(request.ClassSectionId, cancellationToken);
 
+        // Only a *move to a different class* is checked, so editing a student
+        // whose current class is inactive or at capacity still works.
+        if (student.ClassSectionId != classSection.Id)
+        {
+            ClassSectionRules.EnsureActive(classSection);
+            ClassSectionRules.EnsureHasRoom(classSection,
+                await _classSectionRepository.CountActiveStudentsAsync(classSection.Id, cancellationToken));
+        }
+
         if (student.ClassSectionId != classSection.Id || student.RollNumber != request.RollNumber)
         {
             if (await _studentRepository.ExistsByRollNumberInClassAsync(classSection.Id, request.RollNumber, cancellationToken))
@@ -236,5 +250,4 @@ public class StudentService : IStudentService
     s.DietaryRequirements, s.Allergies, s.InsuranceProvider, s.InsurancePolicyExpiry,
     s.House, s.EalCode, s.FeeConcessionPercent, s.SpecialEducationalNeeds,
     s.Admission?.RegNo, s.AdmissionId);
-
 }

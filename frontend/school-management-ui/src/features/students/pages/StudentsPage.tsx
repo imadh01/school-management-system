@@ -10,6 +10,8 @@ import type { ClassSectionResponse } from "@/features/class-sections/types/class
 import { StudentModal } from "../components/StudentModal";
 import { NotYetAvailableModal } from "../components/NotYetAvailableModal";
 import { LinkedParentsViewModal } from "../components/LinkedParentsViewModal";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { ViewDetailsModal } from "@/components/ViewDetailsModal";
 
 const PIPELINE_STEPS: {
   key: StudentStatus | "All";
@@ -114,6 +116,12 @@ export function StudentsPage() {
     useState<StudentResponse | null>(null);
   const [linkedParentsTarget, setLinkedParentsTarget] =
     useState<StudentResponse | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<StudentResponse | null>(
+    null,
+  );
+  const [detailsTarget, setDetailsTarget] = useState<StudentResponse | null>(
+    null,
+  );
 
   const loadData = async () => {
     setIsLoading(true);
@@ -228,32 +236,23 @@ export function StudentsPage() {
     setStatusFilter("All");
   };
 
-  const openCreate = () => {
-    setEditingStudent(null);
-    setIsModalOpen(true);
-  };
+  // const openCreate = () => {
+  //   setEditingStudent(null);
+  //   setIsModalOpen(true);
+  // };
   const openEdit = (s: StudentResponse) => {
     setEditingStudent(s);
     setIsModalOpen(true);
   };
 
-  const handleView = (s: StudentResponse) => {
-    window.alert(
-      `${s.firstName} ${s.lastName} (${s.admNo})\n${s.classSectionName} · Roll ${s.rollNumber}\n` +
-        `Status: ${s.status} · House: ${s.house ?? "—"}\n` +
-        `Nationality: ${s.nationality ?? "—"} · DOB: ${s.dateOfBirth}\n` +
-        (s.allergies ? `Allergies: ${s.allergies}` : "No allergies recorded"),
-    );
+  const handleDelete = (s: StudentResponse) => {
+    setDeleteTarget(s);
   };
 
-  const handleDelete = async (s: StudentResponse) => {
-    if (
-      !window.confirm(
-        `Delete ${s.firstName} ${s.lastName} (${s.admNo})? This cannot be undone.`,
-      )
-    )
-      return;
-    await studentService.delete(s.id);
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    await studentService.delete(deleteTarget.id);
+    setDeleteTarget(null);
     await loadData();
   };
 
@@ -271,315 +270,308 @@ export function StudentsPage() {
 
   return (
     <div>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 16,
-        }}
-      >
+      <div className="page-head">
         <div />
-        <button className="btn btn--primary" onClick={openCreate}>
-          + Add Student
-        </button>
       </div>
 
-      <div className="pipeline">
-        {PIPELINE_STEPS.map((step) => (
-          <button
-            key={step.key}
-            className={`pipeline__step ${statusFilter === step.key ? step.activeClass : ""}`}
-            onClick={() => setStatusFilter(step.key)}
-          >
-            {step.label} ({counts[step.key] ?? 0})
-          </button>
-        ))}
-      </div>
-
-      <div className="filters">
-        <div className="field">
-          <label>Search</label>
-          <input
-            placeholder="Search students..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
-        <div className="field">
-          <label>Class</label>
-          <select
-            value={classFilter}
-            onChange={(e) => setClassFilter(e.target.value)}
-          >
-            <option value="">All Classes</option>
-            {classNames.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="field">
-          <label>Gender</label>
-          <select
-            value={genderFilter}
-            onChange={(e) => setGenderFilter(e.target.value)}
-          >
-            <option value="">All Genders</option>
-            <option>Male</option>
-            <option>Female</option>
-          </select>
-        </div>
-        <div className="field">
-          <label>Curriculum</label>
-          <select
-            value={curriculumFilter}
-            onChange={(e) => setCurriculumFilter(e.target.value)}
-          >
-            <option value="">All Curricula</option>
-            {curricula.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="field">
-          <label>English Level</label>
-          <select
-            value={ealFilter}
-            onChange={(e) => setEalFilter(e.target.value)}
-          >
-            <option value="">All Levels</option>
-            {ealLevels.map((l) => (
-              <option key={l} value={l}>
-                {l}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="field">
-          <label>House</label>
-          <select
-            value={houseFilter}
-            onChange={(e) => setHouseFilter(e.target.value)}
-          >
-            <option value="">All Houses</option>
-            {houses.map((h) => (
-              <option key={h} value={h}>
-                {h}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="field" style={{ justifyContent: "flex-end" }}>
-          <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <input
-              type="checkbox"
-              checked={hasAllergies}
-              onChange={(e) => setHasAllergies(e.target.checked)}
-            />{" "}
-            Has Allergies
-          </label>
-        </div>
-        <button
-          className="btn btn--secondary filters__clear"
-          onClick={clearFilters}
-        >
-          Clear
-        </button>
-      </div>
-
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 12,
-          flexWrap: "wrap",
-          gap: 8,
-        }}
-      >
-        <div style={{ display: "flex", gap: 8 }}>
-          <button
-            className="export-btn"
-            style={{ background: "var(--green)" }}
-            onClick={handleExportCsv}
-          >
-            CSV
-          </button>
-          <button
-            className="export-btn"
-            style={{ background: "var(--red)" }}
-            onClick={() => window.alert("PDF export not implemented yet.")}
-          >
-            PDF
-          </button>
-          <button
-            className="export-btn"
-            style={{ background: "var(--navy-700)" }}
-            onClick={() => window.print()}
-          >
-            PRINT
-          </button>
-        </div>
-        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          <span style={{ fontSize: 12.5, color: "var(--muted)" }}>
-            Show{" "}
-            <select
-              value={pageSize}
-              onChange={(e) => setPageSize(Number(e.target.value))}
+      <div className="card">
+        <div className="pipeline">
+          {PIPELINE_STEPS.map((step) => (
+            <button
+              key={step.key}
+              className={`pipeline__step ${statusFilter === step.key ? step.activeClass : ""}`}
+              onClick={() => setStatusFilter(step.key)}
             >
-              <option value={10}>10</option>
-              <option value={25}>25</option>
-            </select>{" "}
+              {step.label} ({counts[step.key] ?? 0})
+            </button>
+          ))}
+        </div>
+
+        <div className="filters">
+          <div className="field">
+            <label>Search</label>
+            <input
+              placeholder="Search students..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          <div className="field">
+            <label>Class</label>
+            <select
+              value={classFilter}
+              onChange={(e) => setClassFilter(e.target.value)}
+            >
+              <option value="">All Classes</option>
+              {classNames.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="field">
+            <label>Gender</label>
+            <select
+              value={genderFilter}
+              onChange={(e) => setGenderFilter(e.target.value)}
+            >
+              <option value="">All Genders</option>
+              <option>Male</option>
+              <option>Female</option>
+            </select>
+          </div>
+          <div className="field">
+            <label>Curriculum</label>
+            <select
+              value={curriculumFilter}
+              onChange={(e) => setCurriculumFilter(e.target.value)}
+            >
+              <option value="">All Curricula</option>
+              {curricula.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="field">
+            <label>English Level</label>
+            <select
+              value={ealFilter}
+              onChange={(e) => setEalFilter(e.target.value)}
+            >
+              <option value="">All Levels</option>
+              {ealLevels.map((l) => (
+                <option key={l} value={l}>
+                  {l}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="field">
+            <label>House</label>
+            <select
+              value={houseFilter}
+              onChange={(e) => setHouseFilter(e.target.value)}
+            >
+              <option value="">All Houses</option>
+              {houses.map((h) => (
+                <option key={h} value={h}>
+                  {h}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="field" style={{ justifyContent: "flex-end" }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <input
+                type="checkbox"
+                checked={hasAllergies}
+                onChange={(e) => setHasAllergies(e.target.checked)}
+              />{" "}
+              Has Allergies
+            </label>
+          </div>
+          <button
+            className="btn btn--secondary filters__clear"
+            onClick={clearFilters}
+          >
+            Clear
+          </button>
+        </div>
+
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: 12,
+            flexWrap: "wrap",
+            gap: 8,
+          }}
+        >
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              className="export-btn"
+              style={{ background: "var(--green)" }}
+              onClick={handleExportCsv}
+            >
+              CSV
+            </button>
+            <button
+              className="export-btn"
+              style={{ background: "var(--red)" }}
+              onClick={() => window.alert("PDF export not implemented yet.")}
+            >
+              PDF
+            </button>
+            <button
+              className="export-btn"
+              style={{ background: "var(--navy-700)" }}
+              onClick={() => window.print()}
+            >
+              PRINT
+            </button>
+          </div>
+          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            <span style={{ fontSize: 12.5, color: "var(--muted)" }}>
+              Show{" "}
+              <select
+                value={pageSize}
+                onChange={(e) => setPageSize(Number(e.target.value))}
+              >
+                <option value={10}>10</option>
+                <option value={25}>25</option>
+              </select>{" "}
+              entries
+            </span>
+            <input
+              className="search-box"
+              type="search"
+              placeholder="Search..."
+              value={quickSearch}
+              onChange={(e) => setQuickSearch(e.target.value)}
+            />
+          </div>
+        </div>
+
+        {isLoading ? (
+          <div className="empty-state">Loading…</div>
+        ) : pageRows.length === 0 ? (
+          <div className="empty-state">No students found.</div>
+        ) : (
+          <div style={{ overflowX: "auto" }}>
+            <table>
+              <thead>
+                <tr>
+                  <th>Adm #</th>
+                  <th>Student</th>
+                  <th>Nationality</th>
+                  <th>Curriculum</th>
+                  <th>EAL</th>
+                  <th>Class</th>
+                  <th>Status</th>
+                  <th>House</th>
+                  <th>Allergies</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pageRows.map((s) => (
+                  <tr key={s.id}>
+                    <td>
+                      {s.admNo}
+                      {s.admissionRegNo && (
+                        <span title={`From admission ${s.admissionRegNo}`}>
+                          {" "}
+                          🔗
+                        </span>
+                      )}
+                    </td>
+                    <td>
+                      {s.firstName} {s.lastName}
+                    </td>
+                    <td>{s.nationality ?? "—"}</td>
+                    <td>{s.curriculumTrack ?? "—"}</td>
+                    <td>{s.ealCode ?? "—"}</td>
+                    <td>{s.classSectionName}</td>
+                    <td>
+                      <span
+                        className={`badge ${STATUS_BADGE_CLASS[s.status] ?? "badge--gray"}`}
+                      >
+                        {s.status}
+                      </span>
+                    </td>
+                    <td>{s.house ?? "—"}</td>
+                    <td>{s.allergies || "—"}</td>
+                    <td style={{ whiteSpace: "nowrap" }}>
+                      <button
+                        className="btn--icon"
+                        title="View Details"
+                        onClick={() => setDetailsTarget(s)}
+                      >
+                        👁
+                      </button>
+                      <button
+                        className="btn--icon"
+                        title="Fee Summary"
+                        style={{ color: "var(--green)" }}
+                        onClick={() => setFeeSummaryTarget(s)}
+                      >
+                        💳
+                      </button>
+                      <button
+                        className="btn--icon"
+                        title="Attendance Report"
+                        style={{ color: "var(--amber)" }}
+                        onClick={() => setAttendanceTarget(s)}
+                      >
+                        📅
+                      </button>
+                      <button
+                        className="btn--icon"
+                        title="Report Card"
+                        style={{ color: "var(--blue)" }}
+                        onClick={() => setReportCardTarget(s)}
+                      >
+                        🎓
+                      </button>
+                      <button
+                        className="btn--icon"
+                        title="Linked Parents"
+                        style={{ color: "var(--purple)" }}
+                        onClick={() => setLinkedParentsTarget(s)}
+                      >
+                        👪
+                      </button>
+                      <button
+                        className="btn--icon"
+                        title="Edit"
+                        onClick={() => openEdit(s)}
+                      >
+                        ✎
+                      </button>
+                      <button
+                        className="btn--icon danger"
+                        title="Delete"
+                        onClick={() => handleDelete(s)}
+                      >
+                        🗑
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <div className="table-footer">
+          <span>
+            Showing {pageRows.length ? (page - 1) * pageSize + 1 : 0} to{" "}
+            {(page - 1) * pageSize + pageRows.length} of {filtered.length}{" "}
             entries
           </span>
-          <input
-            className="search-box"
-            type="search"
-            placeholder="Search..."
-            value={quickSearch}
-            onChange={(e) => setQuickSearch(e.target.value)}
-          />
-        </div>
-      </div>
-
-      {isLoading ? (
-        <div className="empty-state">Loading…</div>
-      ) : pageRows.length === 0 ? (
-        <div className="empty-state">No students found.</div>
-      ) : (
-        <div style={{ overflowX: "auto" }}>
-          <table>
-            <thead>
-              <tr>
-                <th>Adm #</th>
-                <th>Student</th>
-                <th>Nationality</th>
-                <th>Curriculum</th>
-                <th>EAL</th>
-                <th>Class</th>
-                <th>Status</th>
-                <th>House</th>
-                <th>Allergies</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pageRows.map((s) => (
-                <tr key={s.id}>
-                  <td>
-                    {s.admNo}
-                    {s.admissionRegNo && (
-                      <span title={`From admission ${s.admissionRegNo}`}>
-                        {" "}
-                        🔗
-                      </span>
-                    )}
-                  </td>
-                  <td>
-                    {s.firstName} {s.lastName}
-                  </td>
-                  <td>{s.nationality ?? "—"}</td>
-                  <td>{s.curriculumTrack ?? "—"}</td>
-                  <td>{s.ealCode ?? "—"}</td>
-                  <td>{s.classSectionName}</td>
-                  <td>
-                    <span
-                      className={`badge ${STATUS_BADGE_CLASS[s.status] ?? "badge--gray"}`}
-                    >
-                      {s.status}
-                    </span>
-                  </td>
-                  <td>{s.house ?? "—"}</td>
-                  <td>{s.allergies || "—"}</td>
-                  <td style={{ whiteSpace: "nowrap" }}>
-                    <button
-                      className="btn--icon"
-                      title="View"
-                      onClick={() => handleView(s)}
-                    >
-                      👁
-                    </button>
-                    <button
-                      className="btn--icon"
-                      title="Fee Summary"
-                      style={{ color: "var(--green)" }}
-                      onClick={() => setFeeSummaryTarget(s)}
-                    >
-                      💳
-                    </button>
-                    <button
-                      className="btn--icon"
-                      title="Attendance Report"
-                      style={{ color: "var(--amber)" }}
-                      onClick={() => setAttendanceTarget(s)}
-                    >
-                      📅
-                    </button>
-                    <button
-                      className="btn--icon"
-                      title="Report Card"
-                      style={{ color: "var(--blue)" }}
-                      onClick={() => setReportCardTarget(s)}
-                    >
-                      🎓
-                    </button>
-                    <button
-                      className="btn--icon"
-                      title="Linked Parents"
-                      style={{ color: "var(--purple)" }}
-                      onClick={() => setLinkedParentsTarget(s)}
-                    >
-                      👪
-                    </button>
-                    <button
-                      className="btn--icon"
-                      title="Edit"
-                      onClick={() => openEdit(s)}
-                    >
-                      ✎
-                    </button>
-                    <button
-                      className="btn--icon danger"
-                      title="Delete"
-                      onClick={() => handleDelete(s)}
-                    >
-                      🗑
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      <div className="table-footer">
-        <span>
-          Showing {pageRows.length ? (page - 1) * pageSize + 1 : 0} to{" "}
-          {(page - 1) * pageSize + pageRows.length} of {filtered.length} entries
-        </span>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <button
-            className="btn btn--secondary btn--sm"
-            disabled={page <= 1}
-            onClick={() => setPage((p) => p - 1)}
-          >
-            Previous
-          </button>
-          <span>
-            {page} / {totalPages}
-          </span>
-          <button
-            className="btn btn--secondary btn--sm"
-            disabled={page >= totalPages}
-            onClick={() => setPage((p) => p + 1)}
-          >
-            Next
-          </button>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <button
+              className="btn btn--secondary btn--sm"
+              disabled={page <= 1}
+              onClick={() => setPage((p) => p - 1)}
+            >
+              Previous
+            </button>
+            <span>
+              {page} / {totalPages}
+            </span>
+            <button
+              className="btn btn--secondary btn--sm"
+              disabled={page >= totalPages}
+              onClick={() => setPage((p) => p + 1)}
+            >
+              Next
+            </button>
+          </div>
         </div>
       </div>
 
@@ -630,6 +622,79 @@ export function StudentsPage() {
       <LinkedParentsViewModal
         student={linkedParentsTarget}
         onClose={() => setLinkedParentsTarget(null)}
+      />
+
+      <ConfirmDialog
+        isOpen={deleteTarget !== null}
+        title="Delete Student"
+        message={
+          deleteTarget
+            ? `Delete ${deleteTarget.firstName} ${deleteTarget.lastName} (${deleteTarget.admNo})? This cannot be undone.`
+            : ""
+        }
+        confirmLabel="Delete"
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
+
+      <ViewDetailsModal
+        isOpen={detailsTarget !== null}
+        title={
+          detailsTarget
+            ? `${detailsTarget.firstName} ${detailsTarget.lastName}`
+            : ""
+        }
+        subtitle={detailsTarget?.admNo}
+        onClose={() => setDetailsTarget(null)}
+        sections={
+          detailsTarget
+            ? [
+                {
+                  heading: "Basics",
+                  rows: [
+                    { label: "Gender", value: detailsTarget.gender },
+                    {
+                      label: "Date of Birth",
+                      value: detailsTarget.dateOfBirth,
+                    },
+                    {
+                      label: "Nationality",
+                      value: detailsTarget.nationality,
+                    },
+                    { label: "Blood Group", value: detailsTarget.bloodGroup },
+                  ],
+                },
+                {
+                  heading: "Academic",
+                  rows: [
+                    { label: "Class", value: detailsTarget.classSectionName },
+                    { label: "Roll Number", value: detailsTarget.rollNumber },
+                    {
+                      label: "Curriculum",
+                      value: detailsTarget.curriculumTrack,
+                    },
+                    { label: "EAL", value: detailsTarget.ealCode },
+                    { label: "House", value: detailsTarget.house },
+                    { label: "Status", value: detailsTarget.status },
+                  ],
+                },
+                {
+                  heading: "Health",
+                  rows: [
+                    { label: "Allergies", value: detailsTarget.allergies },
+                    {
+                      label: "Dietary Requirements",
+                      value: detailsTarget.dietaryRequirements,
+                    },
+                    {
+                      label: "Medical Notes",
+                      value: detailsTarget.medicalNotes,
+                    },
+                  ],
+                },
+              ]
+            : []
+        }
       />
     </div>
   );

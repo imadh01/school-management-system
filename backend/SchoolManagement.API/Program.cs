@@ -11,6 +11,7 @@ using SchoolManagement.Application.DTOs.Auth;
 using SchoolManagement.Application.DTOs.ClassSections;
 using SchoolManagement.Application.DTOs.Parents;
 using SchoolManagement.Application.DTOs.Students;
+using SchoolManagement.Application.DTOs.Subjects;
 using SchoolManagement.Application.DTOs.Users;
 using SchoolManagement.Application.Interfaces;
 using SchoolManagement.Application.Services;
@@ -46,6 +47,8 @@ builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
 builder.Services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<ISubjectRepository, SubjectRepository>();
+builder.Services.AddScoped<ISubjectService, SubjectService>();
 
 builder.Services.AddScoped<IValidator<LoginRequest>, LoginRequestValidator>();
 builder.Services.AddScoped<IValidator<CreateUserRequest>, CreateUserRequestValidator>();
@@ -77,6 +80,10 @@ builder.Services.AddScoped<IValidator<CreateParentRequest>, CreateParentRequestV
 builder.Services.AddScoped<IValidator<UpdateParentRequest>, UpdateParentRequestValidator>();
 builder.Services.AddScoped<IValidator<LinkGuardianRequest>, LinkGuardianRequestValidator>();
 builder.Services.AddScoped<IValidator<LinkStudentRequest>, LinkStudentRequestValidator>();
+
+builder.Services.AddScoped<IValidator<CreateSubjectRequest>, CreateSubjectRequestValidator>();
+builder.Services.AddScoped<IValidator<UpdateSubjectRequest>, UpdateSubjectRequestValidator>();
+builder.Services.AddScoped<IValidator<UpdateClassSectionRequest>, UpdateClassSectionRequestValidator>();
 
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("Jwt"));
 var jwtSettings = builder.Configuration.GetSection("Jwt").Get<JwtSettings>()!;
@@ -140,6 +147,9 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("ClassSections.Create", policy =>
     policy.RequireClaim("permission", "ClassSections.Create"));
 
+    options.AddPolicy("ClassSections.Manage", policy =>
+    policy.RequireClaim("permission", "ClassSections.Manage"));
+
     options.AddPolicy("Admissions.Manage", policy =>
     policy.RequireClaim("permission", "Admissions.Manage"));
 
@@ -148,6 +158,9 @@ builder.Services.AddAuthorization(options =>
 
     options.AddPolicy("Parents.Manage", policy =>
     policy.RequireClaim("permission", "Parents.Manage"));
+
+    options.AddPolicy("Subjects.Manage", policy =>
+    policy.RequireClaim("permission", "Subjects.Manage"));
 
 });
 

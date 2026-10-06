@@ -9,13 +9,16 @@ public class AdmissionService : IAdmissionService
 {
     private readonly IAdmissionRepository _admissionRepository;
     private readonly IClassSectionRepository _classSectionRepository;
+    private readonly IStudentRepository _studentRepository;
 
     public AdmissionService(
         IAdmissionRepository admissionRepository,
-        IClassSectionRepository classSectionRepository)
+        IClassSectionRepository classSectionRepository,
+        IStudentRepository studentRepository)
     {
         _admissionRepository = admissionRepository;
         _classSectionRepository = classSectionRepository;
+        _studentRepository = studentRepository;
     }
 
     public async Task<List<AdmissionResponse>> GetAllAsync(CancellationToken cancellationToken)
@@ -33,6 +36,7 @@ public class AdmissionService : IAdmissionService
     public async Task<AdmissionResponse> CreateAsync(CreateAdmissionRequest request, CancellationToken cancellationToken)
     {
         var classSection = await GetClassSectionOrThrowAsync(request.AppliedForClassSectionId, cancellationToken);
+        ClassSectionRules.EnsureActive(classSection);
 
         var admission = new Admission
         {
@@ -60,7 +64,7 @@ public class AdmissionService : IAdmissionService
             City = request.City,
             State = request.State,
             Pincode = request.Pincode,
-            RegNo = "PENDING", // placeholder until Id is assigned — see below4
+            RegNo = "PENDING", // placeholder until Id is assigned — see below
             Grade = request.Grade,
             RegistrationFee = request.RegistrationFee,
             Notes = request.Notes,
@@ -82,6 +86,11 @@ public class AdmissionService : IAdmissionService
     {
         var admission = await GetOrThrowAsync(id, cancellationToken);
         var classSection = await GetClassSectionOrThrowAsync(request.AppliedForClassSectionId, cancellationToken);
+
+        // Only a *changed* class is checked, so editing an old applicant whose
+        // class has since been deactivated still works.
+        if (admission.AppliedForClassSectionId != classSection.Id)
+            ClassSectionRules.EnsureActive(classSection);
 
         // Only registration-stage fields — Status and later-stage data
         // (fee, roll number, etc.) are never touched here, per the
@@ -136,24 +145,59 @@ public class AdmissionService : IAdmissionService
 
     public async Task<AdmissionResponse> EnrollAsync(int id, EnrollAdmissionRequest request, CancellationToken cancellationToken)
     {
-        var admission = await GetOrThrowAsync(id, cancellationToken);
-        RequireStatus(admission, "Admitted", "enroll");
+        return await _admissionRepository.ExecuteInTransactionAsync(async () =>
+        {
+            var admission = await GetOrThrowAsync(id, cancellationToken);
+            RequireStatus(admission, "Admitted", "enroll");
 
-        var allottedClassSection = await GetClassSectionOrThrowAsync(request.AllottedClassSectionId, cancellationToken);
+            var allottedClassSection = await GetClassSectionOrThrowAsync(request.AllottedClassSectionId, cancellationToken);
 
-        admission.RollNumber = request.RollNumber;
-        admission.AdmissionNumber = request.AdmissionNumber;
-        admission.AdmissionDate = request.AdmissionDate;
-        admission.EntryPoint = request.EntryPoint;
-        admission.TransportRequired = request.TransportRequired;
-        admission.AllottedClassSectionId = allottedClassSection.Id;
-        admission.Status = "Enrolled";
-        // Deliberately not creating a Student login here — confirmed
-        // decision: portal login stays a manual, separate step.
+            // Business rules: the section must be active and not full.
+            ClassSectionRules.EnsureActive(allottedClassSection);
+            ClassSectionRules.EnsureHasRoom(allottedClassSection,
+                await _classSectionRepository.CountActiveStudentsAsync(allottedClassSection.Id, cancellationToken));
 
-        await _admissionRepository.SaveChangesAsync(cancellationToken);
-        admission.AllottedClassSection = allottedClassSection;
-        return ToResponse(admission);
+            admission.RollNumber = request.RollNumber;
+            admission.AdmissionNumber = request.AdmissionNumber;
+            admission.AdmissionDate = request.AdmissionDate;
+            admission.EntryPoint = request.EntryPoint;
+            admission.TransportRequired = request.TransportRequired;
+            admission.AllottedClassSectionId = allottedClassSection.Id;
+            admission.Status = "Enrolled";
+
+            // Enrolling now creates the Student record in the same step —
+            // no separate "Create Student Record" action. Portal login
+            // credentials are still a deliberate, separate step (not set here).
+            var student = new Student
+            {
+                AdmissionId = admission.Id,
+                AdmNo = admission.AdmissionNumber!,
+                RollNumber = admission.RollNumber!,
+                ClassSectionId = allottedClassSection.Id,
+                AdmissionDate = admission.AdmissionDate!.Value,
+                Status = "Active",
+                FirstName = admission.FirstName,
+                MiddleName = admission.MiddleName,
+                LastName = admission.LastName,
+                Gender = admission.Gender,
+                DateOfBirth = admission.DateOfBirth,
+                BloodGroup = admission.BloodGroup,
+                Nationality = request.Nationality,
+                CurriculumTrack = request.CurriculumTrack,
+                EnglishProficiency = request.EnglishProficiency,
+                EalCode = request.EalCode,
+                House = request.House,
+                Allergies = request.Allergies,
+            };
+
+            await _studentRepository.AddAsync(student, cancellationToken);
+
+            admission.StudentId = student.Id;
+            await _admissionRepository.SaveChangesAsync(cancellationToken);
+
+            admission.AllottedClassSection = allottedClassSection;
+            return ToResponse(admission);
+        }, cancellationToken);
     }
 
     public async Task<AdmissionResponse> RejectAsync(int id, RejectAdmissionRequest request, CancellationToken cancellationToken)
@@ -190,6 +234,7 @@ public class AdmissionService : IAdmissionService
             throw new ConflictException(
                 $"Cannot {action} application '{admission.RegNo}' — current status is '{admission.Status}', expected '{requiredStatus}'.");
     }
+
     public async Task DeleteAsync(int id, CancellationToken cancellationToken)
     {
         var admission = await GetOrThrowAsync(id, cancellationToken);

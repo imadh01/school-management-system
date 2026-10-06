@@ -4,6 +4,12 @@ public record CreateClassSectionRequest(
     string Name,
     string Section,
     int? Grade,
-    int? Capacity,
+    string Stage,
+    string Medium,
+    string Stream,
+    int Capacity,
+    string? Building,
+    int? Floor,
     string? Room,
-    int? AcademicYearId); // null = use the current year
+    int? AcademicYearId,   // null = use the current year
+    bool IsActive = true);

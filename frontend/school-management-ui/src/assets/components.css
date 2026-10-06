@@ -58,6 +58,10 @@
   background: var(--red-bg);
   color: var(--red);
 }
+.btn--danger {
+  background: var(--red);
+  color: #fff;
+}
 
 /* ---- Status pipeline ---- */
 .pipeline {
@@ -138,8 +142,11 @@
   outline-offset: 0;
   border-color: var(--blue);
 }
+
 .filters__clear {
   align-self: end;
+  justify-self: start;
+  width: fit-content;
 }
 
 /* ---- Table toolbar (export buttons, page size, quick search) ---- */

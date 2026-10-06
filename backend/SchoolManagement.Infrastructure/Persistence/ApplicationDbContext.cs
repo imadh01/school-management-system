@@ -26,6 +26,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<Student> Students => Set<Student>();
     public DbSet<Parent> Parents => Set<Parent>();
     public DbSet<StudentGuardian> StudentGuardians => Set<StudentGuardian>();
+    public DbSet<Subject> Subjects => Set<Subject>();
 
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
@@ -126,6 +127,32 @@ public class ApplicationDbContext : DbContext
         {
             RoleId = 1,
             PermissionId = 5,
+        });
+        modelBuilder.Entity<Permission>().HasData(new Permission
+        {
+            Id = 6,
+            Name = "Subjects.Manage",
+            Module = "Subjects",
+            Description = "Create and edit subjects, including their marks configuration.",
+        });
+
+        modelBuilder.Entity<RolePermission>().HasData(new RolePermission
+        {
+            RoleId = 1, // Admin
+            PermissionId = 6,
+        });
+        modelBuilder.Entity<Permission>().HasData(new Permission
+        {
+            Id = 7,
+            Name = "ClassSections.Manage",
+            Module = "ClassSections",
+            Description = "Create, edit, activate/deactivate and delete class sections.",
+        });
+
+        modelBuilder.Entity<RolePermission>().HasData(new RolePermission
+        {
+            RoleId = 1, // Admin
+            PermissionId = 7,
         });
     }
 }

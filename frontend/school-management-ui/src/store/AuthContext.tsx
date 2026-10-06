@@ -1,10 +1,4 @@
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-  type ReactNode,
-} from "react";
+import { createContext, useContext, useState, type ReactNode } from "react";
 import type { AuthResult } from "../features/authentication/types/auth.types";
 
 interface AuthContextValue {
@@ -18,16 +12,34 @@ const STORAGE_KEY = "auth_session";
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<AuthResult | null>(null);
-
-  // Restore session on page refresh
-  useEffect(() => {
+// Read the saved session synchronously so the very first render already
+// knows whether the user is logged in (otherwise ProtectedRoute redirects
+// to /login before the session is restored). Expired or corrupt sessions
+// are discarded.
+function loadStoredSession(): AuthResult | null {
+  try {
     const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      setUser(JSON.parse(stored) as AuthResult);
+    if (!stored) return null;
+
+    const session = JSON.parse(stored) as AuthResult;
+    const expired =
+      !session.token ||
+      (session.expiresAtUtc &&
+        new Date(session.expiresAtUtc).getTime() <= Date.now());
+
+    if (expired) {
+      localStorage.removeItem(STORAGE_KEY);
+      return null;
     }
-  }, []);
+    return session;
+  } catch {
+    localStorage.removeItem(STORAGE_KEY);
+    return null;
+  }
+}
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [user, setUser] = useState<AuthResult | null>(loadStoredSession);
 
   const login = (result: AuthResult) => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(result));

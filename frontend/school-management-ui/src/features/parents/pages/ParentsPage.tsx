@@ -4,9 +4,9 @@ import type { ParentResponse } from "../types/parent.types";
 import { ParentModal } from "../components/ParentModal";
 import { LinkedChildrenModal } from "../components/LinkedChildrenModal";
 
-function initials(name: string) {
-  return (name || "?").trim().charAt(0).toUpperCase();
-}
+// function initials(name: string) {
+//   return (name || "?").trim().charAt(0).toUpperCase();
+// }
 
 function toCsv(rows: ParentResponse[]) {
   const headers = [
@@ -286,10 +286,7 @@ export function ParentsPage() {
                 {pageRows.map((p) => (
                   <tr key={p.id}>
                     <td>{p.id}</td>
-                    <td>
-                      <span className="avatar-circle">{initials(p.name)}</span>
-                      {p.name}
-                    </td>
+                    <td>{p.name}</td>
                     <td>
                       {p.employer ? (
                         <>
@@ -434,9 +431,6 @@ export function ParentsPage() {
             </div>
             <div className="modal__body">
               <div className="modal-context-card">
-                <span className="avatar-circle avatar-circle--lg">
-                  {initials(feeRecordsParent.name)}
-                </span>
                 <div>
                   <strong>{feeRecordsParent.name}</strong>
                   <br />

@@ -317,6 +317,10 @@ namespace SchoolManagement.Infrastructure.Migrations
                     b.Property<int>("AcademicYearId")
                         .HasColumnType("int");
 
+                    b.Property<string>("Building")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
                     b.Property<int?>("Capacity")
                         .HasColumnType("int");
 
@@ -332,6 +336,9 @@ namespace SchoolManagement.Infrastructure.Migrations
                     b.Property<int?>("DeletedBy")
                         .HasColumnType("int");
 
+                    b.Property<int?>("Floor")
+                        .HasColumnType("int");
+
                     b.Property<int?>("Grade")
                         .HasColumnType("int");
 
@@ -339,6 +346,13 @@ namespace SchoolManagement.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("bit")
                         .HasDefaultValue(false);
+
+                    b.Property<string>("Medium")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasDefaultValue("English");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -354,12 +368,26 @@ namespace SchoolManagement.Infrastructure.Migrations
                         .HasMaxLength(10)
                         .HasColumnType("nvarchar(10)");
 
+                    b.Property<string>("Stage")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasDefaultValue("Primary");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)")
                         .HasDefaultValue("Active");
+
+                    b.Property<string>("Stream")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasDefaultValue("General");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("datetime2");
@@ -370,9 +398,13 @@ namespace SchoolManagement.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("AcademicYearId", "Name", "Section")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("[IsDeleted] = 0");
 
-                    b.ToTable("ClassSections", (string)null);
+                    b.ToTable("ClassSections", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_ClassSections_Floor", "[Floor] IS NULL OR [Floor] >= 0");
+                        });
                 });
 
             modelBuilder.Entity("SchoolManagement.Domain.Entities.Parent", b =>
@@ -594,6 +626,20 @@ namespace SchoolManagement.Infrastructure.Migrations
                             Description = "Create and edit parent records, and link/unlink guardians to students.",
                             Module = "Parents",
                             Name = "Parents.Manage"
+                        },
+                        new
+                        {
+                            Id = 6,
+                            Description = "Create and edit subjects, including their marks configuration.",
+                            Module = "Subjects",
+                            Name = "Subjects.Manage"
+                        },
+                        new
+                        {
+                            Id = 7,
+                            Description = "Create, edit, activate/deactivate and delete class sections.",
+                            Module = "ClassSections",
+                            Name = "ClassSections.Manage"
                         });
                 });
 
@@ -693,6 +739,16 @@ namespace SchoolManagement.Infrastructure.Migrations
                         {
                             RoleId = 1,
                             PermissionId = 5
+                        },
+                        new
+                        {
+                            RoleId = 1,
+                            PermissionId = 6
+                        },
+                        new
+                        {
+                            RoleId = 1,
+                            PermissionId = 7
                         });
                 });
 
@@ -1018,6 +1074,94 @@ namespace SchoolManagement.Infrastructure.Migrations
                     b.ToTable("StudentGuardians", (string)null);
                 });
 
+            modelBuilder.Entity("SchoolManagement.Domain.Entities.Subject", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("ClassSectionId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedBy")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("DeletedBy")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<int?>("MaxMarks")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int?>("PassMarks")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("PracticalMax")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("PracticalPass")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasDefaultValue("Active");
+
+                    b.Property<int?>("TheoryMax")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("TheoryPass")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UpdatedBy")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClassSectionId");
+
+                    b.HasIndex("Code", "ClassSectionId")
+                        .IsUnique()
+                        .HasFilter("[IsDeleted] = 0");
+
+                    b.ToTable("Subjects", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Subjects_MarksByType", "([Type] IN ('Theory','Practical') AND [MaxMarks] IS NOT NULL AND [PassMarks] IS NOT NULL  AND [TheoryMax] IS NULL AND [TheoryPass] IS NULL AND [PracticalMax] IS NULL AND [PracticalPass] IS NULL) OR ([Type] = 'Both' AND [TheoryMax] IS NOT NULL AND [TheoryPass] IS NOT NULL  AND [PracticalMax] IS NOT NULL AND [PracticalPass] IS NOT NULL AND [MaxMarks] IS NULL AND [PassMarks] IS NULL)");
+                        });
+                });
+
             modelBuilder.Entity("SchoolManagement.Domain.Entities.User", b =>
                 {
                     b.Property<int>("Id")
@@ -1221,6 +1365,17 @@ namespace SchoolManagement.Infrastructure.Migrations
                     b.Navigation("Parent");
 
                     b.Navigation("Student");
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Entities.Subject", b =>
+                {
+                    b.HasOne("SchoolManagement.Domain.Entities.ClassSection", "ClassSection")
+                        .WithMany()
+                        .HasForeignKey("ClassSectionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("ClassSection");
                 });
 
             modelBuilder.Entity("SchoolManagement.Domain.Entities.User", b =>

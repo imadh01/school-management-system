@@ -248,6 +248,46 @@ body.dark-mode .app-footer {
   padding: 22px;
   flex: 1;
 }
+.page-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.page-head h1 {
+  font-size: 19px;
+  margin: 0;
+}
+.page-head__actions {
+  display: flex;
+  gap: 10px;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+  padding: 18px;
+}
+.card + .card {
+  margin-top: 18px;
+}
+
+.avatar-circle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--primary-bg, #e8ecff);
+  color: var(--primary, #3b4ed6);
+  font-weight: 600;
+  font-size: 12px;
+  margin-right: 8px;
+  flex-shrink: 0;
+}
 
 @media (max-width: 900px) {
   .sidebar {

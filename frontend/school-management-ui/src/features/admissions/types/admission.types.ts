@@ -99,6 +99,12 @@ export interface EnrollAdmissionRequest {
   entryPoint: string | null;
   transportRequired: boolean;
   allottedClassSectionId: number;
+  nationality: string | null;
+  curriculumTrack: string | null;
+  englishProficiency: string | null;
+  ealCode: string | null;
+  house: string | null;
+  allergies: string | null;
 }
 
 export interface RejectAdmissionRequest {
