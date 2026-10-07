@@ -96,11 +96,13 @@ export function EnrollModal({
                 }
               >
                 <option value="">Select a class...</option>
-                {classSections.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.displayName}
-                  </option>
-                ))}
+                {classSections
+                  .filter((c) => c.status === "Active")
+                  .map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.displayName}
+                    </option>
+                  ))}
               </select>
             </div>
             <div className="field">

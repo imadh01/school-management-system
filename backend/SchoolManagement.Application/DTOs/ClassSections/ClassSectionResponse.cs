@@ -17,4 +17,6 @@ public record ClassSectionResponse(
     string Status,
     string DisplayName,
     int AcademicYearId,
-    string AcademicYearName);
+    string AcademicYearName,
+    int? ClassTeacherId,
+    string? ClassTeacherName);

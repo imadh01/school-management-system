@@ -1,0 +1,119 @@
+/* Attendance page — ported from the prototype. All classes are att- prefixed
+   so they cannot collide with the shared component styles. */
+
+.att-tabs {
+  display: flex;
+  gap: 2px;
+  margin-bottom: 18px;
+}
+.att-tab {
+  flex: 1;
+  text-align: center;
+  padding: 12px;
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.6);
+  background: var(--navy-900);
+  border: 0;
+  cursor: pointer;
+  border-radius: 4px;
+}
+.att-tab--active {
+  color: #fff;
+  background: var(--blue);
+}
+
+.att-last7 {
+  display: inline-flex;
+  gap: 3px;
+}
+.att-last7__dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  display: inline-block;
+  background: var(--gray-bg);
+}
+.att-last7__dot--present {
+  background: var(--green);
+}
+.att-last7__dot--absent {
+  background: var(--red);
+}
+.att-last7__dot--other {
+  background: var(--amber);
+}
+
+.att-status-btn {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-right: 4px;
+}
+.att-status-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+.att-status-btn--green {
+  background: var(--green);
+  border-color: var(--green);
+  color: #fff;
+}
+.att-status-btn--red {
+  background: var(--red);
+  border-color: var(--red);
+  color: #fff;
+}
+.att-status-btn--amber {
+  background: var(--amber);
+  border-color: var(--amber);
+  color: #fff;
+}
+.att-status-btn--blue {
+  background: var(--blue);
+  border-color: var(--blue);
+  color: #fff;
+}
+.att-status-btn--purple {
+  background: var(--purple);
+  border-color: var(--purple);
+  color: #fff;
+}
+
+.att-remarks {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+  font-size: 12px;
+  width: 100%;
+}
+
+.att-progress {
+  height: 8px;
+  background: var(--gray-bg);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-top: 8px;
+}
+.att-progress__fill {
+  height: 100%;
+  background: var(--green);
+  transition: width 0.2s;
+}
+
+.att-save-bar {
+  position: sticky;
+  bottom: 0;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  padding: 12px 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 10px;
+}

@@ -9,6 +9,9 @@ public class Subject
 
     public int ClassSectionId { get; set; }
     public ClassSection ClassSection { get; set; } = null!;
+    /// <summary>The teacher who teaches this subject in this class (null = unassigned).</summary>
+    public int? TeacherId { get; set; }
+    public Teacher? Teacher { get; set; }
 
     /// <summary>Theory | Practical | Both.</summary>
     public string Type { get; set; } = "Theory";
@@ -33,4 +36,5 @@ public class Subject
     public bool IsDeleted { get; set; }
     public DateTime? DeletedAt { get; set; }
     public int? DeletedBy { get; set; }
+
 }

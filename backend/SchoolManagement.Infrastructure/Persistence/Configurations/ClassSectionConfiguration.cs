@@ -32,6 +32,12 @@ public class ClassSectionConfiguration : IEntityTypeConfiguration<ClassSection>
             .HasForeignKey(c => c.AcademicYearId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        builder.HasOne(c => c.ClassTeacher)
+            .WithMany()
+            .HasForeignKey(c => c.ClassTeacherId)
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(c => c.ClassTeacherId);
+
         builder.Property(c => c.CreatedAt).IsRequired();
         builder.Property(c => c.UpdatedAt).IsRequired();
         builder.Property(c => c.IsDeleted).IsRequired().HasDefaultValue(false);

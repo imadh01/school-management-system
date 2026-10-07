@@ -306,6 +306,95 @@ namespace SchoolManagement.Infrastructure.Migrations
                     b.ToTable("Admissions", (string)null);
                 });
 
+            modelBuilder.Entity("SchoolManagement.Domain.Entities.AttendanceRecord", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Remarks")
+                        .HasMaxLength(250)
+                        .HasColumnType("nvarchar(250)");
+
+                    b.Property<int>("SessionId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<int>("StudentId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SessionId", "StudentId")
+                        .IsUnique();
+
+                    b.HasIndex("StudentId", "SessionId");
+
+                    b.ToTable("AttendanceRecords", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_AttendanceRecords_Status", "[Status] IN ('Present','Absent','Late','Half Day','Leave')");
+                        });
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Entities.AttendanceSession", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("ClassSectionId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedBy")
+                        .HasColumnType("int");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date");
+
+                    b.Property<int?>("SubjectId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TakenByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UpdatedBy")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Date");
+
+                    b.HasIndex("SubjectId");
+
+                    b.HasIndex("TakenByUserId");
+
+                    b.HasIndex("ClassSectionId", "Date")
+                        .IsUnique()
+                        .HasDatabaseName("UX_AttendanceSessions_Class_Date_Daily")
+                        .HasFilter("[SubjectId] IS NULL");
+
+                    b.HasIndex("ClassSectionId", "Date", "SubjectId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_AttendanceSessions_Class_Date_Subject")
+                        .HasFilter("[SubjectId] IS NOT NULL");
+
+                    b.ToTable("AttendanceSessions", (string)null);
+                });
+
             modelBuilder.Entity("SchoolManagement.Domain.Entities.ClassSection", b =>
                 {
                     b.Property<int>("Id")
@@ -322,6 +411,9 @@ namespace SchoolManagement.Infrastructure.Migrations
                         .HasColumnType("nvarchar(50)");
 
                     b.Property<int?>("Capacity")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("ClassTeacherId")
                         .HasColumnType("int");
 
                     b.Property<DateTime>("CreatedAt")
@@ -396,6 +488,8 @@ namespace SchoolManagement.Infrastructure.Migrations
                         .HasColumnType("int");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ClassTeacherId");
 
                     b.HasIndex("AcademicYearId", "Name", "Section")
                         .IsUnique()
@@ -636,10 +730,31 @@ namespace SchoolManagement.Infrastructure.Migrations
                         },
                         new
                         {
+                            Id = 8,
+                            Description = "Create, edit and delete teachers; assign subjects and class teachers.",
+                            Module = "Teachers",
+                            Name = "Teachers.Manage"
+                        },
+                        new
+                        {
                             Id = 7,
                             Description = "Create, edit, activate/deactivate and delete class sections.",
                             Module = "ClassSections",
                             Name = "ClassSections.Manage"
+                        },
+                        new
+                        {
+                            Id = 9,
+                            Description = "Mark and edit attendance for any class.",
+                            Module = "Attendance",
+                            Name = "Attendance.Manage"
+                        },
+                        new
+                        {
+                            Id = 10,
+                            Description = "Mark attendance for own class or subjects (checked in the service).",
+                            Module = "Attendance",
+                            Name = "Attendance.Mark"
                         });
                 });
 
@@ -743,12 +858,37 @@ namespace SchoolManagement.Infrastructure.Migrations
                         new
                         {
                             RoleId = 1,
+                            PermissionId = 8
+                        },
+                        new
+                        {
+                            RoleId = 1,
                             PermissionId = 6
                         },
                         new
                         {
                             RoleId = 1,
                             PermissionId = 7
+                        },
+                        new
+                        {
+                            RoleId = 1,
+                            PermissionId = 9
+                        },
+                        new
+                        {
+                            RoleId = 2,
+                            PermissionId = 9
+                        },
+                        new
+                        {
+                            RoleId = 3,
+                            PermissionId = 9
+                        },
+                        new
+                        {
+                            RoleId = 4,
+                            PermissionId = 10
                         });
                 });
 
@@ -1131,6 +1271,9 @@ namespace SchoolManagement.Infrastructure.Migrations
                         .HasColumnType("nvarchar(20)")
                         .HasDefaultValue("Active");
 
+                    b.Property<int?>("TeacherId")
+                        .HasColumnType("int");
+
                     b.Property<int?>("TheoryMax")
                         .HasColumnType("int");
 
@@ -1152,6 +1295,8 @@ namespace SchoolManagement.Infrastructure.Migrations
 
                     b.HasIndex("ClassSectionId");
 
+                    b.HasIndex("TeacherId");
+
                     b.HasIndex("Code", "ClassSectionId")
                         .IsUnique()
                         .HasFilter("[IsDeleted] = 0");
@@ -1160,6 +1305,61 @@ namespace SchoolManagement.Infrastructure.Migrations
                         {
                             t.HasCheckConstraint("CK_Subjects_MarksByType", "([Type] IN ('Theory','Practical') AND [MaxMarks] IS NOT NULL AND [PassMarks] IS NOT NULL  AND [TheoryMax] IS NULL AND [TheoryPass] IS NULL AND [PracticalMax] IS NULL AND [PracticalPass] IS NULL) OR ([Type] = 'Both' AND [TheoryMax] IS NOT NULL AND [TheoryPass] IS NOT NULL  AND [PracticalMax] IS NOT NULL AND [PracticalPass] IS NOT NULL AND [MaxMarks] IS NULL AND [PassMarks] IS NULL)");
                         });
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Entities.Teacher", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedBy")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("DeletedBy")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<string>("Phone")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<string>("Specialization")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UpdatedBy")
+                        .HasColumnType("int");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId")
+                        .IsUnique();
+
+                    b.ToTable("Teachers", (string)null);
                 });
 
             modelBuilder.Entity("SchoolManagement.Domain.Entities.User", b =>
@@ -1283,6 +1483,49 @@ namespace SchoolManagement.Infrastructure.Migrations
                     b.Navigation("AppliedForClassSection");
                 });
 
+            modelBuilder.Entity("SchoolManagement.Domain.Entities.AttendanceRecord", b =>
+                {
+                    b.HasOne("SchoolManagement.Domain.Entities.AttendanceSession", "Session")
+                        .WithMany("Records")
+                        .HasForeignKey("SessionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("SchoolManagement.Domain.Entities.Student", "Student")
+                        .WithMany()
+                        .HasForeignKey("StudentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Session");
+
+                    b.Navigation("Student");
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Entities.AttendanceSession", b =>
+                {
+                    b.HasOne("SchoolManagement.Domain.Entities.ClassSection", "ClassSection")
+                        .WithMany()
+                        .HasForeignKey("ClassSectionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SchoolManagement.Domain.Entities.Subject", "Subject")
+                        .WithMany()
+                        .HasForeignKey("SubjectId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("SchoolManagement.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("TakenByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("ClassSection");
+
+                    b.Navigation("Subject");
+                });
+
             modelBuilder.Entity("SchoolManagement.Domain.Entities.ClassSection", b =>
                 {
                     b.HasOne("SchoolManagement.Domain.Entities.AcademicYear", "AcademicYear")
@@ -1291,7 +1534,14 @@ namespace SchoolManagement.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("SchoolManagement.Domain.Entities.Teacher", "ClassTeacher")
+                        .WithMany()
+                        .HasForeignKey("ClassTeacherId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("AcademicYear");
+
+                    b.Navigation("ClassTeacher");
                 });
 
             modelBuilder.Entity("SchoolManagement.Domain.Entities.Parent", b =>
@@ -1375,7 +1625,25 @@ namespace SchoolManagement.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("SchoolManagement.Domain.Entities.Teacher", "Teacher")
+                        .WithMany()
+                        .HasForeignKey("TeacherId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("ClassSection");
+
+                    b.Navigation("Teacher");
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Entities.Teacher", b =>
+                {
+                    b.HasOne("SchoolManagement.Domain.Entities.User", "User")
+                        .WithOne()
+                        .HasForeignKey("SchoolManagement.Domain.Entities.Teacher", "UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("SchoolManagement.Domain.Entities.User", b =>
@@ -1423,6 +1691,11 @@ namespace SchoolManagement.Infrastructure.Migrations
             modelBuilder.Entity("SchoolManagement.Domain.Entities.Admission", b =>
                 {
                     b.Navigation("Student");
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Entities.AttendanceSession", b =>
+                {
+                    b.Navigation("Records");
                 });
 
             modelBuilder.Entity("SchoolManagement.Domain.Entities.Parent", b =>

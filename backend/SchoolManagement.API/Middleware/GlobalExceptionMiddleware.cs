@@ -35,6 +35,8 @@ public class GlobalExceptionMiddleware
         {
             NotFoundException => (StatusCodes.Status404NotFound, "NOT_FOUND", ex.Message),
             ConflictException => (StatusCodes.Status409Conflict, "CONFLICT", ex.Message),
+            ForbiddenException => (StatusCodes.Status403Forbidden, "FORBIDDEN", ex.Message),
+            BusinessRuleException => (StatusCodes.Status422UnprocessableEntity, "BUSINESS_RULE_VIOLATION", ex.Message),
             _ => (StatusCodes.Status500InternalServerError, "INTERNAL_SERVER_ERROR", "An unexpected error occurred."),
         };
 

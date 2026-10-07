@@ -12,7 +12,9 @@ using SchoolManagement.Application.DTOs.ClassSections;
 using SchoolManagement.Application.DTOs.Parents;
 using SchoolManagement.Application.DTOs.Students;
 using SchoolManagement.Application.DTOs.Subjects;
+using SchoolManagement.Application.DTOs.Teachers;
 using SchoolManagement.Application.DTOs.Users;
+using SchoolManagement.Application.DTOs.Attendance;
 using SchoolManagement.Application.Interfaces;
 using SchoolManagement.Application.Services;
 using SchoolManagement.Application.Validators;
@@ -84,6 +86,18 @@ builder.Services.AddScoped<IValidator<LinkStudentRequest>, LinkStudentRequestVal
 builder.Services.AddScoped<IValidator<CreateSubjectRequest>, CreateSubjectRequestValidator>();
 builder.Services.AddScoped<IValidator<UpdateSubjectRequest>, UpdateSubjectRequestValidator>();
 builder.Services.AddScoped<IValidator<UpdateClassSectionRequest>, UpdateClassSectionRequestValidator>();
+
+builder.Services.AddScoped<ITeacherRepository, TeacherRepository>();
+builder.Services.AddScoped<ITeacherService, TeacherService>();
+builder.Services.AddScoped<IValidator<CreateTeacherRequest>, CreateTeacherRequestValidator>();
+builder.Services.AddScoped<IValidator<UpdateTeacherRequest>, UpdateTeacherRequestValidator>();
+builder.Services.AddScoped<IValidator<ChangeTeacherStatusRequest>, ChangeTeacherStatusRequestValidator>();
+builder.Services.AddScoped<IValidator<AssignSubjectsRequest>, AssignSubjectsRequestValidator>();
+builder.Services.AddScoped<IValidator<SetClassTeacherRequest>, SetClassTeacherRequestValidator>();
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddScoped<IAttendanceRepository, AttendanceRepository>();
+builder.Services.AddScoped<IAttendanceService, AttendanceService>();
+builder.Services.AddScoped<IValidator<SaveAttendanceRequest>, SaveAttendanceRequestValidator>();
 
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("Jwt"));
 var jwtSettings = builder.Configuration.GetSection("Jwt").Get<JwtSettings>()!;
@@ -161,6 +175,14 @@ builder.Services.AddAuthorization(options =>
 
     options.AddPolicy("Subjects.Manage", policy =>
     policy.RequireClaim("permission", "Subjects.Manage"));
+
+    options.AddPolicy("Teachers.Manage", policy =>
+    policy.RequireClaim("permission", "Teachers.Manage"));
+
+    options.AddPolicy("Attendance.Write", policy =>
+    policy.RequireAssertion(ctx =>
+        ctx.User.HasClaim("permission", "Attendance.Manage") ||
+        ctx.User.HasClaim("permission", "Attendance.Mark")));
 
 });
 

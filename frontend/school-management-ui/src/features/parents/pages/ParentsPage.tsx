@@ -273,7 +273,7 @@ export function ParentsPage() {
             <table>
               <thead>
                 <tr>
-                  <th>ID</th>
+                  <th>#</th>
                   <th>Parent</th>
                   <th>Employer</th>
                   <th>Contact</th>
@@ -283,9 +283,9 @@ export function ParentsPage() {
                 </tr>
               </thead>
               <tbody>
-                {pageRows.map((p) => (
+                {pageRows.map((p, index) => (
                   <tr key={p.id}>
-                    <td>{p.id}</td>
+                    <td>{(page - 1) * pageSize + index + 1}</td>
                     <td>{p.name}</td>
                     <td>
                       {p.employer ? (

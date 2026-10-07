@@ -143,7 +143,8 @@ public class ClassSectionService : IClassSectionService
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     private static ClassSectionResponse ToResponse(ClassSection c, int enrolled) => new(
-        c.Id, c.Name, c.Section, c.Code, c.Grade, c.Stage, c.Medium, c.Stream,
-        c.Capacity, enrolled, c.Building, c.Floor, c.Room, c.Status,
-        c.DisplayName, c.AcademicYearId, c.AcademicYear.Name);
+      c.Id, c.Name, c.Section, c.Code, c.Grade, c.Stage, c.Medium, c.Stream,
+      c.Capacity, enrolled, c.Building, c.Floor, c.Room, c.Status,
+      c.DisplayName, c.AcademicYearId, c.AcademicYear.Name,
+      c.ClassTeacherId, c.ClassTeacher?.Name);
 }

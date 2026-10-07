@@ -27,7 +27,9 @@ public class ApplicationDbContext : DbContext
     public DbSet<Parent> Parents => Set<Parent>();
     public DbSet<StudentGuardian> StudentGuardians => Set<StudentGuardian>();
     public DbSet<Subject> Subjects => Set<Subject>();
-
+    public DbSet<Teacher> Teachers => Set<Teacher>();
+    public DbSet<AttendanceSession> AttendanceSessions => Set<AttendanceSession>();
+    public DbSet<AttendanceRecord> AttendanceRecords => Set<AttendanceRecord>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
@@ -136,6 +138,20 @@ public class ApplicationDbContext : DbContext
             Description = "Create and edit subjects, including their marks configuration.",
         });
 
+        modelBuilder.Entity<Permission>().HasData(new Permission
+        {
+            Id = 8,
+            Name = "Teachers.Manage",
+            Module = "Teachers",
+            Description = "Create, edit and delete teachers; assign subjects and class teachers.",
+        });
+
+        modelBuilder.Entity<RolePermission>().HasData(new RolePermission
+        {
+            RoleId = 1, // Admin
+            PermissionId = 8,
+        });
+
         modelBuilder.Entity<RolePermission>().HasData(new RolePermission
         {
             RoleId = 1, // Admin
@@ -154,6 +170,28 @@ public class ApplicationDbContext : DbContext
             RoleId = 1, // Admin
             PermissionId = 7,
         });
+
+        modelBuilder.Entity<Permission>().HasData(
+        new Permission
+        {
+            Id = 9,
+            Name = "Attendance.Manage",
+            Module = "Attendance",
+            Description = "Mark and edit attendance for any class."
+        },
+        new Permission
+        {
+            Id = 10,
+            Name = "Attendance.Mark",
+            Module = "Attendance",
+            Description = "Mark attendance for own class or subjects (checked in the service)."
+        });
+
+        modelBuilder.Entity<RolePermission>().HasData(
+            new RolePermission { RoleId = 1, PermissionId = 9 },   // Admin
+            new RolePermission { RoleId = 2, PermissionId = 9 },   // Supervisor
+            new RolePermission { RoleId = 3, PermissionId = 9 },   // Clerk
+            new RolePermission { RoleId = 4, PermissionId = 10 }); // Teacher
     }
 }
 

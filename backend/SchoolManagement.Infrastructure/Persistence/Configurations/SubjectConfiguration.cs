@@ -33,6 +33,13 @@ public class SubjectConfiguration : IEntityTypeConfiguration<Subject>
             .HasForeignKey(s => s.ClassSectionId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        builder.HasOne(s => s.Teacher)
+            .WithMany()
+            .HasForeignKey(s => s.TeacherId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasIndex(s => s.TeacherId);
+
         builder.Property(s => s.CreatedAt).IsRequired();
         builder.Property(s => s.UpdatedAt).IsRequired();
         builder.Property(s => s.IsDeleted).IsRequired().HasDefaultValue(false);

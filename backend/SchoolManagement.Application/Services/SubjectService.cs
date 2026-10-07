@@ -137,7 +137,7 @@ public class SubjectService : ISubjectService
     }
 
     private static SubjectResponse ToResponse(Subject s) => new(
-        s.Id, s.Name, s.Code, s.ClassSectionId, s.ClassSection.DisplayName,
-        s.Type, s.MaxMarks, s.PassMarks, s.TheoryMax, s.TheoryPass, s.PracticalMax, s.PracticalPass,
-        s.Status);
+     s.Id, s.Name, s.Code, s.ClassSectionId, s.ClassSection.DisplayName,
+     s.Type, s.MaxMarks, s.PassMarks, s.TheoryMax, s.TheoryPass, s.PracticalMax, s.PracticalPass,
+     s.Status, s.TeacherId, s.Teacher?.Name);
 }

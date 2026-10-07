@@ -23,6 +23,9 @@ public class ClassSection
     public int? Floor { get; set; }
     public string? Room { get; set; }
     public string Status { get; set; } = "Active";
+    /// <summary>Class (homeroom) teacher. Null = none assigned.</summary>
+    public int? ClassTeacherId { get; set; }
+    public Teacher? ClassTeacher { get; set; } 
 
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
