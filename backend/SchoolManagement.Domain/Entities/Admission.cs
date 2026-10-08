@@ -8,7 +8,6 @@ public class Admission
     public string FirstName { get; set; } = string.Empty;
     public string? MiddleName { get; set; }
     public string LastName { get; set; } = string.Empty;
-    public int? StudentId { get; set; }
     public Student? Student { get; set; }
     public string Gender { get; set; } = string.Empty;
     public DateOnly DateOfBirth { get; set; }
@@ -27,14 +26,6 @@ public class Admission
 
     public string Status { get; set; } = "Registered";
     public string? RejectionReason { get; set; }
-
-    public string? FatherName { get; set; }
-    public string? FatherMobile { get; set; }
-    public string? MotherName { get; set; }
-    public string? MotherMobile { get; set; }
-    public string? GuardianName { get; set; }
-    public string? GuardianRelation { get; set; }
-    public string? GuardianMobile { get; set; }
 
     public string? AddressLine { get; set; }
     public string? City { get; set; }
@@ -66,10 +57,6 @@ public class Admission
     public bool IsDeleted { get; set; }
     public DateTime? DeletedAt { get; set; }
     public int? DeletedBy { get; set; }
-
-    public string? Grade { get; set; }
-    public decimal? RegistrationFee { get; set; }
-    public string? Notes { get; set; }
 
     // Guardians captured on the application (father/mother/guardian rows).
     // Staff confirm which existing Parent each one maps to at enrolment.

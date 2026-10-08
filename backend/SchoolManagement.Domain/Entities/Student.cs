@@ -33,8 +33,6 @@ public class Student
     public string LastName { get; set; } = string.Empty;
     public string Gender { get; set; } = string.Empty;
     public DateOnly DateOfBirth { get; set; }
-    public string? BloodGroup { get; set; }
-    public string? AadhaarNumber { get; set; }
 
     public string? Mobile { get; set; }
     public string? Email { get; set; }
@@ -43,31 +41,16 @@ public class Student
     public string? State { get; set; }
     public string? Pincode { get; set; }
 
-    public string? FatherName { get; set; }
-    public string? FatherOccupation { get; set; }
-    public string? FatherMobile { get; set; }
-    public string? MotherName { get; set; }
-    public string? MotherOccupation { get; set; }
-    public string? MotherMobile { get; set; }
-    public string? GuardianName { get; set; }
-    public string? GuardianRelation { get; set; }
-    public string? GuardianMobile { get; set; }
-
     public string Category { get; set; } = "General";
     public string? Religion { get; set; }
     public string? PreviousSchool { get; set; }
     public bool TransportRequired { get; set; }
     public string? TransportRoute { get; set; }
-    public string? MedicalNotes { get; set; }
 
     public string? Nationality { get; set; }
     public string? SecondNationality { get; set; }
     public string? CountryOfBirth { get; set; }
     public string? PreferredName { get; set; }
-    public string? PassportNumber { get; set; }
-    public DateOnly? PassportExpiry { get; set; }
-    public string? VisaType { get; set; }
-    public DateOnly? VisaExpiry { get; set; }
 
     public string? MotherTongue { get; set; }
     public string? HomeLanguage { get; set; }
@@ -76,20 +59,12 @@ public class Student
     public string AdmissionType { get; set; } = "Fresh Admission";
 
     public string? CustodyArrangement { get; set; }
-    public string? PrimaryContactParent { get; set; }
-    public string? AuthorizedPickupPersons { get; set; }
     public bool MediaConsent { get; set; } = true;
-
-    public string? DietaryRequirements { get; set; } // comma-delimited tags
-    public string? Allergies { get; set; }
-    public string? InsuranceProvider { get; set; }
-    public DateOnly? InsurancePolicyExpiry { get; set; }
 
     public string? House { get; set; }
     public string? EalCode { get; set; }
 
     public decimal? FeeConcessionPercent { get; set; }
-    public string? SpecialEducationalNeeds { get; set; }
 
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }

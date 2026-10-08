@@ -163,14 +163,6 @@ namespace SchoolManagement.Infrastructure.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
-                    b.Property<string>("FatherMobile")
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<string>("FatherName")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
                     b.Property<string>("FirstName")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -180,22 +172,6 @@ namespace SchoolManagement.Infrastructure.Migrations
                         .IsRequired()
                         .HasMaxLength(10)
                         .HasColumnType("nvarchar(10)");
-
-                    b.Property<string>("Grade")
-                        .HasMaxLength(10)
-                        .HasColumnType("nvarchar(10)");
-
-                    b.Property<string>("GuardianMobile")
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<string>("GuardianName")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("GuardianRelation")
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)");
 
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
@@ -214,18 +190,6 @@ namespace SchoolManagement.Infrastructure.Migrations
                     b.Property<string>("MiddleName")
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
-
-                    b.Property<string>("MotherMobile")
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<string>("MotherName")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("Notes")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
 
                     b.Property<string>("Phone")
                         .IsRequired()
@@ -247,9 +211,6 @@ namespace SchoolManagement.Infrastructure.Migrations
 
                     b.Property<DateOnly>("RegistrationDate")
                         .HasColumnType("date");
-
-                    b.Property<decimal?>("RegistrationFee")
-                        .HasColumnType("decimal(10,2)");
 
                     b.Property<string>("RejectionReason")
                         .HasMaxLength(300)
@@ -277,9 +238,6 @@ namespace SchoolManagement.Infrastructure.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)")
                         .HasDefaultValue("Registered");
-
-                    b.Property<int?>("StudentId")
-                        .HasColumnType("int");
 
                     b.Property<bool>("TransportRequired")
                         .ValueGeneratedOnAdd()
@@ -990,10 +948,6 @@ namespace SchoolManagement.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<string>("AadhaarNumber")
-                        .HasMaxLength(12)
-                        .HasColumnType("nvarchar(12)");
-
                     b.Property<string>("AddressLine")
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
@@ -1015,18 +969,6 @@ namespace SchoolManagement.Infrastructure.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("nvarchar(30)")
                         .HasDefaultValue("Fresh Admission");
-
-                    b.Property<string>("Allergies")
-                        .HasMaxLength(300)
-                        .HasColumnType("nvarchar(300)");
-
-                    b.Property<string>("AuthorizedPickupPersons")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<string>("BloodGroup")
-                        .HasMaxLength(10)
-                        .HasColumnType("nvarchar(10)");
 
                     b.Property<string>("Category")
                         .IsRequired()
@@ -1069,10 +1011,6 @@ namespace SchoolManagement.Infrastructure.Migrations
                     b.Property<int?>("DeletedBy")
                         .HasColumnType("int");
 
-                    b.Property<string>("DietaryRequirements")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
                     b.Property<string>("EalCode")
                         .HasMaxLength(30)
                         .HasColumnType("nvarchar(30)");
@@ -1084,18 +1022,6 @@ namespace SchoolManagement.Infrastructure.Migrations
                     b.Property<string>("EnglishProficiency")
                         .HasMaxLength(30)
                         .HasColumnType("nvarchar(30)");
-
-                    b.Property<string>("FatherMobile")
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<string>("FatherName")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("FatherOccupation")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
 
                     b.Property<decimal?>("FeeConcessionPercent")
                         .HasColumnType("decimal(5,2)");
@@ -1110,18 +1036,6 @@ namespace SchoolManagement.Infrastructure.Migrations
                         .HasMaxLength(10)
                         .HasColumnType("nvarchar(10)");
 
-                    b.Property<string>("GuardianMobile")
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<string>("GuardianName")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("GuardianRelation")
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)");
-
                     b.Property<string>("HomeLanguage")
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
@@ -1129,13 +1043,6 @@ namespace SchoolManagement.Infrastructure.Migrations
                     b.Property<string>("House")
                         .HasMaxLength(30)
                         .HasColumnType("nvarchar(30)");
-
-                    b.Property<DateOnly?>("InsurancePolicyExpiry")
-                        .HasColumnType("date");
-
-                    b.Property<string>("InsuranceProvider")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
 
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
@@ -1152,10 +1059,6 @@ namespace SchoolManagement.Infrastructure.Migrations
                         .HasColumnType("bit")
                         .HasDefaultValue(true);
 
-                    b.Property<string>("MedicalNotes")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
                     b.Property<string>("MiddleName")
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
@@ -1164,18 +1067,6 @@ namespace SchoolManagement.Infrastructure.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
 
-                    b.Property<string>("MotherMobile")
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<string>("MotherName")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("MotherOccupation")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
                     b.Property<string>("MotherTongue")
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
@@ -1183,13 +1074,6 @@ namespace SchoolManagement.Infrastructure.Migrations
                     b.Property<string>("Nationality")
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
-
-                    b.Property<DateOnly?>("PassportExpiry")
-                        .HasColumnType("date");
-
-                    b.Property<string>("PassportNumber")
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)");
 
                     b.Property<string>("PhotoUrl")
                         .HasMaxLength(500)
@@ -1207,10 +1091,6 @@ namespace SchoolManagement.Infrastructure.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
-                    b.Property<string>("PrimaryContactParent")
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
                     b.Property<string>("Religion")
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
@@ -1223,10 +1103,6 @@ namespace SchoolManagement.Infrastructure.Migrations
                     b.Property<string>("SecondNationality")
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
-
-                    b.Property<string>("SpecialEducationalNeeds")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
 
                     b.Property<string>("State")
                         .HasMaxLength(50)
@@ -1256,13 +1132,6 @@ namespace SchoolManagement.Infrastructure.Migrations
 
                     b.Property<int?>("UserId")
                         .HasColumnType("int");
-
-                    b.Property<DateOnly?>("VisaExpiry")
-                        .HasColumnType("date");
-
-                    b.Property<string>("VisaType")
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)");
 
                     b.HasKey("Id");
 
