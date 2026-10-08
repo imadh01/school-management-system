@@ -1,16 +1,27 @@
 import { useEffect, useState } from "react";
 import type {
-  StudentResponse,
   CreateStudentRequest,
+  PickupPersonRequest,
+  StudentHealthDto,
+  StudentResponse,
+  StudentStatus,
+  UpdateStudentIdentityRequest,
 } from "../types/student.types";
 import type { ClassSectionResponse } from "@/features/class-sections/types/classSection.types";
+import { ValidationModal } from "@/components/ValidationModal";
+import { getApiErrors } from "@/utils/apiError";
 
 interface Props {
   isOpen: boolean;
+  /** Full detail record (from GET /students/{id}); null when adding. */
   editingStudent: StudentResponse | null;
   classSections: ClassSectionResponse[];
   onClose: () => void;
-  onSubmit: (data: CreateStudentRequest, status?: string) => Promise<void>;
+  onSubmit: (
+    data: CreateStudentRequest,
+    status: StudentStatus,
+    identity: UpdateStudentIdentityRequest | null,
+  ) => Promise<void>;
 }
 
 const DIETARY_OPTIONS = [
@@ -24,67 +35,86 @@ const DIETARY_OPTIONS = [
   "Nut-Free",
 ];
 const HOUSE_OPTIONS = ["Red", "Blue", "Green", "Yellow"];
+const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
+const RELIGIONS = [
+  "Hindu",
+  "Muslim",
+  "Christian",
+  "Sikh",
+  "Buddhist",
+  "Jain",
+  "Other",
+];
+const CATEGORIES = ["General", "OBC", "SC", "ST", "EWS"];
+const MAX_PICKUP_PERSONS = 10;
+
+const emptyHealth: StudentHealthDto = {
+  bloodGroup: null,
+  allergies: null,
+  dietaryRequirements: null,
+  medicalNotes: null,
+  specialEducationalNeeds: null,
+  insuranceProvider: null,
+  insurancePolicyExpiry: null,
+};
+
+const emptyIdentity: UpdateStudentIdentityRequest = {
+  aadhaarNumber: null,
+  passportNumber: null,
+  passportExpiry: null,
+  visaType: null,
+  visaExpiry: null,
+};
 
 const emptyForm: CreateStudentRequest = {
   admNo: "",
   rollNumber: "",
   classSectionId: 0,
   admissionDate: new Date().toISOString().slice(0, 10),
-  photoUrl: "",
+  photoUrl: null,
   firstName: "",
-  middleName: "",
+  middleName: null,
   lastName: "",
   gender: "Male",
   dateOfBirth: "",
-  bloodGroup: "unknown",
-  aadhaarNumber: "",
-  mobile: "",
-  email: "",
-  addressLine: "",
-  city: "",
-  state: "",
-  pincode: "",
-  fatherName: "",
-  fatherOccupation: "",
-  fatherMobile: "",
-  motherName: "",
-  motherOccupation: "",
-  motherMobile: "",
-  guardianName: "",
-  guardianRelation: "",
-  guardianMobile: "",
+  mobile: null,
+  email: null,
+  addressLine: null,
+  city: null,
+  state: null,
+  pincode: null,
   category: "General",
-  religion: "",
-  previousSchool: "",
+  religion: null,
+  previousSchool: null,
   transportRequired: false,
-  transportRoute: "",
-  medicalNotes: "",
-  nationality: "",
-  secondNationality: "",
-  countryOfBirth: "",
-  preferredName: "",
-  passportNumber: "",
-  passportExpiry: null,
-  visaType: "",
-  visaExpiry: "",
-  motherTongue: "",
-  homeLanguage: "",
+  transportRoute: null,
+  nationality: null,
+  secondNationality: null,
+  countryOfBirth: null,
+  preferredName: null,
+  motherTongue: null,
+  homeLanguage: null,
   englishProficiency: "Native",
   curriculumTrack: "British",
   admissionType: "Fresh Admission",
   custodyArrangement: "Joint",
-  primaryContactParent: "Both Parents",
-  authorizedPickupPersons: "",
   mediaConsent: true,
-  dietaryRequirements: "",
-  allergies: "",
-  insuranceProvider: "",
-  insurancePolicyExpiry: null,
   house: null,
-  ealCode: "",
+  ealCode: null,
   feeConcessionPercent: 0,
-  specialEducationalNeeds: "",
+  health: null,
+  pickupPersons: null,
 };
+
+/** Turns every blank string into null so optional API fields stay clean. */
+function blankToNull<T extends object>(obj: T): T {
+  return Object.fromEntries(
+    Object.entries(obj).map(([k, v]) => [
+      k,
+      typeof v === "string" && v.trim() === "" ? null : v,
+    ]),
+  ) as T;
+}
 
 export function StudentModal({
   isOpen,
@@ -94,93 +124,100 @@ export function StudentModal({
   onSubmit,
 }: Props) {
   const [form, setForm] = useState<CreateStudentRequest>(emptyForm);
-  const [status, setStatus] = useState("Active");
+  const [health, setHealth] = useState<StudentHealthDto>(emptyHealth);
+  const [pickups, setPickups] = useState<PickupPersonRequest[]>([]);
+  const [identity, setIdentity] =
+    useState<UpdateStudentIdentityRequest>(emptyIdentity);
+  const [status, setStatus] = useState<StudentStatus>("Active");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [errors, setErrors] = useState<string[] | null>(null);
+
+  const identityHidden = editingStudent?.identity.isMasked ?? true;
 
   useEffect(() => {
     if (editingStudent) {
-      // StudentResponse only carries the class's display name, not its id —
-      // resolve it against the loaded classSections list so the dropdown
-      // shows the student's actual current class instead of resetting blank.
-      const matchedClassId =
-        classSections.find(
-          (c) => c.displayName === editingStudent.classSectionName,
-        )?.id ?? 0;
+      const s = editingStudent;
       setForm({
-        admNo: editingStudent.admNo,
-        rollNumber: editingStudent.rollNumber,
-        classSectionId: matchedClassId,
-        admissionDate: editingStudent.admissionDate,
-        photoUrl: editingStudent.photoUrl,
-        firstName: editingStudent.firstName,
-        middleName: editingStudent.middleName,
-        lastName: editingStudent.lastName,
-        gender: editingStudent.gender,
-        dateOfBirth: editingStudent.dateOfBirth,
-        bloodGroup: editingStudent.bloodGroup,
-        aadhaarNumber: editingStudent.aadhaarNumber,
-        mobile: editingStudent.mobile,
-        email: editingStudent.email,
-        addressLine: editingStudent.addressLine,
-        city: editingStudent.city,
-        state: editingStudent.state,
-        pincode: editingStudent.pincode,
-        fatherName: editingStudent.fatherName,
-        fatherOccupation: editingStudent.fatherOccupation,
-        fatherMobile: editingStudent.fatherMobile,
-        motherName: editingStudent.motherName,
-        motherOccupation: editingStudent.motherOccupation,
-        motherMobile: editingStudent.motherMobile,
-        guardianName: editingStudent.guardianName,
-        guardianRelation: editingStudent.guardianRelation,
-        guardianMobile: editingStudent.guardianMobile,
-        category: editingStudent.category,
-        religion: editingStudent.religion,
-        previousSchool: editingStudent.previousSchool,
-        transportRequired: editingStudent.transportRequired,
-        transportRoute: editingStudent.transportRoute,
-        medicalNotes: editingStudent.medicalNotes,
-        nationality: editingStudent.nationality,
-        secondNationality: editingStudent.secondNationality,
-        countryOfBirth: editingStudent.countryOfBirth,
-        preferredName: editingStudent.preferredName,
-        passportNumber: editingStudent.passportNumber,
-        passportExpiry: editingStudent.passportExpiry,
-        visaType: editingStudent.visaType,
-        visaExpiry: editingStudent.visaExpiry,
-        motherTongue: editingStudent.motherTongue,
-        homeLanguage: editingStudent.homeLanguage,
-        englishProficiency: editingStudent.englishProficiency,
-        curriculumTrack: editingStudent.curriculumTrack,
-        admissionType: editingStudent.admissionType,
-        custodyArrangement: editingStudent.custodyArrangement,
-        primaryContactParent: editingStudent.primaryContactParent,
-        authorizedPickupPersons: editingStudent.authorizedPickupPersons,
-        mediaConsent: editingStudent.mediaConsent,
-        dietaryRequirements: editingStudent.dietaryRequirements,
-        allergies: editingStudent.allergies,
-        insuranceProvider: editingStudent.insuranceProvider,
-        insurancePolicyExpiry: editingStudent.insurancePolicyExpiry,
-        house: editingStudent.house,
-        ealCode: editingStudent.ealCode,
-        feeConcessionPercent: editingStudent.feeConcessionPercent,
-        specialEducationalNeeds: editingStudent.specialEducationalNeeds,
+        admNo: s.admNo,
+        rollNumber: s.rollNumber,
+        classSectionId: s.classSectionId,
+        admissionDate: s.admissionDate,
+        photoUrl: s.photoUrl,
+        firstName: s.firstName,
+        middleName: s.middleName,
+        lastName: s.lastName,
+        gender: s.gender,
+        dateOfBirth: s.dateOfBirth,
+        mobile: s.mobile,
+        email: s.email,
+        addressLine: s.addressLine,
+        city: s.city,
+        state: s.state,
+        pincode: s.pincode,
+        category: s.category,
+        religion: s.religion,
+        previousSchool: s.previousSchool,
+        transportRequired: s.transportRequired,
+        transportRoute: s.transportRoute,
+        nationality: s.nationality,
+        secondNationality: s.secondNationality,
+        countryOfBirth: s.countryOfBirth,
+        preferredName: s.preferredName,
+        motherTongue: s.motherTongue,
+        homeLanguage: s.homeLanguage,
+        englishProficiency: s.englishProficiency,
+        curriculumTrack: s.curriculumTrack,
+        admissionType: s.admissionType,
+        custodyArrangement: s.custodyArrangement,
+        mediaConsent: s.mediaConsent,
+        house: s.house,
+        ealCode: s.ealCode,
+        feeConcessionPercent: s.feeConcessionPercent,
+        health: null,
+        pickupPersons: null,
       });
-      setStatus(editingStudent.status);
+      setHealth(s.health);
+      setPickups(
+        s.pickupPersons.map((p) => ({
+          name: p.name,
+          relation: p.relation,
+          phone: p.phone,
+          idNote: p.idNote,
+        })),
+      );
+      setIdentity({
+        aadhaarNumber: s.identity.aadhaarNumber,
+        passportNumber: s.identity.passportNumber,
+        passportExpiry: s.identity.passportExpiry,
+        visaType: s.identity.visaType,
+        visaExpiry: s.identity.visaExpiry,
+      });
+      setStatus(s.status);
     } else {
-      setForm(emptyForm);
+      setForm({
+        ...emptyForm,
+        admissionDate: new Date().toISOString().slice(0, 10),
+      });
+      setHealth(emptyHealth);
+      setPickups([]);
+      setIdentity(emptyIdentity);
       setStatus("Active");
     }
-    setError(null);
-  }, [editingStudent, isOpen, classSections]);
+    setErrors(null);
+  }, [editingStudent, isOpen]);
 
   if (!isOpen) return null;
 
   const field = (key: keyof CreateStudentRequest, value: string) =>
     setForm((f) => ({ ...f, [key]: value === "" ? null : value }));
+  const healthField = (key: keyof StudentHealthDto, value: string) =>
+    setHealth((h) => ({ ...h, [key]: value === "" ? null : value }));
+  const identityField = (
+    key: keyof UpdateStudentIdentityRequest,
+    value: string,
+  ) => setIdentity((i) => ({ ...i, [key]: value === "" ? null : value }));
 
-  const selectedDietary = (form.dietaryRequirements ?? "")
+  const selectedDietary = (health.dietaryRequirements ?? "")
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
@@ -188,45 +225,57 @@ export function StudentModal({
     const next = selectedDietary.includes(tag)
       ? selectedDietary.filter((t) => t !== tag)
       : [...selectedDietary, tag];
-    setForm((f) => ({ ...f, dietaryRequirements: next.join(", ") || null }));
+    setHealth((h) => ({ ...h, dietaryRequirements: next.join(", ") || null }));
   };
 
+  const updatePickup = (i: number, patch: Partial<PickupPersonRequest>) =>
+    setPickups((list) =>
+      list.map((p, idx) => (idx === i ? { ...p, ...patch } : p)),
+    );
+
   const handleSubmit = async () => {
-    setError(null);
-    if (
-      !form.admNo ||
-      !form.rollNumber ||
-      !form.classSectionId ||
-      !form.firstName ||
-      !form.lastName ||
-      !form.dateOfBirth ||
-      !form.addressLine ||
-      !form.city ||
-      !form.state ||
-      !form.pincode
-    ) {
-      setError(
-        "Adm #, class, roll number, first/last name, DOB, and full address are required.",
-      );
+    const problems: string[] = [];
+    if (!form.admNo) problems.push("Admission number is required.");
+    if (!form.rollNumber) problems.push("Roll number is required.");
+    if (!form.classSectionId) problems.push("Class is required.");
+    if (!form.firstName) problems.push("First name is required.");
+    if (!form.lastName) problems.push("Last name is required.");
+    if (!form.dateOfBirth) problems.push("Date of birth is required.");
+
+    // A completely blank pickup row is ignored; a partly filled one is an error.
+    const pickupRows = pickups.filter(
+      (p) => p.name.trim() || p.relation.trim() || p.phone.trim(),
+    );
+    pickupRows.forEach((p, i) => {
+      if (!p.name.trim() || !p.relation.trim() || !p.phone.trim())
+        problems.push(
+          `Pickup person ${i + 1}: name, relation and phone are all required.`,
+        );
+    });
+    if (problems.length > 0) {
+      setErrors(problems);
       return;
     }
+
     setIsSubmitting(true);
     try {
-      // Guard against any empty-string value reaching a nullable field —
-      // rather than trust every individual input's state management,
-      // normalize the whole payload once, right before it's sent.
-      const sanitized = Object.fromEntries(
-        Object.entries(form).map(([key, value]) => [
-          key,
-          value === "" ? null : value,
-        ]),
-      ) as CreateStudentRequest;
+      const payload: CreateStudentRequest = {
+        ...blankToNull(form),
+        health: blankToNull(health),
+        // On edit this replaces the list; on create it seeds it.
+        pickupPersons: pickupRows.map((p) => blankToNull(p)),
+      };
+      const identityPayload =
+        editingStudent && !identityHidden ? blankToNull(identity) : null;
 
-      await onSubmit(sanitized, status);
+      await onSubmit(payload, status, identityPayload);
       onClose();
-    } catch {
-      setError(
-        "Could not save this student. The Adm # or roll number may already be in use.",
+    } catch (err) {
+      setErrors(
+        getApiErrors(
+          err,
+          "Could not save this student. The Adm # or roll number may already be in use.",
+        ),
       );
     } finally {
       setIsSubmitting(false);
@@ -312,13 +361,11 @@ export function StudentModal({
               <label>Status</label>
               <select
                 value={status}
-                onChange={(e) => setStatus(e.target.value)}
+                onChange={(e) => setStatus(e.target.value as StudentStatus)}
               >
-                <option>Active</option>
-                <option>Inactive</option>
-                <option>Transferred</option>
-                <option>Passed Out</option>
-                <option>Suspended</option>
+                <option value="Active">Active</option>
+                <option value="Inactive">Inactive</option>
+                <option value="Left">Left</option>
               </select>
             </div>
             <div className="field">
@@ -363,6 +410,13 @@ export function StudentModal({
               />
             </div>
             <div className="field">
+              <label>Preferred Name</label>
+              <input
+                value={form.preferredName ?? ""}
+                onChange={(e) => field("preferredName", e.target.value)}
+              />
+            </div>
+            <div className="field">
               <label>
                 Gender<span className="required">*</span>
               </label>
@@ -392,27 +446,16 @@ export function StudentModal({
             <div className="field">
               <label>Blood Group</label>
               <select
-                value={form.bloodGroup ?? "unknown"}
-                onChange={(e) => field("bloodGroup", e.target.value)}
+                value={health.bloodGroup ?? ""}
+                onChange={(e) => healthField("bloodGroup", e.target.value)}
               >
-                <option>unknown</option>
-                <option>A+</option>
-                <option>A-</option>
-                <option>B+</option>
-                <option>B-</option>
-                <option>O+</option>
-                <option>O-</option>
-                <option>AB+</option>
-                <option>AB-</option>
+                <option value="">Unknown</option>
+                {BLOOD_GROUPS.map((b) => (
+                  <option key={b} value={b}>
+                    {b}
+                  </option>
+                ))}
               </select>
-            </div>
-            <div className="field" style={{ gridColumn: "span 2" }}>
-              <label>Aadhaar Number</label>
-              <input
-                value={form.aadhaarNumber ?? ""}
-                onChange={(e) => field("aadhaarNumber", e.target.value)}
-                placeholder="12 digits"
-              />
             </div>
           </div>
 
@@ -433,37 +476,29 @@ export function StudentModal({
                 onChange={(e) => field("email", e.target.value)}
               />
             </div>
-            <div className="field" style={{ gridColumn: "span 2" }}>
-              <label>
-                Address Line<span className="required">*</span>
-              </label>
+            <div className="field">
+              <label>Address</label>
               <input
                 value={form.addressLine ?? ""}
                 onChange={(e) => field("addressLine", e.target.value)}
               />
             </div>
             <div className="field">
-              <label>
-                City<span className="required">*</span>
-              </label>
+              <label>City</label>
               <input
                 value={form.city ?? ""}
                 onChange={(e) => field("city", e.target.value)}
               />
             </div>
             <div className="field">
-              <label>
-                State<span className="required">*</span>
-              </label>
+              <label>State</label>
               <input
                 value={form.state ?? ""}
                 onChange={(e) => field("state", e.target.value)}
               />
             </div>
-            <div className="field" style={{ gridColumn: "span 2" }}>
-              <label>
-                PIN Code<span className="required">*</span>
-              </label>
+            <div className="field">
+              <label>Pincode</label>
               <input
                 value={form.pincode ?? ""}
                 onChange={(e) => field("pincode", e.target.value)}
@@ -471,73 +506,40 @@ export function StudentModal({
             </div>
           </div>
 
-          <div className="modal__section-title">Family</div>
-          <div className="modal__grid">
-            <div className="field">
-              <label>Father Name</label>
-              <input
-                value={form.fatherName ?? ""}
-                onChange={(e) => field("fatherName", e.target.value)}
-              />
+          <div className="modal__section-title">Parents / Guardians</div>
+          {editingStudent ? (
+            <>
+              {editingStudent.guardians.length === 0 ? (
+                <div className="empty-state" style={{ padding: 12 }}>
+                  No parents linked yet.
+                </div>
+              ) : (
+                editingStudent.guardians.map((g) => (
+                  <div key={g.parentId} style={{ marginBottom: 6 }}>
+                    <strong>{g.parentName}</strong>{" "}
+                    <span className="badge badge--info">{g.relationType}</span>
+                    {g.isPrimaryContact && (
+                      <span className="badge badge--warn"> ★ Primary</span>
+                    )}
+                    <span style={{ color: "var(--muted)", fontSize: 12.5 }}>
+                      {" "}
+                      · {g.parentMobile}
+                    </span>
+                  </div>
+                ))
+              )}
+              <div className="modal__note">
+                Parent details are edited in the Parents module. Links are
+                managed there too.
+              </div>
+            </>
+          ) : (
+            <div className="modal__note" style={{ marginTop: 0 }}>
+              Parents are linked after the student is created, from the Parents
+              module. Students admitted through Admissions get their parents
+              linked automatically at enrolment.
             </div>
-            <div className="field">
-              <label>Father Occupation</label>
-              <input
-                value={form.fatherOccupation ?? ""}
-                onChange={(e) => field("fatherOccupation", e.target.value)}
-              />
-            </div>
-            <div className="field">
-              <label>Father Mobile</label>
-              <input
-                value={form.fatherMobile ?? ""}
-                onChange={(e) => field("fatherMobile", e.target.value)}
-              />
-            </div>
-            <div className="field">
-              <label>Mother Name</label>
-              <input
-                value={form.motherName ?? ""}
-                onChange={(e) => field("motherName", e.target.value)}
-              />
-            </div>
-            <div className="field">
-              <label>Mother Occupation</label>
-              <input
-                value={form.motherOccupation ?? ""}
-                onChange={(e) => field("motherOccupation", e.target.value)}
-              />
-            </div>
-            <div className="field">
-              <label>Mother Mobile</label>
-              <input
-                value={form.motherMobile ?? ""}
-                onChange={(e) => field("motherMobile", e.target.value)}
-              />
-            </div>
-            <div className="field">
-              <label>Guardian Name</label>
-              <input
-                value={form.guardianName ?? ""}
-                onChange={(e) => field("guardianName", e.target.value)}
-              />
-            </div>
-            <div className="field">
-              <label>Guardian Relation</label>
-              <input
-                value={form.guardianRelation ?? ""}
-                onChange={(e) => field("guardianRelation", e.target.value)}
-                placeholder="e.g. Uncle"
-              />
-            </div>
-            <div className="field">
-              <label>Guardian Mobile</label>
-              <input
-                value={form.guardianMobile ?? ""}
-                onChange={(e) => field("guardianMobile", e.target.value)}
-              />
-            </div>
-          </div>
+          )}
 
           <div className="modal__section-title">Other Info</div>
           <div className="modal__grid">
@@ -551,20 +553,26 @@ export function StudentModal({
                   setForm((f) => ({ ...f, category: e.target.value }))
                 }
               >
-                <option>General</option>
-                <option>OBC</option>
-                <option>SC</option>
-                <option>ST</option>
+                {CATEGORIES.map((c) => (
+                  <option key={c}>{c}</option>
+                ))}
               </select>
             </div>
             <div className="field">
               <label>Religion</label>
-              <input
+              <select
                 value={form.religion ?? ""}
                 onChange={(e) => field("religion", e.target.value)}
-              />
+              >
+                <option value="">Not specified</option>
+                {RELIGIONS.map((r) => (
+                  <option key={r} value={r}>
+                    {r}
+                  </option>
+                ))}
+              </select>
             </div>
-            <div className="field" style={{ gridColumn: "span 2" }}>
+            <div className="field">
               <label>Previous School</label>
               <input
                 value={form.previousSchool ?? ""}
@@ -592,7 +600,7 @@ export function StudentModal({
                       setForm((f) => ({
                         ...f,
                         transportRequired: false,
-                        transportRoute: "",
+                        transportRoute: null,
                       }))
                     }
                   />{" "}
@@ -606,21 +614,19 @@ export function StudentModal({
                 value={form.transportRoute ?? ""}
                 disabled={!form.transportRequired}
                 onChange={(e) => field("transportRoute", e.target.value)}
-                placeholder="(transport off)"
               />
             </div>
-            <div className="field" style={{ gridColumn: "span 2" }}>
+            <div className="field">
               <label>Medical Notes</label>
               <textarea
                 rows={2}
-                value={form.medicalNotes ?? ""}
-                onChange={(e) => field("medicalNotes", e.target.value)}
-                placeholder="Allergies, conditions, etc."
+                value={health.medicalNotes ?? ""}
+                onChange={(e) => healthField("medicalNotes", e.target.value)}
               />
             </div>
           </div>
 
-          <div className="modal__section-title">Identity &amp; Citizenship</div>
+          <div className="modal__section-title">Citizenship</div>
           <div className="modal__grid">
             <div className="field">
               <label>Nationality</label>
@@ -634,7 +640,6 @@ export function StudentModal({
               <input
                 value={form.secondNationality ?? ""}
                 onChange={(e) => field("secondNationality", e.target.value)}
-                placeholder="Optional"
               />
             </div>
             <div className="field">
@@ -642,45 +647,6 @@ export function StudentModal({
               <input
                 value={form.countryOfBirth ?? ""}
                 onChange={(e) => field("countryOfBirth", e.target.value)}
-              />
-            </div>
-            <div className="field">
-              <label>Preferred Name</label>
-              <input
-                value={form.preferredName ?? ""}
-                onChange={(e) => field("preferredName", e.target.value)}
-                placeholder="What students like to be called"
-              />
-            </div>
-            <div className="field">
-              <label>Passport Number</label>
-              <input
-                value={form.passportNumber ?? ""}
-                onChange={(e) => field("passportNumber", e.target.value)}
-              />
-            </div>
-            <div className="field">
-              <label>Passport Expiry</label>
-              <input
-                type="date"
-                value={form.passportExpiry ?? ""}
-                onChange={(e) => field("passportExpiry", e.target.value)}
-              />
-            </div>
-            <div className="field">
-              <label>Visa Type</label>
-              <input
-                value={form.visaType ?? ""}
-                onChange={(e) => field("visaType", e.target.value)}
-                placeholder="e.g. Dependent, Student, Tourist"
-              />
-            </div>
-            <div className="field">
-              <label>Visa Expiry</label>
-              <input
-                type="date"
-                value={form.visaExpiry ?? ""}
-                onChange={(e) => field("visaExpiry", e.target.value)}
               />
             </div>
           </div>
@@ -692,7 +658,6 @@ export function StudentModal({
               <input
                 value={form.motherTongue ?? ""}
                 onChange={(e) => field("motherTongue", e.target.value)}
-                placeholder="e.g. English, Mandarin, Hindi"
               />
             </div>
             <div className="field">
@@ -705,9 +670,10 @@ export function StudentModal({
             <div className="field">
               <label>English Proficiency</label>
               <select
-                value={form.englishProficiency ?? "Native"}
+                value={form.englishProficiency ?? ""}
                 onChange={(e) => field("englishProficiency", e.target.value)}
               >
+                <option value="">Not specified</option>
                 <option>Native</option>
                 <option>C2 Proficient</option>
                 <option>C1 Advanced</option>
@@ -719,14 +685,22 @@ export function StudentModal({
             <div className="field">
               <label>Curriculum Track</label>
               <select
-                value={form.curriculumTrack ?? "British"}
+                value={form.curriculumTrack ?? ""}
                 onChange={(e) => field("curriculumTrack", e.target.value)}
               >
+                <option value="">Not specified</option>
                 <option>British</option>
                 <option>American</option>
                 <option>IB</option>
                 <option>National</option>
               </select>
+            </div>
+            <div className="field">
+              <label>EAL Code</label>
+              <input
+                value={form.ealCode ?? ""}
+                onChange={(e) => field("ealCode", e.target.value)}
+              />
             </div>
             <div className="field">
               <label>Admission Type</label>
@@ -747,46 +721,98 @@ export function StudentModal({
             <div className="field">
               <label>Custody Arrangement</label>
               <select
-                value={form.custodyArrangement ?? "Joint"}
+                value={form.custodyArrangement ?? ""}
                 onChange={(e) => field("custodyArrangement", e.target.value)}
               >
+                <option value="">Not specified</option>
                 <option>Joint</option>
                 <option>Mother</option>
                 <option>Father</option>
                 <option>Guardian</option>
               </select>
             </div>
-            <div className="field">
-              <label>Primary Contact Parent</label>
-              <select
-                value={form.primaryContactParent ?? "Both Parents"}
-                onChange={(e) => field("primaryContactParent", e.target.value)}
-              >
-                <option>Both Parents</option>
-                <option>Father</option>
-                <option>Mother</option>
-                <option>Guardian</option>
-              </select>
-            </div>
-            <div className="field" style={{ gridColumn: "span 2" }}>
-              <label>Authorized Pickup Persons</label>
-              <textarea
-                rows={2}
-                value={form.authorizedPickupPersons ?? ""}
-                onChange={(e) =>
-                  field("authorizedPickupPersons", e.target.value)
-                }
-                placeholder="Comma-list of authorized adults — grandparents, drivers, etc."
-              />
-            </div>
           </div>
+          <div className="field" style={{ marginTop: 10 }}>
+            <label>Authorized Pickup Persons</label>
+          </div>
+          {pickups.length === 0 && (
+            <div className="empty-state" style={{ padding: 10 }}>
+              No pickup persons added.
+            </div>
+          )}
+          {pickups.map((p, i) => (
+            <div
+              key={i}
+              className="modal__grid"
+              style={{ alignItems: "end", marginBottom: 8 }}
+            >
+              <div className="field">
+                <label>Name</label>
+                <input
+                  value={p.name}
+                  onChange={(e) => updatePickup(i, { name: e.target.value })}
+                />
+              </div>
+              <div className="field">
+                <label>Relation</label>
+                <input
+                  value={p.relation}
+                  onChange={(e) =>
+                    updatePickup(i, { relation: e.target.value })
+                  }
+                  placeholder="e.g. Grandfather, Driver"
+                />
+              </div>
+              <div className="field">
+                <label>Phone</label>
+                <input
+                  value={p.phone}
+                  onChange={(e) => updatePickup(i, { phone: e.target.value })}
+                />
+              </div>
+              <div className="field">
+                <label>ID note</label>
+                <input
+                  value={p.idNote ?? ""}
+                  onChange={(e) =>
+                    updatePickup(i, { idNote: e.target.value || null })
+                  }
+                  placeholder="Optional"
+                />
+              </div>
+              <div className="field">
+                <button
+                  type="button"
+                  className="btn btn--secondary btn--sm"
+                  onClick={() =>
+                    setPickups((list) => list.filter((_, idx) => idx !== i))
+                  }
+                >
+                  Remove
+                </button>
+              </div>
+            </div>
+          ))}
+          <button
+            type="button"
+            className="btn btn--secondary btn--sm"
+            disabled={pickups.length >= MAX_PICKUP_PERSONS}
+            onClick={() =>
+              setPickups((list) => [
+                ...list,
+                { name: "", relation: "", phone: "", idNote: null },
+              ])
+            }
+          >
+            + Add pickup person
+          </button>
           <div
             className="checkbox-row"
             style={{
               display: "flex",
               alignItems: "center",
               gap: 8,
-              marginTop: 8,
+              marginTop: 12,
             }}
           >
             <input
@@ -823,7 +849,7 @@ export function StudentModal({
                 type="button"
                 className={`tag-btn tag-btn--restrictions ${selectedDietary.length === 0 ? "selected" : ""}`}
                 onClick={() =>
-                  setForm((f) => ({ ...f, dietaryRequirements: null }))
+                  setHealth((h) => ({ ...h, dietaryRequirements: null }))
                 }
               >
                 ✓ No Restrictions
@@ -835,30 +861,33 @@ export function StudentModal({
               <label>Allergies</label>
               <textarea
                 rows={2}
-                value={form.allergies ?? ""}
-                onChange={(e) => field("allergies", e.target.value)}
+                value={health.allergies ?? ""}
+                onChange={(e) => healthField("allergies", e.target.value)}
                 placeholder="Critical: peanut, treenut, dairy, penicillin, etc. — staff sees this everywhere"
               />
             </div>
             <div className="field">
               <label>Insurance Provider</label>
               <input
-                value={form.insuranceProvider ?? ""}
-                onChange={(e) => field("insuranceProvider", e.target.value)}
-                placeholder="e.g. AXA International"
+                value={health.insuranceProvider ?? ""}
+                onChange={(e) =>
+                  healthField("insuranceProvider", e.target.value)
+                }
               />
             </div>
             <div className="field">
               <label>Insurance Policy Expiry</label>
               <input
                 type="date"
-                value={form.insurancePolicyExpiry ?? ""}
-                onChange={(e) => field("insurancePolicyExpiry", e.target.value)}
+                value={health.insurancePolicyExpiry ?? ""}
+                onChange={(e) =>
+                  healthField("insurancePolicyExpiry", e.target.value)
+                }
               />
             </div>
           </div>
 
-          <div className="modal__section-title">House &amp; Identity</div>
+          <div className="modal__section-title">House</div>
           <div className="tag-group" style={{ marginBottom: 16 }}>
             {HOUSE_OPTIONS.map((h) => (
               <button
@@ -897,9 +926,9 @@ export function StudentModal({
               <label>Special Educational Needs (SEN / IEP)</label>
               <textarea
                 rows={2}
-                value={form.specialEducationalNeeds ?? ""}
+                value={health.specialEducationalNeeds ?? ""}
                 onChange={(e) =>
-                  field("specialEducationalNeeds", e.target.value)
+                  healthField("specialEducationalNeeds", e.target.value)
                 }
                 placeholder="e.g. IEP - Dyslexia, extra time on exams"
               />
@@ -909,20 +938,85 @@ export function StudentModal({
             </div>
           </div>
 
+          <div className="modal__section-title">
+            Identity Documents (Aadhaar / Passport / Visa)
+          </div>
+          {!editingStudent ? (
+            <div className="modal__note" style={{ marginTop: 0 }}>
+              Identity numbers can be added by authorised staff after the
+              student is created (Edit student).
+            </div>
+          ) : identityHidden ? (
+            <>
+              <div className="modal__note" style={{ marginTop: 0 }}>
+                Numbers are hidden for your role. Only staff with sensitive-data
+                permission can view or change them.
+              </div>
+              <div className="modal__grid">
+                <div className="field">
+                  <label>Aadhaar</label>
+                  <input value={identity.aadhaarNumber ?? "—"} disabled />
+                </div>
+                <div className="field">
+                  <label>Passport Number</label>
+                  <input value={identity.passportNumber ?? "—"} disabled />
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="modal__grid">
+              <div className="field">
+                <label>Aadhaar Number</label>
+                <input
+                  value={identity.aadhaarNumber ?? ""}
+                  onChange={(e) =>
+                    identityField("aadhaarNumber", e.target.value)
+                  }
+                  placeholder="12 digits"
+                />
+              </div>
+              <div className="field">
+                <label>Passport Number</label>
+                <input
+                  value={identity.passportNumber ?? ""}
+                  onChange={(e) =>
+                    identityField("passportNumber", e.target.value)
+                  }
+                />
+              </div>
+              <div className="field">
+                <label>Passport Expiry</label>
+                <input
+                  type="date"
+                  value={identity.passportExpiry ?? ""}
+                  onChange={(e) =>
+                    identityField("passportExpiry", e.target.value)
+                  }
+                />
+              </div>
+              <div className="field">
+                <label>Visa Type</label>
+                <input
+                  value={identity.visaType ?? ""}
+                  onChange={(e) => identityField("visaType", e.target.value)}
+                />
+              </div>
+              <div className="field">
+                <label>Visa Expiry</label>
+                <input
+                  type="date"
+                  value={identity.visaExpiry ?? ""}
+                  onChange={(e) => identityField("visaExpiry", e.target.value)}
+                />
+              </div>
+            </div>
+          )}
+
           <div className="modal__note">
             <strong>Note:</strong> Portal login credentials aren't set here —
             student portal access is provisioned as a separate, deliberate step,
             not part of adding a student record.
           </div>
-
-          {error && (
-            <div
-              className="modal__note"
-              style={{ background: "var(--red-bg)", color: "var(--red)" }}
-            >
-              {error}
-            </div>
-          )}
         </div>
         <div className="modal__footer">
           <button
@@ -937,6 +1031,7 @@ export function StudentModal({
           </button>
         </div>
       </div>
+      <ValidationModal errors={errors} onClose={() => setErrors(null)} />
     </div>
   );
 }

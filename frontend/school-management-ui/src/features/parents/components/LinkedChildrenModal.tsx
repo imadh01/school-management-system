@@ -6,7 +6,7 @@ import type {
   LinkedStudentResponse,
   RelationType,
 } from "../types/parent.types";
-import type { StudentResponse } from "@/features/students/types/student.types";
+import type { StudentSummaryResponse } from "@/features/students/types/student.types";
 
 interface Props {
   isOpen: boolean;
@@ -26,7 +26,7 @@ export function LinkedChildrenModal({
   onChanged,
 }: Props) {
   const [linked, setLinked] = useState<LinkedStudentResponse[]>([]);
-  const [allStudents, setAllStudents] = useState<StudentResponse[]>([]);
+  const [allStudents, setAllStudents] = useState<StudentSummaryResponse[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedStudentId, setSelectedStudentId] = useState("");
   const [relation, setRelation] = useState<RelationType>("Father");

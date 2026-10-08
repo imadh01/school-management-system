@@ -4,6 +4,32 @@ export type AdmissionStatus =
   | "Enrolled"
   | "Rejected";
 
+export type GuardianRelation = "Father" | "Mother" | "Guardian";
+
+/** What the server suggests / what staff decide for each guardian at enrolment. */
+export type GuardianAction =
+  | "UseExisting"
+  | "CreateNew"
+  | "MustChoose"
+  | "MissingMobile";
+
+export interface AdmissionGuardianRequest {
+  relationType: GuardianRelation;
+  name: string;
+  mobile: string | null;
+  email: string | null;
+  isPrimaryContact: boolean;
+}
+
+export interface AdmissionGuardianResponse {
+  id: number;
+  relationType: GuardianRelation;
+  name: string;
+  mobile: string | null;
+  email: string | null;
+  isPrimaryContact: boolean;
+}
+
 export interface AdmissionResponse {
   id: number;
   regNo: string;
@@ -15,7 +41,6 @@ export interface AdmissionResponse {
   academicYearName: string;
   appliedForClassSectionId: number;
   appliedForClassSectionName: string;
-  grade: string | null;
   admissionType: string;
   previousSchool: string | null;
   phone: string;
@@ -23,19 +48,10 @@ export interface AdmissionResponse {
   registrationDate: string;
   status: AdmissionStatus;
   rejectionReason: string | null;
-  fatherName: string | null;
-  fatherMobile: string | null;
-  motherName: string | null;
-  motherMobile: string | null;
-  guardianName: string | null;
-  guardianRelation: string | null;
-  guardianMobile: string | null;
   addressLine: string | null;
   city: string | null;
   state: string | null;
   pincode: string | null;
-  registrationFee: number | null;
-  notes: string | null;
   admissionFee: number | null;
   admissionFeeReference: string | null;
   bloodGroup: string | null;
@@ -51,6 +67,7 @@ export interface AdmissionResponse {
   allottedClassSectionId: number | null;
   allottedClassSectionName: string | null;
   studentId: number | null;
+  guardians: AdmissionGuardianResponse[];
 }
 
 export interface CreateAdmissionRequest {
@@ -60,24 +77,16 @@ export interface CreateAdmissionRequest {
   gender: string;
   dateOfBirth: string;
   appliedForClassSectionId: number;
-  grade: string | null;
   admissionType: string;
   previousSchool: string | null;
   phone: string;
   email: string | null;
-  fatherName: string | null;
-  fatherMobile: string | null;
-  motherName: string | null;
-  motherMobile: string | null;
-  guardianName: string | null;
-  guardianRelation: string | null;
-  guardianMobile: string | null;
   addressLine: string | null;
   city: string | null;
   state: string | null;
   pincode: string | null;
-  registrationFee: number | null;
-  notes: string | null;
+  remarks: string | null;
+  guardians: AdmissionGuardianRequest[];
 }
 
 export type UpdateAdmissionRequest = CreateAdmissionRequest;
@@ -90,6 +99,12 @@ export interface ConfirmAdmissionRequest {
   category: string | null;
   medicalNotes: string | null;
   remarks: string | null;
+}
+
+export interface GuardianDecision {
+  admissionGuardianId: number;
+  action: "UseExisting" | "CreateNew";
+  parentId: number | null;
 }
 
 export interface EnrollAdmissionRequest {
@@ -105,8 +120,31 @@ export interface EnrollAdmissionRequest {
   ealCode: string | null;
   house: string | null;
   allergies: string | null;
+  guardians: GuardianDecision[];
 }
 
 export interface RejectAdmissionRequest {
   rejectionReason: string;
+}
+
+export interface ParentCandidate {
+  parentId: number;
+  name: string;
+  mobile: string;
+  email: string | null;
+  linkedChildren: string[];
+}
+
+export interface GuardianMatch {
+  admissionGuardianId: number;
+  relationType: GuardianRelation;
+  name: string;
+  mobile: string | null;
+  suggestedAction: GuardianAction;
+  candidates: ParentCandidate[];
+}
+
+export interface GuardianMatchesResponse {
+  admissionId: number;
+  guardians: GuardianMatch[];
 }

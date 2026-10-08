@@ -10,6 +10,12 @@ public class Parent
     public string Name { get; set; } = string.Empty;
     public string? Email { get; set; }
     public string Mobile { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Mobile with spaces/dashes/brackets stripped. Computed by the database
+    /// (never set in code) so it cannot drift from Mobile. Used for matching.
+    /// </summary>
+    public string MobileKey { get; private set; } = string.Empty;
     public string Status { get; set; } = "Active";
 
     public string? Occupation { get; set; }

@@ -14,6 +14,13 @@ public class ParentConfiguration : IEntityTypeConfiguration<Parent>
         builder.Property(p => p.Name).HasMaxLength(100).IsRequired();
         builder.Property(p => p.Email).HasMaxLength(100);
         builder.Property(p => p.Mobile).HasMaxLength(20).IsRequired();
+
+        // Persisted computed column: one definition of "same number" shared with AdmissionGuardians.
+        builder.Property(p => p.MobileKey)
+            .HasMaxLength(20)
+            .HasComputedColumnSql(MobileKeySql.Expression("Mobile"), stored: true);
+        // Deliberately NOT unique: families may share a number (matching is staff-confirmed).
+        builder.HasIndex(p => p.MobileKey).HasDatabaseName("IX_Parents_MobileKey");
         builder.Property(p => p.Status).HasMaxLength(20).IsRequired().HasDefaultValue("Active");
 
         builder.Property(p => p.Occupation).HasMaxLength(100);

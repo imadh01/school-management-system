@@ -15,5 +15,14 @@ public class UpdateStudentRequestValidator : AbstractValidator<UpdateStudentRequ
         RuleFor(x => x.LastName).NotEmpty().MaximumLength(50);
         RuleFor(x => x.Gender).NotEmpty();
         RuleFor(x => x.DateOfBirth).LessThan(DateOnly.FromDateTime(DateTime.UtcNow));
+        RuleFor(x => x.Category).NotEmpty().MaximumLength(20);
+        RuleFor(x => x.AdmissionType).NotEmpty().MaximumLength(30);
+        RuleFor(x => x.Email).EmailAddress().MaximumLength(100).When(x => !string.IsNullOrWhiteSpace(x.Email));
+        RuleFor(x => x.FeeConcessionPercent).InclusiveBetween(0m, 100m).When(x => x.FeeConcessionPercent.HasValue);
+
+        RuleFor(x => x.Health!).SetValidator(new StudentHealthDtoValidator()).When(x => x.Health is not null);
+        RuleForEach(x => x.PickupPersons).SetValidator(new PickupPersonRequestValidator());
+        RuleFor(x => x.PickupPersons).Must(StudentRequestRules.PickupPersonsWithinLimit)
+            .WithMessage($"A student can have at most {StudentRequestRules.MaxPickupPersons} authorised pickup persons.");
     }
 }

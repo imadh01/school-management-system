@@ -4,10 +4,11 @@ namespace SchoolManagement.Application.Interfaces;
 
 public interface IStudentService
 {
-    Task<List<StudentResponse>> GetAllAsync(CancellationToken cancellationToken);
-    Task<StudentResponse> GetByIdAsync(int id, CancellationToken cancellationToken);
-    Task<StudentResponse> CreateAsync(CreateStudentRequest request, CancellationToken cancellationToken);
-    Task<StudentResponse> CreateFromAdmissionAsync(int admissionId, CreateStudentFromAdmissionRequest request, CancellationToken cancellationToken);
-    Task<StudentResponse> UpdateAsync(int id, UpdateStudentRequest request, CancellationToken cancellationToken);
+    Task<List<StudentSummaryResponse>> GetAllAsync(CancellationToken cancellationToken);
+    Task<StudentResponse> GetByIdAsync(int id, bool includeSensitive, CancellationToken cancellationToken);
+    Task<StudentResponse> CreateAsync(CreateStudentRequest request, bool includeSensitive, CancellationToken cancellationToken);
+    Task<StudentResponse> UpdateAsync(int id, UpdateStudentRequest request, bool includeSensitive, CancellationToken cancellationToken);
+    Task<StudentResponse> UpdateIdentityAsync(int id, UpdateStudentIdentityRequest request, CancellationToken cancellationToken);
+    Task<List<StudentEnrollmentResponse>> GetEnrollmentsAsync(int studentId, CancellationToken cancellationToken);
     Task DeleteAsync(int id, CancellationToken cancellationToken);
 }

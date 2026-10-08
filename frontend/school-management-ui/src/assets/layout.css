@@ -270,9 +270,9 @@ body.dark-mode .app-footer {
   box-shadow: var(--shadow-card);
   padding: 18px;
 }
-.card + .card {
+/* .card + .card {
   margin-top: 18px;
-}
+} */
 
 .avatar-circle {
   display: inline-flex;

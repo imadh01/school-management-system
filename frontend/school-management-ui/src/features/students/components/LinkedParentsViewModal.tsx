@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import { parentService } from "@/features/parents/services/parentService";
 import type { StudentGuardianResponse } from "@/features/parents/types/parent.types";
-import type { StudentResponse } from "../types/student.types";
+import type { StudentSummaryResponse } from "../types/student.types";
 
 interface Props {
-  student: StudentResponse | null;
+  student: StudentSummaryResponse | null;
   onClose: () => void;
 }
 

@@ -4,4 +4,5 @@ public record EnrollAdmissionRequest(
     string RollNumber, string AdmissionNumber, DateOnly AdmissionDate,
     string? EntryPoint, bool TransportRequired, int AllottedClassSectionId,
     string? Nationality, string? CurriculumTrack, string? EnglishProficiency,
-    string? EalCode, string? House, string? Allergies);
+    string? EalCode, string? House, string? Allergies,
+    List<GuardianDecision> Guardians);

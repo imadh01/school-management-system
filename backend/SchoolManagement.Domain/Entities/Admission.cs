@@ -70,4 +70,8 @@ public class Admission
     public string? Grade { get; set; }
     public decimal? RegistrationFee { get; set; }
     public string? Notes { get; set; }
+
+    // Guardians captured on the application (father/mother/guardian rows).
+    // Staff confirm which existing Parent each one maps to at enrolment.
+    public ICollection<AdmissionGuardian> Guardians { get; set; } = new List<AdmissionGuardian>();
 }

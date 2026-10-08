@@ -1,18 +1,18 @@
 ﻿namespace SchoolManagement.Application.DTOs.Students;
 
+/// <summary>
+/// Direct creation (without an admission). Guardians are linked afterwards with
+/// POST /api/students/{id}/guardians; identity numbers are set with PUT /api/students/{id}/identity.
+/// </summary>
 public record CreateStudentRequest(
     string AdmNo, string RollNumber, int ClassSectionId, DateOnly AdmissionDate, string? PhotoUrl,
     string FirstName, string? MiddleName, string LastName, string Gender, DateOnly DateOfBirth,
-    string? BloodGroup, string? AadhaarNumber,
     string? Mobile, string? Email, string? AddressLine, string? City, string? State, string? Pincode,
-    string? FatherName, string? FatherOccupation, string? FatherMobile,
-    string? MotherName, string? MotherOccupation, string? MotherMobile,
-    string? GuardianName, string? GuardianRelation, string? GuardianMobile,
     string Category, string? Religion, string? PreviousSchool,
-    bool TransportRequired, string? TransportRoute, string? MedicalNotes,
+    bool TransportRequired, string? TransportRoute,
     string? Nationality, string? SecondNationality, string? CountryOfBirth, string? PreferredName,
-    string? PassportNumber, DateOnly? PassportExpiry, string? VisaType, DateOnly? VisaExpiry,
     string? MotherTongue, string? HomeLanguage, string? EnglishProficiency, string? CurriculumTrack, string AdmissionType,
-    string? CustodyArrangement, string? PrimaryContactParent, string? AuthorizedPickupPersons, bool MediaConsent,
-    string? DietaryRequirements, string? Allergies, string? InsuranceProvider, DateOnly? InsurancePolicyExpiry,
-    string? House, string? EalCode, decimal? FeeConcessionPercent, string? SpecialEducationalNeeds);
+    string? CustodyArrangement, bool MediaConsent,
+    string? House, string? EalCode, decimal? FeeConcessionPercent,
+    StudentHealthDto? Health,
+    List<PickupPersonRequest>? PickupPersons);

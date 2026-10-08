@@ -1,9 +1,13 @@
 import { useEffect, useState } from "react";
 import type {
+  AdmissionGuardianRequest,
   AdmissionResponse,
   CreateAdmissionRequest,
+  GuardianRelation,
 } from "../types/admission.types";
 import type { ClassSectionResponse } from "@/features/class-sections/types/classSection.types";
+import { ValidationModal } from "@/components/ValidationModal";
+import { getApiErrors } from "@/utils/apiError";
 
 interface Props {
   isOpen: boolean;
@@ -13,6 +17,18 @@ interface Props {
   onSubmit: (data: CreateAdmissionRequest) => Promise<void>;
 }
 
+const MAX_GUARDIANS = 5;
+
+const emptyGuardian = (
+  relationType: GuardianRelation,
+): AdmissionGuardianRequest => ({
+  relationType,
+  name: "",
+  mobile: "",
+  email: "",
+  isPrimaryContact: false,
+});
+
 const emptyForm: CreateAdmissionRequest = {
   firstName: "",
   middleName: "",
@@ -20,24 +36,16 @@ const emptyForm: CreateAdmissionRequest = {
   gender: "Male",
   dateOfBirth: "",
   appliedForClassSectionId: 0,
-  grade: "",
   admissionType: "New",
   previousSchool: "",
   phone: "",
   email: "",
-  fatherName: "",
-  fatherMobile: "",
-  motherName: "",
-  motherMobile: "",
-  guardianName: "",
-  guardianRelation: "",
-  guardianMobile: "",
   addressLine: "",
   city: "",
   state: "",
   pincode: "",
-  registrationFee: 0,
-  notes: "",
+  remarks: "",
+  guardians: [],
 };
 
 export function RegistrationModal({
@@ -49,7 +57,7 @@ export function RegistrationModal({
 }: Props) {
   const [form, setForm] = useState<CreateAdmissionRequest>(emptyForm);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [errors, setErrors] = useState<string[] | null>(null);
 
   useEffect(() => {
     if (editingAdmission) {
@@ -60,29 +68,27 @@ export function RegistrationModal({
         gender: editingAdmission.gender,
         dateOfBirth: editingAdmission.dateOfBirth,
         appliedForClassSectionId: editingAdmission.appliedForClassSectionId,
-        grade: editingAdmission.grade,
         admissionType: editingAdmission.admissionType,
         previousSchool: editingAdmission.previousSchool,
         phone: editingAdmission.phone,
         email: editingAdmission.email,
-        fatherName: editingAdmission.fatherName,
-        fatherMobile: editingAdmission.fatherMobile,
-        motherName: editingAdmission.motherName,
-        motherMobile: editingAdmission.motherMobile,
-        guardianName: editingAdmission.guardianName,
-        guardianRelation: editingAdmission.guardianRelation,
-        guardianMobile: editingAdmission.guardianMobile,
         addressLine: editingAdmission.addressLine,
         city: editingAdmission.city,
         state: editingAdmission.state,
         pincode: editingAdmission.pincode,
-        registrationFee: editingAdmission.registrationFee,
-        notes: editingAdmission.notes,
+        remarks: editingAdmission.remarks,
+        guardians: editingAdmission.guardians.map((g) => ({
+          relationType: g.relationType,
+          name: g.name,
+          mobile: g.mobile,
+          email: g.email,
+          isPrimaryContact: g.isPrimaryContact,
+        })),
       });
     } else {
       setForm(emptyForm);
     }
-    setError(null);
+    setErrors(null);
   }, [editingAdmission, isOpen]);
 
   if (!isOpen) return null;
@@ -90,43 +96,108 @@ export function RegistrationModal({
   const field = (key: keyof CreateAdmissionRequest, value: string) =>
     setForm((f) => ({ ...f, [key]: value === "" ? null : value }));
 
-  // Academic Year is derived from the selected class, never entered directly —
-  // shown here read-only so the person can see what will be recorded.
   const selectedClassSection = classSections.find(
     (c) => c.id === form.appliedForClassSectionId,
   );
 
+  // ----- guardian rows -----
+  const updateGuardian = (
+    index: number,
+    patch: Partial<AdmissionGuardianRequest>,
+  ) =>
+    setForm((f) => ({
+      ...f,
+      guardians: f.guardians.map((g, i) =>
+        i === index ? { ...g, ...patch } : g,
+      ),
+    }));
+
+  const setPrimary = (index: number) =>
+    setForm((f) => ({
+      ...f,
+      guardians: f.guardians.map((g, i) => ({
+        ...g,
+        isPrimaryContact: i === index,
+      })),
+    }));
+
+  const addGuardian = () => {
+    if (form.guardians.length >= MAX_GUARDIANS) return;
+    // Suggest the next missing relation so the common case is one click.
+    const has = (r: GuardianRelation) =>
+      form.guardians.some((g) => g.relationType === r);
+    const next: GuardianRelation = !has("Father")
+      ? "Father"
+      : !has("Mother")
+        ? "Mother"
+        : "Guardian";
+    setForm((f) => ({
+      ...f,
+      guardians: [...f.guardians, emptyGuardian(next)],
+    }));
+  };
+
+  const removeGuardian = (index: number) =>
+    setForm((f) => ({
+      ...f,
+      guardians: f.guardians.filter((_, i) => i !== index),
+    }));
+
   const handleSubmit = async () => {
-    setError(null);
-    if (
-      !form.firstName ||
-      !form.lastName ||
-      !form.phone ||
-      !form.dateOfBirth ||
-      !form.appliedForClassSectionId
-    ) {
-      setError(
-        "First name, last name, phone, date of birth, and applied class are required.",
-      );
+    const problems: string[] = [];
+    if (!form.firstName) problems.push("First name is required.");
+    if (!form.lastName) problems.push("Last name is required.");
+    if (!form.dateOfBirth) problems.push("Date of birth is required.");
+    if (!form.phone) problems.push("Phone is required.");
+    if (!form.appliedForClassSectionId)
+      problems.push("Applied class is required.");
+
+    // A row left completely blank is simply ignored; a half-filled one is an error.
+    const guardians = form.guardians.filter((g) => g.name.trim() || g.mobile);
+    guardians.forEach((g, i) => {
+      if (!g.name.trim()) problems.push(`Guardian ${i + 1}: name is required.`);
+    });
+    if (guardians.filter((g) => g.relationType === "Father").length > 1)
+      problems.push("Only one father can be added.");
+    if (guardians.filter((g) => g.relationType === "Mother").length > 1)
+      problems.push("Only one mother can be added.");
+
+    if (problems.length > 0) {
+      setErrors(problems);
       return;
     }
+
+    // If staff did not tick a primary contact, the first guardian is primary.
+    const normalizedGuardians = guardians.map((g, i) => ({
+      ...g,
+      name: g.name.trim(),
+      mobile: g.mobile?.trim() || null,
+      email: g.email?.trim() || null,
+      isPrimaryContact: guardians.some((x) => x.isPrimaryContact)
+        ? g.isPrimaryContact
+        : i === 0,
+    }));
+
     setIsSubmitting(true);
     try {
-      // Guard against any empty-string value reaching a nullable field —
-      // normalize the whole payload once, right before it's sent, rather
-      // than trust every individual input's own handling.
-      const sanitized = Object.fromEntries(
-        Object.entries(form).map(([key, value]) => [
-          key,
-          value === "" ? null : value,
-        ]),
-      ) as CreateAdmissionRequest;
+      const sanitized = {
+        ...Object.fromEntries(
+          Object.entries(form).map(([key, value]) => [
+            key,
+            value === "" ? null : value,
+          ]),
+        ),
+        guardians: normalizedGuardians,
+      } as CreateAdmissionRequest;
 
       await onSubmit(sanitized);
       onClose();
-    } catch {
-      setError(
-        "Could not save this registration. Check the details and try again.",
+    } catch (err) {
+      setErrors(
+        getApiErrors(
+          err,
+          "Could not save this registration. Check the details and try again.",
+        ),
       );
     } finally {
       setIsSubmitting(false);
@@ -223,14 +294,6 @@ export function RegistrationModal({
               </select>
             </div>
             <div className="field">
-              <label>Grade</label>
-              <input
-                value={form.grade ?? ""}
-                onChange={(e) => field("grade", e.target.value)}
-                placeholder="e.g. 6"
-              />
-            </div>
-            <div className="field">
               <label>Admission Type</label>
               <select
                 value={form.admissionType}
@@ -259,59 +322,101 @@ export function RegistrationModal({
             </div>
           </div>
 
-          <div className="modal__section-title">Parents / Guardian</div>
-          <div className="modal__grid">
-            <div className="field">
-              <label>Father's Name</label>
-              <input
-                value={form.fatherName ?? ""}
-                onChange={(e) => field("fatherName", e.target.value)}
-              />
-            </div>
-            <div className="field">
-              <label>Father's Mobile</label>
-              <input
-                value={form.fatherMobile ?? ""}
-                onChange={(e) => field("fatherMobile", e.target.value)}
-              />
-            </div>
-            <div className="field">
-              <label>Mother's Name</label>
-              <input
-                value={form.motherName ?? ""}
-                onChange={(e) => field("motherName", e.target.value)}
-              />
-            </div>
-            <div className="field">
-              <label>Mother's Mobile</label>
-              <input
-                value={form.motherMobile ?? ""}
-                onChange={(e) => field("motherMobile", e.target.value)}
-              />
-            </div>
-            <div className="field">
-              <label>Guardian's Name</label>
-              <input
-                value={form.guardianName ?? ""}
-                onChange={(e) => field("guardianName", e.target.value)}
-              />
-            </div>
-            <div className="field">
-              <label>Guardian Relation</label>
-              <input
-                value={form.guardianRelation ?? ""}
-                onChange={(e) => field("guardianRelation", e.target.value)}
-                placeholder="e.g. Uncle"
-              />
-            </div>
-            <div className="field">
-              <label>Guardian's Mobile</label>
-              <input
-                value={form.guardianMobile ?? ""}
-                onChange={(e) => field("guardianMobile", e.target.value)}
-              />
-            </div>
+          <div className="modal__section-title">Parents / Guardians</div>
+          <div className="modal__note" style={{ marginTop: 0 }}>
+            Optional while the application is a draft, but at least one guardian
+            with a mobile number is needed before enrolment. The mobile number
+            is used to find parents already in the system.
           </div>
+          {form.guardians.length === 0 && (
+            <div className="empty-state" style={{ padding: 12 }}>
+              No guardians added yet.
+            </div>
+          )}
+          {form.guardians.map((g, i) => (
+            <div
+              key={i}
+              className="modal__grid"
+              style={{
+                borderBottom: "1px solid var(--border, #e5e7eb)",
+                paddingBottom: 12,
+                marginBottom: 12,
+                alignItems: "end",
+              }}
+            >
+              <div className="field">
+                <label>Relation</label>
+                <select
+                  value={g.relationType}
+                  onChange={(e) =>
+                    updateGuardian(i, {
+                      relationType: e.target.value as GuardianRelation,
+                    })
+                  }
+                >
+                  <option value="Father">Father</option>
+                  <option value="Mother">Mother</option>
+                  <option value="Guardian">Guardian</option>
+                </select>
+              </div>
+              <div className="field">
+                <label>
+                  Name<span className="required">*</span>
+                </label>
+                <input
+                  value={g.name}
+                  onChange={(e) => updateGuardian(i, { name: e.target.value })}
+                />
+              </div>
+              <div className="field">
+                <label>Mobile</label>
+                <input
+                  value={g.mobile ?? ""}
+                  onChange={(e) =>
+                    updateGuardian(i, { mobile: e.target.value })
+                  }
+                />
+              </div>
+              <div className="field">
+                <label>Email</label>
+                <input
+                  type="email"
+                  value={g.email ?? ""}
+                  onChange={(e) => updateGuardian(i, { email: e.target.value })}
+                />
+              </div>
+              <div className="field">
+                <label
+                  style={{ display: "flex", alignItems: "center", gap: 6 }}
+                >
+                  <input
+                    type="radio"
+                    name="primaryGuardian"
+                    checked={g.isPrimaryContact}
+                    onChange={() => setPrimary(i)}
+                  />
+                  Primary contact
+                </label>
+              </div>
+              <div className="field">
+                <button
+                  type="button"
+                  className="btn btn--secondary btn--sm"
+                  onClick={() => removeGuardian(i)}
+                >
+                  Remove
+                </button>
+              </div>
+            </div>
+          ))}
+          <button
+            type="button"
+            className="btn btn--secondary btn--sm"
+            onClick={addGuardian}
+            disabled={form.guardians.length >= MAX_GUARDIANS}
+          >
+            + Add guardian
+          </button>
 
           <div className="modal__section-title">Contact &amp; Address</div>
           <div className="modal__grid">
@@ -362,43 +467,15 @@ export function RegistrationModal({
             </div>
           </div>
 
-          <div className="modal__section-title">
-            Registration Fee &amp; Notes
+          <div className="modal__section-title">Remarks</div>
+          <div className="field">
+            <textarea
+              rows={3}
+              value={form.remarks ?? ""}
+              onChange={(e) => field("remarks", e.target.value)}
+              placeholder="Optional notes about this application"
+            />
           </div>
-          <div className="modal__grid">
-            <div className="field">
-              <label>Registration Fee</label>
-              <input
-                type="number"
-                value={form.registrationFee ?? 0}
-                onChange={(e) =>
-                  setForm((f) => ({
-                    ...f,
-                    registrationFee:
-                      e.target.value === "" ? null : Number(e.target.value),
-                  }))
-                }
-              />
-            </div>
-            <div className="field" style={{ gridColumn: "span 2" }}>
-              <label>Notes</label>
-              <textarea
-                rows={3}
-                value={form.notes ?? ""}
-                onChange={(e) => field("notes", e.target.value)}
-                placeholder="Optional notes about this application"
-              />
-            </div>
-          </div>
-
-          {error && (
-            <div
-              className="modal__note"
-              style={{ background: "var(--red-bg)", color: "var(--red)" }}
-            >
-              {error}
-            </div>
-          )}
         </div>
         <div className="modal__footer">
           <button
@@ -417,6 +494,7 @@ export function RegistrationModal({
           </button>
         </div>
       </div>
+      <ValidationModal errors={errors} onClose={() => setErrors(null)} />
     </div>
   );
 }

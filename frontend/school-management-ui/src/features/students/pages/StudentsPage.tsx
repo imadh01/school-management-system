@@ -3,15 +3,20 @@ import { studentService } from "../services/studentService";
 import { classSectionService } from "@/features/class-sections/services/classSectionService";
 import type {
   StudentResponse,
+  StudentSummaryResponse,
   StudentStatus,
   CreateStudentRequest,
+  UpdateStudentIdentityRequest,
 } from "../types/student.types";
 import type { ClassSectionResponse } from "@/features/class-sections/types/classSection.types";
+import { StudentHistoryModal } from "../components/StudentHistoryModal";
 import { StudentModal } from "../components/StudentModal";
 import { NotYetAvailableModal } from "../components/NotYetAvailableModal";
 import { LinkedParentsViewModal } from "../components/LinkedParentsViewModal";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { ViewDetailsModal } from "@/components/ViewDetailsModal";
+import { ValidationModal } from "@/components/ValidationModal";
+import { getApiErrors } from "@/utils/apiError";
 
 const PIPELINE_STEPS: {
   key: StudentStatus | "All";
@@ -21,25 +26,13 @@ const PIPELINE_STEPS: {
   { key: "All", label: "All", activeClass: "pipeline__step--dark" },
   { key: "Active", label: "Active", activeClass: "pipeline__step--green" },
   { key: "Inactive", label: "Inactive", activeClass: "" },
-  {
-    key: "Transferred",
-    label: "Transferred",
-    activeClass: "pipeline__step--purple",
-  },
-  {
-    key: "Passed Out",
-    label: "Passed Out",
-    activeClass: "pipeline__step--purple",
-  },
-  { key: "Suspended", label: "Suspended", activeClass: "pipeline__step--red" },
+  { key: "Left", label: "Left", activeClass: "pipeline__step--purple" },
 ];
 
 const STATUS_BADGE_CLASS: Record<string, string> = {
   Active: "badge--active",
   Inactive: "badge--inactive",
-  Transferred: "badge--purple",
-  "Passed Out": "badge--purple",
-  Suspended: "badge--danger",
+  Left: "badge--purple",
 };
 
 function unique(values: (string | null)[]): string[] {
@@ -54,7 +47,7 @@ function unique(values: (string | null)[]): string[] {
   return out.sort();
 }
 
-function toCsv(rows: StudentResponse[]): string {
+function toCsv(rows: StudentSummaryResponse[]): string {
   const headers = [
     "Adm #",
     "Student",
@@ -85,7 +78,7 @@ function toCsv(rows: StudentResponse[]): string {
 }
 
 export function StudentsPage() {
-  const [students, setStudents] = useState<StudentResponse[]>([]);
+  const [students, setStudents] = useState<StudentSummaryResponse[]>([]);
   const [classSections, setClassSections] = useState<ClassSectionResponse[]>(
     [],
   );
@@ -109,19 +102,21 @@ export function StudentsPage() {
     null,
   );
   const [feeSummaryTarget, setFeeSummaryTarget] =
-    useState<StudentResponse | null>(null);
+    useState<StudentSummaryResponse | null>(null);
   const [attendanceTarget, setAttendanceTarget] =
-    useState<StudentResponse | null>(null);
+    useState<StudentSummaryResponse | null>(null);
   const [reportCardTarget, setReportCardTarget] =
-    useState<StudentResponse | null>(null);
+    useState<StudentSummaryResponse | null>(null);
   const [linkedParentsTarget, setLinkedParentsTarget] =
-    useState<StudentResponse | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<StudentResponse | null>(
-    null,
-  );
+    useState<StudentSummaryResponse | null>(null);
+  const [historyTarget, setHistoryTarget] =
+    useState<StudentSummaryResponse | null>(null);
+  const [deleteTarget, setDeleteTarget] =
+    useState<StudentSummaryResponse | null>(null);
   const [detailsTarget, setDetailsTarget] = useState<StudentResponse | null>(
     null,
   );
+  const [errors, setErrors] = useState<string[] | null>(null);
 
   const loadData = async () => {
     setIsLoading(true);
@@ -160,9 +155,7 @@ export function StudentsPage() {
       All: students.length,
       Active: 0,
       Inactive: 0,
-      Transferred: 0,
-      "Passed Out": 0,
-      Suspended: 0,
+      Left: 0,
     };
     students.forEach((s) => {
       c[s.status] = (c[s.status] ?? 0) + 1;
@@ -240,20 +233,39 @@ export function StudentsPage() {
   //   setEditingStudent(null);
   //   setIsModalOpen(true);
   // };
-  const openEdit = (s: StudentResponse) => {
-    setEditingStudent(s);
-    setIsModalOpen(true);
+  // The list only carries summary fields, so the full record is fetched
+  // when a student is opened for editing or viewing.
+  const openEdit = async (s: StudentSummaryResponse) => {
+    try {
+      setEditingStudent(await studentService.getById(s.id));
+      setIsModalOpen(true);
+    } catch (err) {
+      setErrors(getApiErrors(err, "Could not load this student."));
+    }
   };
 
-  const handleDelete = (s: StudentResponse) => {
+  const openDetails = async (s: StudentSummaryResponse) => {
+    try {
+      setDetailsTarget(await studentService.getById(s.id));
+    } catch (err) {
+      setErrors(getApiErrors(err, "Could not load this student."));
+    }
+  };
+
+  const handleDelete = (s: StudentSummaryResponse) => {
     setDeleteTarget(s);
   };
 
   const confirmDelete = async () => {
     if (!deleteTarget) return;
-    await studentService.delete(deleteTarget.id);
-    setDeleteTarget(null);
-    await loadData();
+    try {
+      await studentService.delete(deleteTarget.id);
+      setDeleteTarget(null);
+      await loadData();
+    } catch (err) {
+      setDeleteTarget(null);
+      setErrors(getApiErrors(err, "Could not delete this student."));
+    }
   };
 
   const handleExportCsv = () => {
@@ -489,7 +501,7 @@ export function StudentsPage() {
                       <button
                         className="btn--icon"
                         title="View Details"
-                        onClick={() => setDetailsTarget(s)}
+                        onClick={() => openDetails(s)}
                       >
                         👁
                       </button>
@@ -525,6 +537,14 @@ export function StudentsPage() {
                       >
                         👪
                       </button>
+                      <button
+                        className="btn--icon"
+                        title="Academic History"
+                        onClick={() => setHistoryTarget(s)}
+                      >
+                        📚
+                      </button>
+
                       <button
                         className="btn--icon"
                         title="Edit"
@@ -580,7 +600,11 @@ export function StudentsPage() {
         editingStudent={editingStudent}
         classSections={classSections}
         onClose={() => setIsModalOpen(false)}
-        onSubmit={async (data: CreateStudentRequest, status) => {
+        onSubmit={async (
+          data: CreateStudentRequest,
+          status: StudentStatus,
+          identity: UpdateStudentIdentityRequest | null,
+        ) => {
           if (editingStudent) {
             const {
               admNo: _admNo,
@@ -589,8 +613,12 @@ export function StudentsPage() {
             } = data;
             await studentService.update(editingStudent.id, {
               ...rest,
-              status: (status ?? "Active") as StudentStatus,
+              status,
             });
+            // Identity numbers have their own endpoint and permission.
+            if (identity) {
+              await studentService.updateIdentity(editingStudent.id, identity);
+            }
           } else {
             await studentService.create(data);
           }
@@ -623,7 +651,10 @@ export function StudentsPage() {
         student={linkedParentsTarget}
         onClose={() => setLinkedParentsTarget(null)}
       />
-
+      <StudentHistoryModal
+        student={historyTarget}
+        onClose={() => setHistoryTarget(null)}
+      />
       <ConfirmDialog
         isOpen={deleteTarget !== null}
         title="Delete Student"
@@ -636,6 +667,8 @@ export function StudentsPage() {
         onConfirm={confirmDelete}
         onCancel={() => setDeleteTarget(null)}
       />
+
+      <ValidationModal errors={errors} onClose={() => setErrors(null)} />
 
       <ViewDetailsModal
         isOpen={detailsTarget !== null}
@@ -661,7 +694,10 @@ export function StudentsPage() {
                       label: "Nationality",
                       value: detailsTarget.nationality,
                     },
-                    { label: "Blood Group", value: detailsTarget.bloodGroup },
+                    {
+                      label: "Blood Group",
+                      value: detailsTarget.health.bloodGroup,
+                    },
                   ],
                 },
                 {
@@ -681,14 +717,17 @@ export function StudentsPage() {
                 {
                   heading: "Health",
                   rows: [
-                    { label: "Allergies", value: detailsTarget.allergies },
+                    {
+                      label: "Allergies",
+                      value: detailsTarget.health.allergies,
+                    },
                     {
                       label: "Dietary Requirements",
-                      value: detailsTarget.dietaryRequirements,
+                      value: detailsTarget.health.dietaryRequirements,
                     },
                     {
                       label: "Medical Notes",
-                      value: detailsTarget.medicalNotes,
+                      value: detailsTarget.health.medicalNotes,
                     },
                   ],
                 },

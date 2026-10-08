@@ -1,14 +1,55 @@
-export type StudentStatus =
-  | "Active"
-  | "Inactive"
-  | "Transferred"
-  | "Passed Out"
-  | "Suspended";
+import type { StudentGuardianResponse } from "@/features/parents/types/parent.types";
 
-export interface StudentResponse {
+// BUSINESS DECISION REQUIRED: the API currently accepts only these three
+// statuses. The earlier prototype also listed Transferred / Passed Out /
+// Suspended — add them to the backend validator first if they are wanted.
+export type StudentStatus = "Active" | "Inactive" | "Left";
+
+export interface StudentHealthDto {
+  bloodGroup: string | null;
+  allergies: string | null;
+  dietaryRequirements: string | null;
+  medicalNotes: string | null;
+  specialEducationalNeeds: string | null;
+  insuranceProvider: string | null;
+  insurancePolicyExpiry: string | null;
+}
+
+export interface PickupPersonRequest {
+  name: string;
+  relation: string;
+  phone: string;
+  idNote: string | null;
+}
+
+export interface PickupPersonResponse extends PickupPersonRequest {
+  id: number;
+}
+
+export interface StudentIdentityResponse {
+  aadhaarNumber: string | null;
+  passportNumber: string | null;
+  passportExpiry: string | null;
+  visaType: string | null;
+  visaExpiry: string | null;
+  /** true when the caller lacks Students.ViewSensitive and numbers are hidden. */
+  isMasked: boolean;
+}
+
+export interface UpdateStudentIdentityRequest {
+  aadhaarNumber: string | null;
+  passportNumber: string | null;
+  passportExpiry: string | null;
+  visaType: string | null;
+  visaExpiry: string | null;
+}
+
+/** One row of the student list (GET /students). */
+export interface StudentSummaryResponse {
   id: number;
   admNo: string;
   rollNumber: string;
+  classSectionId: number;
   classSectionName: string;
   admissionDate: string;
   status: StudentStatus;
@@ -18,56 +59,64 @@ export interface StudentResponse {
   lastName: string;
   gender: string;
   dateOfBirth: string;
-  bloodGroup: string | null;
-  aadhaarNumber: string | null;
+  mobile: string | null;
+  category: string;
+  transportRequired: boolean;
+  nationality: string | null;
+  curriculumTrack: string | null;
+  house: string | null;
+  ealCode: string | null;
+  allergies: string | null;
+  admissionRegNo: string | null;
+  admissionId: number | null;
+}
+
+/** Full detail of one student (GET /students/{id}). */
+export interface StudentResponse {
+  id: number;
+  admNo: string;
+  rollNumber: string;
+  classSectionId: number;
+  classSectionName: string;
+  admissionDate: string;
+  status: StudentStatus;
+  photoUrl: string | null;
+  firstName: string;
+  middleName: string | null;
+  lastName: string;
+  gender: string;
+  dateOfBirth: string;
   mobile: string | null;
   email: string | null;
   addressLine: string | null;
   city: string | null;
   state: string | null;
   pincode: string | null;
-  fatherName: string | null;
-  fatherOccupation: string | null;
-  fatherMobile: string | null;
-  motherName: string | null;
-  motherOccupation: string | null;
-  motherMobile: string | null;
-  guardianName: string | null;
-  guardianRelation: string | null;
-  guardianMobile: string | null;
   category: string;
   religion: string | null;
   previousSchool: string | null;
   transportRequired: boolean;
   transportRoute: string | null;
-  medicalNotes: string | null;
   nationality: string | null;
   secondNationality: string | null;
   countryOfBirth: string | null;
   preferredName: string | null;
-  passportNumber: string | null;
-  passportExpiry: string | null;
-  visaType: string | null;
-  visaExpiry: string | null;
   motherTongue: string | null;
   homeLanguage: string | null;
   englishProficiency: string | null;
   curriculumTrack: string | null;
   admissionType: string;
   custodyArrangement: string | null;
-  primaryContactParent: string | null;
-  authorizedPickupPersons: string | null;
   mediaConsent: boolean;
-  dietaryRequirements: string | null;
-  allergies: string | null;
-  insuranceProvider: string | null;
-  insurancePolicyExpiry: string | null;
   house: string | null;
   ealCode: string | null;
   feeConcessionPercent: number | null;
-  specialEducationalNeeds: string | null;
   admissionRegNo: string | null;
   admissionId: number | null;
+  health: StudentHealthDto;
+  identity: StudentIdentityResponse;
+  pickupPersons: PickupPersonResponse[];
+  guardians: StudentGuardianResponse[];
 }
 
 export interface CreateStudentRequest {
@@ -81,54 +130,33 @@ export interface CreateStudentRequest {
   lastName: string;
   gender: string;
   dateOfBirth: string;
-  bloodGroup: string | null;
-  aadhaarNumber: string | null;
   mobile: string | null;
   email: string | null;
   addressLine: string | null;
   city: string | null;
   state: string | null;
   pincode: string | null;
-  fatherName: string | null;
-  fatherOccupation: string | null;
-  fatherMobile: string | null;
-  motherName: string | null;
-  motherOccupation: string | null;
-  motherMobile: string | null;
-  guardianName: string | null;
-  guardianRelation: string | null;
-  guardianMobile: string | null;
   category: string;
   religion: string | null;
   previousSchool: string | null;
   transportRequired: boolean;
   transportRoute: string | null;
-  medicalNotes: string | null;
   nationality: string | null;
   secondNationality: string | null;
   countryOfBirth: string | null;
   preferredName: string | null;
-  passportNumber: string | null;
-  passportExpiry: string | null;
-  visaType: string | null;
-  visaExpiry: string | null;
   motherTongue: string | null;
   homeLanguage: string | null;
   englishProficiency: string | null;
   curriculumTrack: string | null;
   admissionType: string;
   custodyArrangement: string | null;
-  primaryContactParent: string | null;
-  authorizedPickupPersons: string | null;
   mediaConsent: boolean;
-  dietaryRequirements: string | null;
-  allergies: string | null;
-  insuranceProvider: string | null;
-  insurancePolicyExpiry: string | null;
   house: string | null;
   ealCode: string | null;
   feeConcessionPercent: number | null;
-  specialEducationalNeeds: string | null;
+  health: StudentHealthDto | null;
+  pickupPersons: PickupPersonRequest[] | null;
 }
 
 export interface UpdateStudentRequest extends Omit<
@@ -137,12 +165,15 @@ export interface UpdateStudentRequest extends Omit<
 > {
   status: StudentStatus;
 }
-
-export interface CreateStudentFromAdmissionRequest {
-  nationality: string | null;
-  curriculumTrack: string | null;
-  englishProficiency: string | null;
-  ealCode: string | null;
-  house: string | null;
-  allergies: string | null;
+export interface StudentEnrollmentResponse {
+  id: number;
+  academicYearId: number;
+  academicYearName: string;
+  classSectionId: number;
+  classSectionName: string;
+  rollNumber: string;
+  startDate: string;
+  endDate: string | null;
+  status: "Active" | "Promoted" | "Repeated" | "Transferred" | "Left";
+  remarks: string | null;
 }

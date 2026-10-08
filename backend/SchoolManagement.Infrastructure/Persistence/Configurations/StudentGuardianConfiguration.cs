@@ -8,10 +8,18 @@ public class StudentGuardianConfiguration : IEntityTypeConfiguration<StudentGuar
 {
     public void Configure(EntityTypeBuilder<StudentGuardian> builder)
     {
-        builder.ToTable("StudentGuardians");
+        builder.ToTable("StudentGuardians", t =>
+            t.HasCheckConstraint("CK_StudentGuardians_RelationType",
+                "[RelationType] IN ('Father','Mother','Guardian')"));
         builder.HasKey(sg => new { sg.StudentId, sg.ParentId });
 
         builder.Property(sg => sg.RelationType).HasMaxLength(30).IsRequired();
+
+        // At most one primary contact per student.
+        builder.HasIndex(sg => sg.StudentId)
+            .IsUnique()
+            .HasFilter("[IsPrimaryContact] = 1")
+            .HasDatabaseName("UX_StudentGuardians_Student_Primary");
 
         builder.HasOne(sg => sg.Student)
             .WithMany()

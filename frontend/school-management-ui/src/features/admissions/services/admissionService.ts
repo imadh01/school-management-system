@@ -6,11 +6,8 @@ import type {
   ConfirmAdmissionRequest,
   EnrollAdmissionRequest,
   RejectAdmissionRequest,
+  GuardianMatchesResponse,
 } from "../types/admission.types";
-import type {
-  StudentResponse,
-  CreateStudentFromAdmissionRequest,
-} from "@/features/students/types/student.types";
 
 export const admissionService = {
   getAll: () =>
@@ -36,6 +33,12 @@ export const admissionService = {
       .post<AdmissionResponse>(`/admissions/${id}/confirm-admission`, request)
       .then((res) => res.data),
 
+  // Parents already in the system that match each guardian's mobile number.
+  getGuardianMatches: (id: number) =>
+    apiClient
+      .get<GuardianMatchesResponse>(`/admissions/${id}/guardian-matches`)
+      .then((res) => res.data),
+
   enroll: (id: number, request: EnrollAdmissionRequest) =>
     apiClient
       .post<AdmissionResponse>(`/admissions/${id}/enroll`, request)
@@ -44,11 +47,6 @@ export const admissionService = {
   reject: (id: number, request: RejectAdmissionRequest) =>
     apiClient
       .post<AdmissionResponse>(`/admissions/${id}/reject`, request)
-      .then((res) => res.data),
-
-  createStudent: (id: number, request: CreateStudentFromAdmissionRequest) =>
-    apiClient
-      .post<StudentResponse>(`/admissions/${id}/create-student`, request)
       .then((res) => res.data),
 
   delete: (id: number) => apiClient.delete(`/admissions/${id}`),

@@ -10,6 +10,7 @@ import { RegistrationModal } from "../components/RegistrationModal";
 import { ConfirmAdmissionModal } from "../components/ConfirmAdmissionModal";
 import { EnrollModal } from "../components/EnrollModal";
 import { ViewReasonModal } from "../components/ViewReasonModal";
+import { RejectAdmissionModal } from "../components/RejectAdmissionModal";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { ViewDetailsModal } from "@/components/ViewDetailsModal";
 
@@ -113,6 +114,9 @@ export function AdmissionsPage() {
     null,
   );
   const [viewReason, setViewReason] = useState<string | null>(null);
+  const [rejectTarget, setRejectTarget] = useState<AdmissionResponse | null>(
+    null,
+  );
   const [deleteTarget, setDeleteTarget] = useState<AdmissionResponse | null>(
     null,
   );
@@ -229,14 +233,8 @@ export function AdmissionsPage() {
     setIsRegistrationOpen(true);
   };
 
-  const handleReject = async (a: AdmissionResponse) => {
-    const reason = window.prompt(
-      `Reason for rejecting ${a.firstName} ${a.lastName} (optional):`,
-      "",
-    );
-    if (reason === null) return;
-    await admissionService.reject(a.id, { rejectionReason: reason.trim() });
-    await loadData();
+  const handleReject = (a: AdmissionResponse) => {
+    setRejectTarget(a);
   };
 
   const handleDelete = (a: AdmissionResponse) => {
@@ -639,6 +637,15 @@ export function AdmissionsPage() {
         onClose={() => setEnrollTarget(null)}
         onSubmit={async (id, data) => {
           await admissionService.enroll(id, data);
+          await loadData();
+        }}
+      />
+
+      <RejectAdmissionModal
+        admission={rejectTarget}
+        onClose={() => setRejectTarget(null)}
+        onSubmit={async (id, reason) => {
+          await admissionService.reject(id, { rejectionReason: reason });
           await loadData();
         }}
       />

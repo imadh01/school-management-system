@@ -73,6 +73,7 @@ builder.Services.AddScoped<IStudentService, StudentService>();
 builder.Services.AddScoped<IValidator<CreateStudentRequest>, CreateStudentRequestValidator>();
 builder.Services.AddScoped<IValidator<CreateStudentFromAdmissionRequest>, CreateStudentFromAdmissionRequestValidator>();
 builder.Services.AddScoped<IValidator<UpdateStudentRequest>, UpdateStudentRequestValidator>();
+builder.Services.AddScoped<IValidator<UpdateStudentIdentityRequest>, UpdateStudentIdentityRequestValidator>();
 
 builder.Services.AddScoped<IParentRepository, ParentRepository>();
 builder.Services.AddScoped<IStudentGuardianRepository, StudentGuardianRepository>();
@@ -169,6 +170,9 @@ builder.Services.AddAuthorization(options =>
 
     options.AddPolicy("Students.Manage", policy =>
     policy.RequireClaim("permission", "Students.Manage"));
+
+    options.AddPolicy("Students.ViewSensitive", policy =>
+    policy.RequireClaim("permission", "Students.ViewSensitive"));
 
     options.AddPolicy("Parents.Manage", policy =>
     policy.RequireClaim("permission", "Parents.Manage"));

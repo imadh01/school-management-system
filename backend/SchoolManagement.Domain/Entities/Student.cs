@@ -10,6 +10,14 @@ public class Student
     public int? UserId { get; set; }
     public User? User { get; set; }
 
+    // Side tables split out of the old 70-column Students row.
+    public StudentHealth? Health { get; set; }
+    public StudentIdentityDocument? IdentityDocument { get; set; }
+    public ICollection<StudentPickupPerson> PickupPersons { get; set; } = new List<StudentPickupPerson>();
+
+    /// <summary>Academic history: one row per class/section period. ClassSectionId and RollNumber below mirror the Active one.</summary>
+    public ICollection<StudentEnrollment> Enrollments { get; set; } = new List<StudentEnrollment>();
+
     public string AdmNo { get; set; } = string.Empty;
     public string RollNumber { get; set; } = string.Empty;
 

@@ -25,7 +25,7 @@ public class ClassSection
     public string Status { get; set; } = "Active";
     /// <summary>Class (homeroom) teacher. Null = none assigned.</summary>
     public int? ClassTeacherId { get; set; }
-    public Teacher? ClassTeacher { get; set; } 
+    public Teacher? ClassTeacher { get; set; }
 
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
@@ -37,7 +37,14 @@ public class ClassSection
     public int? DeletedBy { get; set; }
 
     /// <summary>Display label like "Class 1 A (2026-2027)" — computed, never stored.</summary>
-    public string DisplayName => $"{Name} {Section} ({AcademicYear?.Name})";
+    public string DisplayName => BuildDisplayName(Name, Section, AcademicYear?.Name);
+
+    /// <summary>
+    /// The single definition of the display label, usable where only raw columns are available
+    /// (for example list queries that project name, section and year separately).
+    /// </summary>
+    public static string BuildDisplayName(string name, string section, string? academicYear) =>
+        $"{name} {section} ({academicYear})";
 
     /// <summary>Short code like "C1A", "C10B", "LKGA" — computed, never stored.</summary>
     public string Code =>

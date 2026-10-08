@@ -4,7 +4,6 @@ using FluentValidation;
 using SchoolManagement.API.Common;
 using SchoolManagement.API.Extensions;
 using SchoolManagement.Application.DTOs.Admissions;
-using SchoolManagement.Application.DTOs.Students;
 using SchoolManagement.Application.Interfaces;
 
 namespace SchoolManagement.API.Controllers;
@@ -14,32 +13,26 @@ namespace SchoolManagement.API.Controllers;
 public class AdmissionsController : ControllerBase
 {
     private readonly IAdmissionService _admissionService;
-    private readonly IStudentService _studentService;
     private readonly IValidator<CreateAdmissionRequest> _createValidator;
     private readonly IValidator<UpdateAdmissionRequest> _updateValidator;
     private readonly IValidator<ConfirmAdmissionRequest> _confirmValidator;
     private readonly IValidator<EnrollAdmissionRequest> _enrollValidator;
     private readonly IValidator<RejectAdmissionRequest> _rejectValidator;
-    private readonly IValidator<CreateStudentFromAdmissionRequest> _createStudentValidator;
 
     public AdmissionsController(
         IAdmissionService admissionService,
-        IStudentService studentService,
         IValidator<CreateAdmissionRequest> createValidator,
         IValidator<UpdateAdmissionRequest> updateValidator,
         IValidator<ConfirmAdmissionRequest> confirmValidator,
         IValidator<EnrollAdmissionRequest> enrollValidator,
-        IValidator<RejectAdmissionRequest> rejectValidator,
-        IValidator<CreateStudentFromAdmissionRequest> createStudentValidator)
+        IValidator<RejectAdmissionRequest> rejectValidator)
     {
         _admissionService = admissionService;
-        _studentService = studentService;
         _createValidator = createValidator;
         _updateValidator = updateValidator;
         _confirmValidator = confirmValidator;
         _enrollValidator = enrollValidator;
         _rejectValidator = rejectValidator;
-        _createStudentValidator = createStudentValidator;
     }
 
     private async Task<IActionResult?> ValidateAsync<T>(IValidator<T> validator, T request, CancellationToken cancellationToken)
@@ -95,6 +88,15 @@ public class AdmissionsController : ControllerBase
         return Ok(await _admissionService.ConfirmAdmissionAsync(id, request, cancellationToken));
     }
 
+    /// <summary>
+    /// Existing parents that share each guardian's mobile number, with a suggested action.
+    /// Read-only: nothing is linked until the enrol request is sent.
+    /// </summary>
+    [HttpGet("{id:int}/guardian-matches")]
+    [Authorize(Policy = "Admissions.Manage")]
+    public async Task<IActionResult> GetGuardianMatches(int id, CancellationToken cancellationToken) =>
+        Ok(await _admissionService.GetGuardianMatchesAsync(id, cancellationToken));
+
     [HttpPost("{id:int}/enroll")]
     [Authorize(Policy = "Admissions.Manage")]
     public async Task<IActionResult> Enroll(int id, EnrollAdmissionRequest request, CancellationToken cancellationToken)
@@ -113,17 +115,6 @@ public class AdmissionsController : ControllerBase
         if (validationError is not null) return validationError;
 
         return Ok(await _admissionService.RejectAsync(id, request, cancellationToken));
-    }
-
-    [HttpPost("{id:int}/create-student")]
-    [Authorize(Policy = "Students.Manage")]
-    public async Task<IActionResult> CreateStudent(int id, CreateStudentFromAdmissionRequest request, CancellationToken cancellationToken)
-    {
-        var validationError = await ValidateAsync(_createStudentValidator, request, cancellationToken);
-        if (validationError is not null) return validationError;
-
-        var result = await _studentService.CreateFromAdmissionAsync(id, request, cancellationToken);
-        return Created($"api/students/{result.Id}", result);
     }
 
     [HttpDelete("{id:int}")]

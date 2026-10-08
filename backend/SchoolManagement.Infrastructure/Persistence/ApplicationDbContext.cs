@@ -26,10 +26,15 @@ public class ApplicationDbContext : DbContext
     public DbSet<Student> Students => Set<Student>();
     public DbSet<Parent> Parents => Set<Parent>();
     public DbSet<StudentGuardian> StudentGuardians => Set<StudentGuardian>();
+    public DbSet<AdmissionGuardian> AdmissionGuardians => Set<AdmissionGuardian>();
+    public DbSet<StudentHealth> StudentHealth => Set<StudentHealth>();
+    public DbSet<StudentIdentityDocument> StudentIdentityDocuments => Set<StudentIdentityDocument>();
+    public DbSet<StudentPickupPerson> StudentPickupPersons => Set<StudentPickupPerson>();
     public DbSet<Subject> Subjects => Set<Subject>();
     public DbSet<Teacher> Teachers => Set<Teacher>();
     public DbSet<AttendanceSession> AttendanceSessions => Set<AttendanceSession>();
     public DbSet<AttendanceRecord> AttendanceRecords => Set<AttendanceRecord>();
+    public DbSet<StudentEnrollment> StudentEnrollments => Set<StudentEnrollment>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
@@ -192,6 +197,18 @@ public class ApplicationDbContext : DbContext
             new RolePermission { RoleId = 2, PermissionId = 9 },   // Supervisor
             new RolePermission { RoleId = 3, PermissionId = 9 },   // Clerk
             new RolePermission { RoleId = 4, PermissionId = 10 }); // Teacher
+
+        // Full Aadhaar / passport / visa. Without this permission the API returns masked values only.
+        modelBuilder.Entity<Permission>().HasData(new Permission
+        {
+            Id = 11,
+            Name = "Students.ViewSensitive",
+            Module = "Students",
+            Description = "View and edit full Aadhaar, passport and visa details of students."
+        });
+
+        modelBuilder.Entity<RolePermission>().HasData(
+            new RolePermission { RoleId = 1, PermissionId = 11 },   // Admin
+            new RolePermission { RoleId = 2, PermissionId = 11 });  // Supervisor
     }
 }
-

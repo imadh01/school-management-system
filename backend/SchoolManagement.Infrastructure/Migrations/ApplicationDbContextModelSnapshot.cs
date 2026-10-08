@@ -306,6 +306,69 @@ namespace SchoolManagement.Infrastructure.Migrations
                     b.ToTable("Admissions", (string)null);
                 });
 
+            modelBuilder.Entity("SchoolManagement.Domain.Entities.AdmissionGuardian", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AdmissionId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("SYSUTCDATETIME()");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<bool>("IsPrimaryContact")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<string>("Mobile")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("MobileKey")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasComputedColumnSql("CAST(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE([Mobile],' ',''),'-',''),'+',''),'(',''),')',''),'.','') AS nvarchar(20))", true);
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("RelationType")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("SYSUTCDATETIME()");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AdmissionId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_AdmissionGuardians_Admission_Primary")
+                        .HasFilter("[IsPrimaryContact] = 1");
+
+                    b.ToTable("AdmissionGuardians", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_AdmissionGuardians_RelationType", "[RelationType] IN ('Father','Mother','Guardian')");
+                        });
+                });
+
             modelBuilder.Entity("SchoolManagement.Domain.Entities.AttendanceRecord", b =>
                 {
                     b.Property<int>("Id")
@@ -561,6 +624,13 @@ namespace SchoolManagement.Infrastructure.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
 
+                    b.Property<string>("MobileKey")
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasComputedColumnSql("CAST(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE([Mobile],' ',''),'-',''),'+',''),'(',''),')',''),'.','') AS nvarchar(20))", true);
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -648,6 +718,9 @@ namespace SchoolManagement.Infrastructure.Migrations
                         .HasColumnType("nvarchar(20)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("MobileKey")
+                        .HasDatabaseName("IX_Parents_MobileKey");
 
                     b.HasIndex("UserId");
 
@@ -755,6 +828,13 @@ namespace SchoolManagement.Infrastructure.Migrations
                             Description = "Mark attendance for own class or subjects (checked in the service).",
                             Module = "Attendance",
                             Name = "Attendance.Mark"
+                        },
+                        new
+                        {
+                            Id = 11,
+                            Description = "View and edit full Aadhaar, passport and visa details of students.",
+                            Module = "Students",
+                            Name = "Students.ViewSensitive"
                         });
                 });
 
@@ -889,6 +969,16 @@ namespace SchoolManagement.Infrastructure.Migrations
                         {
                             RoleId = 4,
                             PermissionId = 10
+                        },
+                        new
+                        {
+                            RoleId = 1,
+                            PermissionId = 11
+                        },
+                        new
+                        {
+                            RoleId = 2,
+                            PermissionId = 11
                         });
                 });
 
@@ -1191,6 +1281,89 @@ namespace SchoolManagement.Infrastructure.Migrations
                     b.ToTable("Students", (string)null);
                 });
 
+            modelBuilder.Entity("SchoolManagement.Domain.Entities.StudentEnrollment", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AcademicYearId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ClassSectionId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("SYSUTCDATETIME()");
+
+                    b.Property<int?>("CreatedBy")
+                        .HasColumnType("int");
+
+                    b.Property<DateOnly?>("EndDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Remarks")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<string>("RollNumber")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateOnly>("StartDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasDefaultValue("Active");
+
+                    b.Property<int>("StudentId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("SYSUTCDATETIME()");
+
+                    b.Property<int?>("UpdatedBy")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AcademicYearId");
+
+                    b.HasIndex("StudentId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_StudentEnrollments_Student_Active")
+                        .HasFilter("[Status] = 'Active'");
+
+                    b.HasIndex("ClassSectionId", "RollNumber")
+                        .IsUnique()
+                        .HasDatabaseName("UX_StudentEnrollments_Section_Roll_Active")
+                        .HasFilter("[Status] = 'Active'");
+
+                    b.HasIndex("ClassSectionId", "Status")
+                        .HasDatabaseName("IX_StudentEnrollments_Section_Status");
+
+                    b.HasIndex("StudentId", "AcademicYearId")
+                        .HasDatabaseName("IX_StudentEnrollments_Student_Year");
+
+                    b.ToTable("StudentEnrollments", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_StudentEnrollments_EndDate", "([Status] = 'Active' AND [EndDate] IS NULL) OR ([Status] <> 'Active' AND [EndDate] IS NOT NULL AND [EndDate] >= [StartDate])");
+
+                            t.HasCheckConstraint("CK_StudentEnrollments_Status", "[Status] IN ('Active','Promoted','Repeated','Transferred','Left')");
+                        });
+                });
+
             modelBuilder.Entity("SchoolManagement.Domain.Entities.StudentGuardian", b =>
                 {
                     b.Property<int>("StudentId")
@@ -1211,7 +1384,156 @@ namespace SchoolManagement.Infrastructure.Migrations
 
                     b.HasIndex("ParentId");
 
-                    b.ToTable("StudentGuardians", (string)null);
+                    b.HasIndex("StudentId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_StudentGuardians_Student_Primary")
+                        .HasFilter("[IsPrimaryContact] = 1");
+
+                    b.ToTable("StudentGuardians", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_StudentGuardians_RelationType", "[RelationType] IN ('Father','Mother','Guardian')");
+                        });
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Entities.StudentHealth", b =>
+                {
+                    b.Property<int>("StudentId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Allergies")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<string>("BloodGroup")
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("SYSUTCDATETIME()");
+
+                    b.Property<string>("DietaryRequirements")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateOnly?>("InsurancePolicyExpiry")
+                        .HasColumnType("date");
+
+                    b.Property<string>("InsuranceProvider")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("MedicalNotes")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("SpecialEducationalNeeds")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("SYSUTCDATETIME()");
+
+                    b.HasKey("StudentId");
+
+                    b.ToTable("StudentHealth", (string)null);
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Entities.StudentIdentityDocument", b =>
+                {
+                    b.Property<int>("StudentId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("AadhaarNumber")
+                        .HasMaxLength(12)
+                        .HasColumnType("nvarchar(12)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("SYSUTCDATETIME()");
+
+                    b.Property<DateOnly?>("PassportExpiry")
+                        .HasColumnType("date");
+
+                    b.Property<string>("PassportNumber")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("SYSUTCDATETIME()");
+
+                    b.Property<DateOnly?>("VisaExpiry")
+                        .HasColumnType("date");
+
+                    b.Property<string>("VisaType")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.HasKey("StudentId");
+
+                    b.HasIndex("AadhaarNumber")
+                        .IsUnique()
+                        .HasDatabaseName("UX_StudentIdentityDocuments_Aadhaar")
+                        .HasFilter("[AadhaarNumber] IS NOT NULL");
+
+                    b.ToTable("StudentIdentityDocuments", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_StudentIdentityDocuments_Aadhaar", "[AadhaarNumber] IS NULL OR (LEN([AadhaarNumber]) = 12 AND [AadhaarNumber] NOT LIKE '%[^0-9]%')");
+                        });
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Entities.StudentPickupPerson", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("SYSUTCDATETIME()");
+
+                    b.Property<string>("IdNote")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Phone")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Relation")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<int>("StudentId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("SYSUTCDATETIME()");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StudentId")
+                        .HasDatabaseName("IX_StudentPickupPersons_StudentId");
+
+                    b.ToTable("StudentPickupPersons", (string)null);
                 });
 
             modelBuilder.Entity("SchoolManagement.Domain.Entities.Subject", b =>
@@ -1483,6 +1805,17 @@ namespace SchoolManagement.Infrastructure.Migrations
                     b.Navigation("AppliedForClassSection");
                 });
 
+            modelBuilder.Entity("SchoolManagement.Domain.Entities.AdmissionGuardian", b =>
+                {
+                    b.HasOne("SchoolManagement.Domain.Entities.Admission", "Admission")
+                        .WithMany("Guardians")
+                        .HasForeignKey("AdmissionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Admission");
+                });
+
             modelBuilder.Entity("SchoolManagement.Domain.Entities.AttendanceRecord", b =>
                 {
                     b.HasOne("SchoolManagement.Domain.Entities.AttendanceSession", "Session")
@@ -1598,6 +1931,33 @@ namespace SchoolManagement.Infrastructure.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("SchoolManagement.Domain.Entities.StudentEnrollment", b =>
+                {
+                    b.HasOne("SchoolManagement.Domain.Entities.AcademicYear", "AcademicYear")
+                        .WithMany()
+                        .HasForeignKey("AcademicYearId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SchoolManagement.Domain.Entities.ClassSection", "ClassSection")
+                        .WithMany()
+                        .HasForeignKey("ClassSectionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SchoolManagement.Domain.Entities.Student", "Student")
+                        .WithMany("Enrollments")
+                        .HasForeignKey("StudentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("AcademicYear");
+
+                    b.Navigation("ClassSection");
+
+                    b.Navigation("Student");
+                });
+
             modelBuilder.Entity("SchoolManagement.Domain.Entities.StudentGuardian", b =>
                 {
                     b.HasOne("SchoolManagement.Domain.Entities.Parent", "Parent")
@@ -1613,6 +1973,39 @@ namespace SchoolManagement.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("Parent");
+
+                    b.Navigation("Student");
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Entities.StudentHealth", b =>
+                {
+                    b.HasOne("SchoolManagement.Domain.Entities.Student", "Student")
+                        .WithOne("Health")
+                        .HasForeignKey("SchoolManagement.Domain.Entities.StudentHealth", "StudentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Student");
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Entities.StudentIdentityDocument", b =>
+                {
+                    b.HasOne("SchoolManagement.Domain.Entities.Student", "Student")
+                        .WithOne("IdentityDocument")
+                        .HasForeignKey("SchoolManagement.Domain.Entities.StudentIdentityDocument", "StudentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Student");
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Entities.StudentPickupPerson", b =>
+                {
+                    b.HasOne("SchoolManagement.Domain.Entities.Student", "Student")
+                        .WithMany("PickupPersons")
+                        .HasForeignKey("StudentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.Navigation("Student");
                 });
@@ -1690,6 +2083,8 @@ namespace SchoolManagement.Infrastructure.Migrations
 
             modelBuilder.Entity("SchoolManagement.Domain.Entities.Admission", b =>
                 {
+                    b.Navigation("Guardians");
+
                     b.Navigation("Student");
                 });
 
@@ -1713,6 +2108,17 @@ namespace SchoolManagement.Infrastructure.Migrations
                     b.Navigation("RolePermissions");
 
                     b.Navigation("UserRoles");
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Entities.Student", b =>
+                {
+                    b.Navigation("Enrollments");
+
+                    b.Navigation("Health");
+
+                    b.Navigation("IdentityDocument");
+
+                    b.Navigation("PickupPersons");
                 });
 
             modelBuilder.Entity("SchoolManagement.Domain.Entities.User", b =>

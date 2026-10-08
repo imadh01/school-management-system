@@ -16,5 +16,14 @@ public class UpdateAdmissionRequestValidator : AbstractValidator<UpdateAdmission
             .WithMessage("AdmissionType must be 'New' or 'Transfer'.");
         RuleFor(x => x.Phone).NotEmpty().MaximumLength(20);
         RuleFor(x => x.Email).EmailAddress().When(x => !string.IsNullOrEmpty(x.Email));
+        RuleFor(x => x.Remarks).MaximumLength(300);
+
+        RuleForEach(x => x.Guardians).SetValidator(new AdmissionGuardianRequestValidator());
+        RuleFor(x => x.Guardians).Must(AdmissionGuardianListRules.WithinLimit)
+            .WithMessage($"An application can have at most {AdmissionGuardianListRules.MaxGuardians} guardians.");
+        RuleFor(x => x.Guardians).Must(AdmissionGuardianListRules.AtMostOnePrimary)
+            .WithMessage("Only one guardian can be the primary contact.");
+        RuleFor(x => x.Guardians).Must(AdmissionGuardianListRules.AtMostOneFatherAndMother)
+            .WithMessage("An application can list only one father and one mother.");
     }
 }
