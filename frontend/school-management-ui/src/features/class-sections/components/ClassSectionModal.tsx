@@ -6,14 +6,14 @@ import {
   CLASS_STAGES,
   CLASS_STREAMS,
   type ClassSectionResponse,
-  type UpdateClassSectionRequest,
+  type ClassSectionFields,
 } from "../types/classSection.types";
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
   editing: ClassSectionResponse | null;
-  onSave: (data: UpdateClassSectionRequest) => Promise<void>;
+  onSave: (data: ClassSectionFields) => Promise<void>;
 }
 
 interface FormState {

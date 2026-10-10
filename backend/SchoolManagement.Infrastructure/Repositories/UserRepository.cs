@@ -55,4 +55,9 @@ public class UserRepository : IUserRepository
             .Distinct()
             .ToListAsync(cancellationToken)
             .ContinueWith(t => (IReadOnlyList<string>)t.Result, cancellationToken);
+
+    public async Task SaveChangesAsync(CancellationToken cancellationToken)
+    {
+        await _context.SaveChangesAsync(cancellationToken);
+    }
 }

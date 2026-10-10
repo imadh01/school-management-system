@@ -72,7 +72,10 @@ namespace SchoolManagement.Infrastructure.Migrations
                     b.HasIndex("Name")
                         .IsUnique();
 
-                    b.ToTable("AcademicYears", (string)null);
+                    b.ToTable("AcademicYears", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_AcademicYears_Dates", "[EndDate] > [StartDate]");
+                        });
 
                     b.HasData(
                         new
@@ -228,6 +231,12 @@ namespace SchoolManagement.Infrastructure.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
 
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
                     b.Property<string>("State")
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
@@ -261,7 +270,18 @@ namespace SchoolManagement.Infrastructure.Migrations
 
                     b.HasIndex("AcademicYearId", "Status");
 
-                    b.ToTable("Admissions", (string)null);
+                    b.ToTable("Admissions", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Admissions_AdmissionFee", "[AdmissionFee] IS NULL OR [AdmissionFee] >= 0");
+
+                            t.HasCheckConstraint("CK_Admissions_AdmissionType", "[AdmissionType] IN ('New','Transfer')");
+
+                            t.HasCheckConstraint("CK_Admissions_EnrolledIsComplete", "[Status] <> 'Enrolled' OR ([RollNumber] IS NOT NULL AND [AdmissionNumber] IS NOT NULL AND [AdmissionDate] IS NOT NULL AND [AllottedClassSectionId] IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_Admissions_RejectedHasReason", "[Status] <> 'Rejected' OR ([RejectionReason] IS NOT NULL AND LEN(LTRIM(RTRIM([RejectionReason]))) > 0)");
+
+                            t.HasCheckConstraint("CK_Admissions_Status", "[Status] IN ('Registered','Admitted','Enrolled','Rejected')");
+                        });
                 });
 
             modelBuilder.Entity("SchoolManagement.Domain.Entities.AdmissionGuardian", b =>
@@ -279,6 +299,9 @@ namespace SchoolManagement.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime2")
                         .HasDefaultValueSql("SYSUTCDATETIME()");
+
+                    b.Property<int?>("CreatedBy")
+                        .HasColumnType("int");
 
                     b.Property<string>("Email")
                         .HasMaxLength(100)
@@ -314,6 +337,9 @@ namespace SchoolManagement.Infrastructure.Migrations
                         .HasColumnType("datetime2")
                         .HasDefaultValueSql("SYSUTCDATETIME()");
 
+                    b.Property<int?>("UpdatedBy")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
 
                     b.HasIndex("AdmissionId")
@@ -335,6 +361,14 @@ namespace SchoolManagement.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("SYSUTCDATETIME()");
+
+                    b.Property<int?>("CreatedBy")
+                        .HasColumnType("int");
+
                     b.Property<string>("Remarks")
                         .HasMaxLength(250)
                         .HasColumnType("nvarchar(250)");
@@ -348,6 +382,14 @@ namespace SchoolManagement.Infrastructure.Migrations
                         .HasColumnType("nvarchar(10)");
 
                     b.Property<int>("StudentId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("SYSUTCDATETIME()");
+
+                    b.Property<int?>("UpdatedBy")
                         .HasColumnType("int");
 
                     b.HasKey("Id");
@@ -416,6 +458,63 @@ namespace SchoolManagement.Infrastructure.Migrations
                     b.ToTable("AttendanceSessions", (string)null);
                 });
 
+            modelBuilder.Entity("SchoolManagement.Domain.Entities.AuditLog", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<string>("Changes")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("OccurredAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("RecordId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("TableName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("TraceId")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<int?>("UserId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("UserName")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OccurredAt")
+                        .HasDatabaseName("IX_AuditLogs_OccurredAt");
+
+                    b.HasIndex("UserId", "OccurredAt")
+                        .HasDatabaseName("IX_AuditLogs_User_Time");
+
+                    b.HasIndex("TableName", "RecordId", "OccurredAt")
+                        .HasDatabaseName("IX_AuditLogs_Table_Record");
+
+                    b.ToTable("AuditLogs", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_AuditLogs_Action", "[Action] IN ('Insert','Update','Delete')");
+                        });
+                });
+
             modelBuilder.Entity("SchoolManagement.Domain.Entities.ClassSection", b =>
                 {
                     b.Property<int>("Id")
@@ -476,6 +575,12 @@ namespace SchoolManagement.Infrastructure.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("nvarchar(30)");
 
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
                     b.Property<string>("Section")
                         .IsRequired()
                         .HasMaxLength(10)
@@ -518,7 +623,11 @@ namespace SchoolManagement.Infrastructure.Migrations
 
                     b.ToTable("ClassSections", null, t =>
                         {
+                            t.HasCheckConstraint("CK_ClassSections_Capacity", "[Capacity] IS NULL OR [Capacity] > 0");
+
                             t.HasCheckConstraint("CK_ClassSections_Floor", "[Floor] IS NULL OR [Floor] >= 0");
+
+                            t.HasCheckConstraint("CK_ClassSections_Status", "[Status] IN ('Active','Inactive')");
                         });
                 });
 
@@ -639,6 +748,12 @@ namespace SchoolManagement.Infrastructure.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("nvarchar(30)");
 
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
                     b.Property<string>("State")
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
@@ -680,9 +795,15 @@ namespace SchoolManagement.Infrastructure.Migrations
                     b.HasIndex("MobileKey")
                         .HasDatabaseName("IX_Parents_MobileKey");
 
-                    b.HasIndex("UserId");
+                    b.HasIndex("UserId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Parents_UserId")
+                        .HasFilter("[UserId] IS NOT NULL AND [IsDeleted] = 0");
 
-                    b.ToTable("Parents", (string)null);
+                    b.ToTable("Parents", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Parents_Status", "[Status] IN ('Active','Inactive')");
+                        });
                 });
 
             modelBuilder.Entity("SchoolManagement.Domain.Entities.Permission", b =>
@@ -793,6 +914,86 @@ namespace SchoolManagement.Infrastructure.Migrations
                             Description = "View and edit full Aadhaar, passport and visa details of students.",
                             Module = "Students",
                             Name = "Students.ViewSensitive"
+                        });
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Entities.RefreshToken", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("CreatedByIp")
+                        .HasMaxLength(45)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(45)");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("FamilyExpiresAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("FamilyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("IssuedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<long?>("ReplacedByTokenId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("RevokedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("RevokedReason")
+                        .HasMaxLength(20)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(20)");
+
+                    b.Property<Guid>("SecurityStamp")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<byte[]>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("binary(32)")
+                        .IsFixedLength();
+
+                    b.Property<string>("UserAgent")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FamilyExpiresAt")
+                        .HasDatabaseName("IX_RefreshTokens_FamilyExpiresAt");
+
+                    b.HasIndex("FamilyId")
+                        .HasDatabaseName("IX_RefreshTokens_FamilyId");
+
+                    b.HasIndex("ReplacedByTokenId");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique()
+                        .HasDatabaseName("UX_RefreshTokens_TokenHash");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("IX_RefreshTokens_UserId_Active")
+                        .HasFilter("[RevokedAt] IS NULL");
+
+                    b.ToTable("RefreshTokens", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_RefreshTokens_Expiry", "[ExpiresAt] > [IssuedAt] AND [ExpiresAt] <= [FamilyExpiresAt]");
+
+                            t.HasCheckConstraint("CK_RefreshTokens_Revoked", "([RevokedAt] IS NULL AND [RevokedReason] IS NULL) OR ([RevokedAt] IS NOT NULL AND [RevokedReason] IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_RefreshTokens_RevokedReason", "[RevokedReason] IS NULL OR [RevokedReason] IN ('Rotated','Logout','LogoutAll','PasswordChanged','ReuseDetected','SessionInvalidated')");
                         });
                 });
 
@@ -966,15 +1167,15 @@ namespace SchoolManagement.Infrastructure.Migrations
                     b.Property<string>("AdmissionType")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)")
-                        .HasDefaultValue("Fresh Admission");
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasDefaultValue("New");
 
                     b.Property<string>("Category")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)")
                         .HasDefaultValue("General");
 
                     b.Property<string>("City")
@@ -1100,6 +1301,12 @@ namespace SchoolManagement.Infrastructure.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
 
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
                     b.Property<string>("SecondNationality")
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
@@ -1142,12 +1349,22 @@ namespace SchoolManagement.Infrastructure.Migrations
                         .IsUnique()
                         .HasFilter("[AdmissionId] IS NOT NULL");
 
-                    b.HasIndex("UserId");
+                    b.HasIndex("UserId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Students_UserId")
+                        .HasFilter("[UserId] IS NOT NULL AND [IsDeleted] = 0");
 
-                    b.HasIndex("ClassSectionId", "RollNumber")
-                        .IsUnique();
+                    b.HasIndex("ClassSectionId", "Status")
+                        .HasDatabaseName("IX_Students_ClassSectionId_Status");
 
-                    b.ToTable("Students", (string)null);
+                    b.ToTable("Students", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Students_AdmissionType", "[AdmissionType] IN ('New','Transfer')");
+
+                            t.HasCheckConstraint("CK_Students_FeeConcession", "[FeeConcessionPercent] IS NULL OR ([FeeConcessionPercent] >= 0 AND [FeeConcessionPercent] <= 100)");
+
+                            t.HasCheckConstraint("CK_Students_Status", "[Status] IN ('Active','Inactive','Left')");
+                        });
                 });
 
             modelBuilder.Entity("SchoolManagement.Domain.Entities.StudentEnrollment", b =>
@@ -1241,6 +1458,14 @@ namespace SchoolManagement.Infrastructure.Migrations
                     b.Property<int>("ParentId")
                         .HasColumnType("int");
 
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("SYSUTCDATETIME()");
+
+                    b.Property<int?>("CreatedBy")
+                        .HasColumnType("int");
+
                     b.Property<bool>("IsPrimaryContact")
                         .HasColumnType("bit");
 
@@ -1248,6 +1473,14 @@ namespace SchoolManagement.Infrastructure.Migrations
                         .IsRequired()
                         .HasMaxLength(30)
                         .HasColumnType("nvarchar(30)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("SYSUTCDATETIME()");
+
+                    b.Property<int?>("UpdatedBy")
+                        .HasColumnType("int");
 
                     b.HasKey("StudentId", "ParentId");
 
@@ -1282,6 +1515,9 @@ namespace SchoolManagement.Infrastructure.Migrations
                         .HasColumnType("datetime2")
                         .HasDefaultValueSql("SYSUTCDATETIME()");
 
+                    b.Property<int?>("CreatedBy")
+                        .HasColumnType("int");
+
                     b.Property<string>("DietaryRequirements")
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
@@ -1306,6 +1542,9 @@ namespace SchoolManagement.Infrastructure.Migrations
                         .HasColumnType("datetime2")
                         .HasDefaultValueSql("SYSUTCDATETIME()");
 
+                    b.Property<int?>("UpdatedBy")
+                        .HasColumnType("int");
+
                     b.HasKey("StudentId");
 
                     b.ToTable("StudentHealth", (string)null);
@@ -1325,6 +1564,9 @@ namespace SchoolManagement.Infrastructure.Migrations
                         .HasColumnType("datetime2")
                         .HasDefaultValueSql("SYSUTCDATETIME()");
 
+                    b.Property<int?>("CreatedBy")
+                        .HasColumnType("int");
+
                     b.Property<DateOnly?>("PassportExpiry")
                         .HasColumnType("date");
 
@@ -1336,6 +1578,9 @@ namespace SchoolManagement.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime2")
                         .HasDefaultValueSql("SYSUTCDATETIME()");
+
+                    b.Property<int?>("UpdatedBy")
+                        .HasColumnType("int");
 
                     b.Property<DateOnly?>("VisaExpiry")
                         .HasColumnType("date");
@@ -1370,6 +1615,9 @@ namespace SchoolManagement.Infrastructure.Migrations
                         .HasColumnType("datetime2")
                         .HasDefaultValueSql("SYSUTCDATETIME()");
 
+                    b.Property<int?>("CreatedBy")
+                        .HasColumnType("int");
+
                     b.Property<string>("IdNote")
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
@@ -1396,6 +1644,9 @@ namespace SchoolManagement.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime2")
                         .HasDefaultValueSql("SYSUTCDATETIME()");
+
+                    b.Property<int?>("UpdatedBy")
+                        .HasColumnType("int");
 
                     b.HasKey("Id");
 
@@ -1495,6 +1746,10 @@ namespace SchoolManagement.Infrastructure.Migrations
                     b.ToTable("Subjects", null, t =>
                         {
                             t.HasCheckConstraint("CK_Subjects_MarksByType", "([Type] IN ('Theory','Practical') AND [MaxMarks] IS NOT NULL AND [PassMarks] IS NOT NULL  AND [TheoryMax] IS NULL AND [TheoryPass] IS NULL AND [PracticalMax] IS NULL AND [PracticalPass] IS NULL) OR ([Type] = 'Both' AND [TheoryMax] IS NOT NULL AND [TheoryPass] IS NOT NULL  AND [PracticalMax] IS NOT NULL AND [PracticalPass] IS NOT NULL AND [MaxMarks] IS NULL AND [PassMarks] IS NULL)");
+
+                            t.HasCheckConstraint("CK_Subjects_PassNotAboveMax", "([PassMarks] IS NULL OR [MaxMarks] IS NULL OR [PassMarks] <= [MaxMarks]) AND ([TheoryPass] IS NULL OR [TheoryMax] IS NULL OR [TheoryPass] <= [TheoryMax]) AND ([PracticalPass] IS NULL OR [PracticalMax] IS NULL OR [PracticalPass] <= [PracticalMax])");
+
+                            t.HasCheckConstraint("CK_Subjects_Status", "[Status] IN ('Active','Inactive')");
                         });
                 });
 
@@ -1548,7 +1803,8 @@ namespace SchoolManagement.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("UserId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("[IsDeleted] = 0");
 
                     b.ToTable("Teachers", (string)null);
                 });
@@ -1560,6 +1816,11 @@ namespace SchoolManagement.Infrastructure.Migrations
                         .HasColumnType("int");
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AccessFailedCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
@@ -1586,9 +1847,22 @@ namespace SchoolManagement.Infrastructure.Migrations
                     b.Property<DateTime?>("LastLoginAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<DateTime?>("LockoutEnd")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("MustChangePassword")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
                     b.Property<string>("PasswordHash")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("SecurityStamp")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier")
+                        .HasDefaultValueSql("NEWID()");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -1754,6 +2028,20 @@ namespace SchoolManagement.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Entities.RefreshToken", b =>
+                {
+                    b.HasOne("SchoolManagement.Domain.Entities.RefreshToken", null)
+                        .WithMany()
+                        .HasForeignKey("ReplacedByTokenId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("SchoolManagement.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("SchoolManagement.Domain.Entities.RolePermission", b =>

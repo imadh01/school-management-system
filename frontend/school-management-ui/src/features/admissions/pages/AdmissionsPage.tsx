@@ -1,3 +1,4 @@
+import { isConcurrencyConflict } from "@/utils/apiError";
 import { useEffect, useMemo, useState } from "react";
 import { admissionService } from "../services/admissionService";
 import { classSectionService } from "@/features/class-sections/services/classSectionService";
@@ -614,7 +615,16 @@ export function AdmissionsPage() {
         onClose={() => setIsRegistrationOpen(false)}
         onSubmit={async (data) => {
           if (editingAdmission) {
-            await admissionService.update(editingAdmission.id, data);
+            try {
+              await admissionService.update(editingAdmission.id, {
+                ...data,
+                rowVersion: editingAdmission.rowVersion,
+              });
+            } catch (err) {
+              // Someone else saved this application first: refresh the list so the next try starts fresh.
+              if (isConcurrencyConflict(err)) await loadData();
+              throw err;
+            }
           } else {
             await admissionService.create(data);
           }

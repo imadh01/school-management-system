@@ -5,13 +5,17 @@ import type {
   ParentResponse,
 } from "../types/parent.types";
 import { ValidationModal } from "@/components/ValidationModal";
+import { getApiErrors } from "@/utils/apiError";
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
   editingParent: ParentResponse | null;
   onCreate: (data: CreateParentRequest) => Promise<void>;
-  onUpdate: (id: number, data: UpdateParentRequest) => Promise<void>;
+  onUpdate: (
+    id: number,
+    data: Omit<UpdateParentRequest, "rowVersion">,
+  ) => Promise<void>;
 }
 
 type FormState = CreateParentRequest & { status: "Active" | "Inactive" };
@@ -130,8 +134,9 @@ export function ParentModal({
         await onCreate(createData);
       }
       onClose();
-    } catch {
-      setError("Could not save this parent.");
+    } catch (err) {
+      // Shows the server's message, e.g. "changed by someone else - reload it".
+      setError(getApiErrors(err, "Could not save this parent.").join(" "));
     } finally {
       setIsSubmitting(false);
     }

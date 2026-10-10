@@ -7,7 +7,8 @@ using Xunit;
 
 namespace SchoolManagement.Tests.IntegrationTests;
 
-public class UsersControllerTests : IClassFixture<CustomWebApplicationFactory>
+[Collection("LegacyApi")]
+public class UsersControllerTests
 {
     private readonly HttpClient _client;
 

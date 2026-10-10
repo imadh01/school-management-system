@@ -11,15 +11,18 @@ public class StudentService : IStudentService
     private readonly IStudentRepository _studentRepository;
     private readonly IClassSectionRepository _classSectionRepository;
     private readonly IStudentGuardianRepository _guardianRepository;
+    private readonly IConcurrencyGuard _concurrency;
 
     public StudentService(
         IStudentRepository studentRepository,
         IClassSectionRepository classSectionRepository,
-        IStudentGuardianRepository guardianRepository)
+        IStudentGuardianRepository guardianRepository,
+        IConcurrencyGuard concurrency)
     {
         _studentRepository = studentRepository;
         _classSectionRepository = classSectionRepository;
         _guardianRepository = guardianRepository;
+        _concurrency = concurrency;
     }
 
     public async Task<List<StudentSummaryResponse>> GetAllAsync(CancellationToken cancellationToken)
@@ -53,37 +56,45 @@ public class StudentService : IStudentService
 
         // Business rules: the section must be active and not full.
         ClassSectionRules.EnsureActive(classSection);
-        ClassSectionRules.EnsureHasRoom(classSection,
-            await _classSectionRepository.CountActiveStudentsAsync(classSection.Id, cancellationToken));
 
-        var student = new Student
+        // Count the seats and take one in ONE transaction, behind a lock on the class,
+        // so two people cannot both take the last seat.
+        return await _studentRepository.ExecuteInTransactionAsync(async () =>
         {
-            AdmNo = request.AdmNo,
-            RollNumber = request.RollNumber,
-            ClassSectionId = classSection.Id,
-            AdmissionDate = request.AdmissionDate,
-            Status = "Active",
-            Health = new StudentHealth(), // every student has a health row; filled below
-        };
-        // First academic-history period; saved in the same SaveChanges as the student.
-        student.Enrollments.Add(StudentEnrollmentRules.StartNew(classSection, request.RollNumber, request.AdmissionDate));
-        ApplyCore(student, request.PhotoUrl, request.FirstName, request.MiddleName, request.LastName, request.Gender,
-            request.DateOfBirth, request.Mobile, request.Email, request.AddressLine, request.City, request.State, request.Pincode,
-            request.Category, request.Religion, request.PreviousSchool, request.TransportRequired, request.TransportRoute,
-            request.Nationality, request.SecondNationality, request.CountryOfBirth, request.PreferredName,
-            request.MotherTongue, request.HomeLanguage, request.EnglishProficiency, request.CurriculumTrack, request.AdmissionType,
-            request.CustodyArrangement, request.MediaConsent, request.House, request.EalCode, request.FeeConcessionPercent);
-        ApplyHealth(student.Health, request.Health);
-        foreach (var p in MapPickupPersons(request.PickupPersons)) student.PickupPersons.Add(p);
+            await _classSectionRepository.LockSeatsAsync(classSection.Id, cancellationToken);
+            ClassSectionRules.EnsureHasRoom(classSection,
+                await _classSectionRepository.CountActiveStudentsAsync(classSection.Id, cancellationToken));
 
-        await _studentRepository.AddAsync(student, cancellationToken); // one SaveChanges = student + health + pickup persons
-        student.ClassSection = classSection;
-        return await ToResponseAsync(student, includeSensitive, cancellationToken);
+            var student = new Student
+            {
+                AdmNo = request.AdmNo,
+                RollNumber = request.RollNumber,
+                ClassSectionId = classSection.Id,
+                AdmissionDate = request.AdmissionDate,
+                Status = "Active",
+                Health = new StudentHealth(), // every student has a health row; filled below
+            };
+            // First academic-history period; saved in the same SaveChanges as the student.
+            student.Enrollments.Add(StudentEnrollmentRules.StartNew(classSection, request.RollNumber, request.AdmissionDate));
+            ApplyCore(student, request.PhotoUrl, request.FirstName, request.MiddleName, request.LastName, request.Gender,
+                request.DateOfBirth, request.Mobile, request.Email, request.AddressLine, request.City, request.State, request.Pincode,
+                request.Category, request.Religion, request.PreviousSchool, request.TransportRequired, request.TransportRoute,
+                request.Nationality, request.SecondNationality, request.CountryOfBirth, request.PreferredName,
+                request.MotherTongue, request.HomeLanguage, request.EnglishProficiency, request.CurriculumTrack, request.AdmissionType,
+                request.CustodyArrangement, request.MediaConsent, request.House, request.EalCode, request.FeeConcessionPercent);
+            ApplyHealth(student.Health, request.Health);
+            foreach (var p in MapPickupPersons(request.PickupPersons)) student.PickupPersons.Add(p);
+
+            await _studentRepository.AddAsync(student, cancellationToken); // one SaveChanges = student + health + pickup persons
+            student.ClassSection = classSection;
+            return await ToResponseAsync(student, includeSensitive, cancellationToken);
+        }, cancellationToken);
     }
 
     public async Task<StudentResponse> UpdateAsync(int id, UpdateStudentRequest request, bool includeSensitive, CancellationToken cancellationToken)
     {
         var student = await GetDetailOrThrowAsync(id, cancellationToken);
+        _concurrency.Expect(student, request.RowVersion); // 409 if someone saved this student after it was loaded
         var classSection = await GetClassSectionOrThrowAsync(request.ClassSectionId, cancellationToken);
 
         var activePeriod = student.Enrollments.FirstOrDefault(e => e.Status == EnrollmentStatuses.Active);
@@ -105,93 +116,106 @@ public class StudentService : IStudentService
                 "A student can only be moved to a class in the same academic year here. " +
                 "Moving to the next year is done through year-end promotion.");
 
-        // Only a *move to a different class* (or coming back) is checked for status and room,
-        // so editing a student whose current class is inactive or at capacity still works.
-        if (!becomesLeft && (classChanged || needsFreshPeriod))
-        {
-            ClassSectionRules.EnsureActive(classSection);
-            ClassSectionRules.EnsureHasRoom(classSection,
-                await _classSectionRepository.CountActiveStudentsAsync(classSection.Id, cancellationToken));
-        }
+        // A move to another class, or a returning student, takes a seat. That whole edit then runs in
+        // one transaction behind a lock on the target class, so two people cannot both take the last seat.
+        var takesSeat = !becomesLeft && (classChanged || needsFreshPeriod);
 
-        if (!becomesLeft && (classChanged || rollChanged))
+        async Task<StudentResponse> ApplyAsync()
         {
-            if (await _studentRepository.ExistsByRollNumberInClassAsync(classSection.Id, request.RollNumber, cancellationToken))
-                throw new ConflictException($"Roll number '{request.RollNumber}' is already in use in this class.");
-        }
-
-        var today = StudentEnrollmentRules.Today();
-        // Which academic-history change does this edit imply?
-        var closeOldAndStartNew = false;
-        if (becomesLeft)
-        {
-            if (activePeriod is not null)
-                StudentEnrollmentRules.Close(activePeriod, EnrollmentStatuses.Left, today);
-        }
-        else if (needsFreshPeriod)
-        {
-            student.Enrollments.Add(StudentEnrollmentRules.StartNew(classSection, request.RollNumber, today));
-        }
-        else if (classChanged)
-        {
-            // Mid-year move: the old period ends today, a new one starts today.
-            StudentEnrollmentRules.Close(activePeriod!, EnrollmentStatuses.Transferred, today,
-                $"Moved to {classSection.DisplayName}");
-            closeOldAndStartNew = true;
-        }
-        else if (rollChanged)
-        {
-            // Correcting a roll number inside the same class is not a new period.
-            activePeriod!.RollNumber = request.RollNumber;
-            activePeriod.UpdatedAt = DateTime.UtcNow;
-        }
-
-        // Students keeps a copy of the current placement (written only here and at enrolment).
-        // A student who has left keeps their last class and roll number.
-        if (!becomesLeft)
-        {
-            student.RollNumber = request.RollNumber;
-            student.ClassSectionId = classSection.Id;
-        }
-        student.Status = request.Status;
-        ApplyCore(student, request.PhotoUrl, request.FirstName, request.MiddleName, request.LastName, request.Gender,
-            request.DateOfBirth, request.Mobile, request.Email, request.AddressLine, request.City, request.State, request.Pincode,
-            request.Category, request.Religion, request.PreviousSchool, request.TransportRequired, request.TransportRoute,
-            request.Nationality, request.SecondNationality, request.CountryOfBirth, request.PreferredName,
-            request.MotherTongue, request.HomeLanguage, request.EnglishProficiency, request.CurriculumTrack, request.AdmissionType,
-            request.CustodyArrangement, request.MediaConsent, request.House, request.EalCode, request.FeeConcessionPercent);
-
-        // null = "not supplied, leave as is"; a supplied block replaces the stored one.
-        if (request.Health is not null)
-        {
-            student.Health ??= new StudentHealth();
-            ApplyHealth(student.Health, request.Health);
-            student.Health.UpdatedAt = DateTime.UtcNow;
-        }
-        if (request.PickupPersons is not null)
-        {
-            student.PickupPersons.Clear();
-            foreach (var p in MapPickupPersons(request.PickupPersons)) student.PickupPersons.Add(p);
-        }
-
-        if (closeOldAndStartNew)
-        {
-            // Two saves in one transaction: the old period must be closed in the database
-            // before the new one is inserted, because only one Active period may exist per student.
-            await _studentRepository.ExecuteInTransactionAsync(async () =>
+            // Only a *move to a different class* (or coming back) is checked for status and room,
+            // so editing a student whose current class is inactive or at capacity still works.
+            if (!becomesLeft && (classChanged || needsFreshPeriod))
             {
+                ClassSectionRules.EnsureActive(classSection);
+                ClassSectionRules.EnsureHasRoom(classSection,
+                    await _classSectionRepository.CountActiveStudentsAsync(classSection.Id, cancellationToken));
+            }
+
+            if (!becomesLeft && (classChanged || rollChanged || needsFreshPeriod))
+            {
+                if (await _studentRepository.ExistsByRollNumberInClassAsync(classSection.Id, request.RollNumber, cancellationToken))
+                    throw new ConflictException($"Roll number '{request.RollNumber}' is already in use in this class.");
+            }
+
+            var today = StudentEnrollmentRules.Today();
+            // Which academic-history change does this edit imply?
+            var closeOldAndStartNew = false;
+            if (becomesLeft)
+            {
+                if (activePeriod is not null)
+                    StudentEnrollmentRules.Close(activePeriod, EnrollmentStatuses.Left, today);
+            }
+            else if (needsFreshPeriod)
+            {
+                student.Enrollments.Add(StudentEnrollmentRules.StartNew(classSection, request.RollNumber, today));
+            }
+            else if (classChanged)
+            {
+                // Mid-year move: the old period ends today, a new one starts today.
+                StudentEnrollmentRules.Close(activePeriod!, EnrollmentStatuses.Transferred, today,
+                    $"Moved to {classSection.DisplayName}");
+                closeOldAndStartNew = true;
+            }
+            else if (rollChanged)
+            {
+                // Correcting a roll number inside the same class is not a new period.
+                activePeriod!.RollNumber = request.RollNumber;
+                activePeriod.UpdatedAt = DateTime.UtcNow;
+            }
+
+            // Students keeps a copy of the current placement (written only here and at enrolment).
+            // A student who has left keeps their last class and roll number.
+            if (!becomesLeft)
+            {
+                student.RollNumber = request.RollNumber;
+                student.ClassSectionId = classSection.Id;
+            }
+            student.Status = request.Status;
+            ApplyCore(student, request.PhotoUrl, request.FirstName, request.MiddleName, request.LastName, request.Gender,
+                request.DateOfBirth, request.Mobile, request.Email, request.AddressLine, request.City, request.State, request.Pincode,
+                request.Category, request.Religion, request.PreviousSchool, request.TransportRequired, request.TransportRoute,
+                request.Nationality, request.SecondNationality, request.CountryOfBirth, request.PreferredName,
+                request.MotherTongue, request.HomeLanguage, request.EnglishProficiency, request.CurriculumTrack, request.AdmissionType,
+                request.CustodyArrangement, request.MediaConsent, request.House, request.EalCode, request.FeeConcessionPercent);
+
+            // null = "not supplied, leave as is"; a supplied block replaces the stored one.
+            if (request.Health is not null)
+            {
+                student.Health ??= new StudentHealth();
+                ApplyHealth(student.Health, request.Health);
+                student.Health.UpdatedAt = DateTime.UtcNow;
+            }
+            if (request.PickupPersons is not null)
+            {
+                student.PickupPersons.Clear();
+                foreach (var p in MapPickupPersons(request.PickupPersons)) student.PickupPersons.Add(p);
+            }
+
+            if (closeOldAndStartNew)
+            {
+                // A class move always takes a seat, so we are already inside the seat transaction here.
+                // Two saves: the old period must be closed in the database before the new one is
+                // inserted, because only one Active period may exist per student.
                 await _studentRepository.SaveChangesAsync(cancellationToken);
                 student.Enrollments.Add(StudentEnrollmentRules.StartNew(classSection, request.RollNumber, today));
                 await _studentRepository.SaveChangesAsync(cancellationToken);
-                return true;
-            }, cancellationToken);
+                student.ClassSection = classSection;
+                return await ToResponseAsync(student, includeSensitive, cancellationToken);
+            }
+
+            await _studentRepository.SaveChangesAsync(cancellationToken);
             student.ClassSection = classSection;
             return await ToResponseAsync(student, includeSensitive, cancellationToken);
         }
 
-        await _studentRepository.SaveChangesAsync(cancellationToken);
-        student.ClassSection = classSection;
-        return await ToResponseAsync(student, includeSensitive, cancellationToken);
+        if (!takesSeat)
+            return await ApplyAsync();
+
+        return await _studentRepository.ExecuteInTransactionAsync(async () =>
+        {
+            await _classSectionRepository.LockSeatsAsync(classSection.Id, cancellationToken);
+            return await ApplyAsync();
+        }, cancellationToken);
     }
 
     /// <summary>Sets Aadhaar / passport / visa. The controller only lets Students.ViewSensitive callers in.</summary>
@@ -231,6 +255,14 @@ public class StudentService : IStudentService
     public async Task DeleteAsync(int id, CancellationToken cancellationToken)
     {
         var student = await GetOrThrowAsync(id, cancellationToken);
+
+        // Deleting is only for records created by mistake. A student with class history or attendance
+        // is closed with status "Left" instead; otherwise a deleted student would keep a roll number and a seat.
+        if (await _studentRepository.HasAcademicHistoryAsync(id, cancellationToken))
+            throw new ConflictException(
+                "This student has academic history (class enrolments or attendance) and cannot be deleted. " +
+                "Set the status to 'Left' instead.");
+
         student.IsDeleted = true;
         student.DeletedAt = DateTime.UtcNow;
         await _studentRepository.SaveChangesAsync(cancellationToken);
@@ -343,6 +375,7 @@ public class StudentService : IStudentService
             health, identity,
             s.PickupPersons.OrderBy(p => p.Id)
                 .Select(p => new PickupPersonResponse(p.Id, p.Name, p.Relation, p.Phone, p.IdNote)).ToList(),
-            guardians);
+            guardians,
+            Convert.ToBase64String(s.RowVersion));
     }
 }

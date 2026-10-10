@@ -8,14 +8,30 @@ public class StudentConfiguration : IEntityTypeConfiguration<Student>
 {
     public void Configure(EntityTypeBuilder<Student> builder)
     {
-        builder.ToTable("Students");
+        builder.ToTable("Students", t =>
+        {
+            t.HasCheckConstraint("CK_Students_Status", CheckSql.In("Status", StudentStatuses.All));
+            t.HasCheckConstraint("CK_Students_AdmissionType", CheckSql.In("AdmissionType", AdmissionTypes.All));
+            t.HasCheckConstraint("CK_Students_FeeConcession",
+                "[FeeConcessionPercent] IS NULL OR ([FeeConcessionPercent] >= 0 AND [FeeConcessionPercent] <= 100)");
+        });
         builder.HasKey(s => s.Id);
+        builder.Property(e => e.RowVersion).IsRowVersion(); // optimistic concurrency
 
         builder.Property(s => s.AdmNo).HasMaxLength(30).IsRequired();
         builder.HasIndex(s => s.AdmNo).IsUnique();
 
         builder.Property(s => s.RollNumber).HasMaxLength(20).IsRequired();
-        builder.HasIndex(s => new { s.ClassSectionId, s.RollNumber }).IsUnique();
+        // Roll numbers are unique among ACTIVE enrollments (UX_StudentEnrollments_Section_Roll_Active).
+        // This table only mirrors the current class and roll, so it must not enforce uniqueness itself:
+        // a student who left keeps their last roll here. This index serves "students of a class" lookups.
+        builder.HasIndex(s => new { s.ClassSectionId, s.Status }).HasDatabaseName("IX_Students_ClassSectionId_Status");
+
+        // One login per student.
+        builder.HasIndex(s => s.UserId)
+            .IsUnique()
+            .HasFilter("[UserId] IS NOT NULL AND [IsDeleted] = 0")
+            .HasDatabaseName("UX_Students_UserId");
 
         builder.Property(s => s.Status).HasMaxLength(20).IsRequired().HasDefaultValue("Active");
         builder.Property(s => s.PhotoUrl).HasMaxLength(500);
@@ -32,7 +48,7 @@ public class StudentConfiguration : IEntityTypeConfiguration<Student>
         builder.Property(s => s.State).HasMaxLength(50);
         builder.Property(s => s.Pincode).HasMaxLength(10);
 
-        builder.Property(s => s.Category).HasMaxLength(20).IsRequired().HasDefaultValue("General");
+        builder.Property(s => s.Category).HasMaxLength(FieldLimits.Category).IsRequired().HasDefaultValue("General");
         builder.Property(s => s.Religion).HasMaxLength(50);
         builder.Property(s => s.PreviousSchool).HasMaxLength(100);
         builder.Property(s => s.TransportRequired).IsRequired().HasDefaultValue(false);
@@ -47,7 +63,7 @@ public class StudentConfiguration : IEntityTypeConfiguration<Student>
         builder.Property(s => s.HomeLanguage).HasMaxLength(50);
         builder.Property(s => s.EnglishProficiency).HasMaxLength(30);
         builder.Property(s => s.CurriculumTrack).HasMaxLength(50);
-        builder.Property(s => s.AdmissionType).HasMaxLength(30).IsRequired().HasDefaultValue("Fresh Admission");
+        builder.Property(s => s.AdmissionType).HasMaxLength(FieldLimits.AdmissionType).IsRequired().HasDefaultValue(AdmissionTypes.New);
 
         builder.Property(s => s.CustodyArrangement).HasMaxLength(20);
         builder.Property(s => s.MediaConsent).IsRequired().HasDefaultValue(true);

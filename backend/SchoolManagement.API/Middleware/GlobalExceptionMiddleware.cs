@@ -1,4 +1,5 @@
-﻿using SchoolManagement.API.Common;
+﻿using Microsoft.EntityFrameworkCore;
+using SchoolManagement.API.Common;
 using SchoolManagement.API.Extensions;
 using SchoolManagement.Domain.Exceptions;
 
@@ -35,6 +36,9 @@ public class GlobalExceptionMiddleware
         {
             NotFoundException => (StatusCodes.Status404NotFound, "NOT_FOUND", ex.Message),
             ConflictException => (StatusCodes.Status409Conflict, "CONFLICT", ex.Message),
+            // Optimistic concurrency: the row changed after the user opened it (rowversion no longer matches).
+            DbUpdateConcurrencyException => (StatusCodes.Status409Conflict, "CONCURRENCY_CONFLICT",
+                "This record was changed by someone else after you opened it. Reload it and make your changes again."),
             ForbiddenException => (StatusCodes.Status403Forbidden, "FORBIDDEN", ex.Message),
             BusinessRuleException => (StatusCodes.Status422UnprocessableEntity, "BUSINESS_RULE_VIOLATION", ex.Message),
             _ => (StatusCodes.Status500InternalServerError, "INTERNAL_SERVER_ERROR", "An unexpected error occurred."),

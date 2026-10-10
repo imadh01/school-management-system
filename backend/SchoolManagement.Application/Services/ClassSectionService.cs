@@ -9,13 +9,16 @@ public class ClassSectionService : IClassSectionService
 {
     private readonly IClassSectionRepository _classSectionRepository;
     private readonly IAcademicYearRepository _academicYearRepository;
+    private readonly IConcurrencyGuard _concurrency;
 
     public ClassSectionService(
         IClassSectionRepository classSectionRepository,
-        IAcademicYearRepository academicYearRepository)
+        IAcademicYearRepository academicYearRepository,
+        IConcurrencyGuard concurrency)
     {
         _classSectionRepository = classSectionRepository;
         _academicYearRepository = academicYearRepository;
+        _concurrency = concurrency;
     }
 
     public async Task<List<ClassSectionResponse>> GetAllAsync(CancellationToken cancellationToken)
@@ -76,6 +79,7 @@ public class ClassSectionService : IClassSectionService
     public async Task<ClassSectionResponse> UpdateAsync(int id, UpdateClassSectionRequest request, CancellationToken cancellationToken)
     {
         var section = await GetOrThrowAsync(id, cancellationToken);
+        _concurrency.Expect(section, request.RowVersion); // 409 if someone saved this class after it was loaded
 
         var name = request.Name.Trim();
         var sectionLetter = request.Section.Trim();
@@ -146,5 +150,6 @@ public class ClassSectionService : IClassSectionService
       c.Id, c.Name, c.Section, c.Code, c.Grade, c.Stage, c.Medium, c.Stream,
       c.Capacity, enrolled, c.Building, c.Floor, c.Room, c.Status,
       c.DisplayName, c.AcademicYearId, c.AcademicYear.Name,
-      c.ClassTeacherId, c.ClassTeacher?.Name);
+      c.ClassTeacherId, c.ClassTeacher?.Name,
+      Convert.ToBase64String(c.RowVersion));
 }

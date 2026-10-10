@@ -11,4 +11,5 @@ public record UpdateClassSectionRequest(
     string? Building,
     int? Floor,
     string? Room,
-    bool IsActive);
+    bool IsActive,
+    string RowVersion);

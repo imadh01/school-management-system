@@ -16,9 +16,9 @@ export function Sidebar() {
   const initials = user?.username.charAt(0).toUpperCase() ?? "?";
   const primaryRole = user?.roles[0] ?? "";
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     if (window.confirm(`Log out of ${SCHOOL_NAME}?`)) {
-      logout();
+      await logout(); // D2: ends the session on the server too (refresh cookie revoked)
       navigate("/login");
     }
   };

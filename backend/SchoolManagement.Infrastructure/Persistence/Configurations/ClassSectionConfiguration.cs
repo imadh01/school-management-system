@@ -9,9 +9,14 @@ public class ClassSectionConfiguration : IEntityTypeConfiguration<ClassSection>
     public void Configure(EntityTypeBuilder<ClassSection> builder)
     {
         builder.ToTable("ClassSections", t =>
-            t.HasCheckConstraint("CK_ClassSections_Floor", "[Floor] IS NULL OR [Floor] >= 0"));
+        {
+            t.HasCheckConstraint("CK_ClassSections_Floor", "[Floor] IS NULL OR [Floor] >= 0");
+            t.HasCheckConstraint("CK_ClassSections_Status", CheckSql.In("Status", ActiveStatuses.All));
+            t.HasCheckConstraint("CK_ClassSections_Capacity", "[Capacity] IS NULL OR [Capacity] > 0");
+        });
 
         builder.HasKey(c => c.Id);
+        builder.Property(e => e.RowVersion).IsRowVersion(); // optimistic concurrency
 
         builder.Property(c => c.Name).HasMaxLength(50).IsRequired();
         builder.Property(c => c.Section).HasMaxLength(10).IsRequired();

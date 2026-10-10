@@ -15,4 +15,5 @@ public record UpdateStudentRequest(
     string? CustodyArrangement, bool MediaConsent,
     string? House, string? EalCode, decimal? FeeConcessionPercent,
     StudentHealthDto? Health,
-    List<PickupPersonRequest>? PickupPersons);
+    List<PickupPersonRequest>? PickupPersons,
+    string RowVersion);

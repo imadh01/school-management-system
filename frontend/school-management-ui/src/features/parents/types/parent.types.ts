@@ -26,6 +26,8 @@ export interface ParentResponse {
   city: string | null;
   state: string | null;
   pincode: string | null;
+  /** Version stamp. Send it back unchanged when saving, so a concurrent edit is detected (409). */
+  rowVersion: string;
 }
 
 export interface CreateParentRequest {
@@ -58,6 +60,7 @@ export interface CreateParentRequest {
 
 export interface UpdateParentRequest extends CreateParentRequest {
   status: "Active" | "Inactive";
+  rowVersion: string;
 }
 
 export type RelationType = "Father" | "Mother" | "Guardian";

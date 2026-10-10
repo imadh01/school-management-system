@@ -31,6 +31,22 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
             .IsRequired()
             .HasDefaultValue("Active");
 
+        // ── D1: Security infrastructure columns ────────────────────────
+        builder.Property(u => u.SecurityStamp)
+            .IsRequired()
+            .HasDefaultValueSql("NEWID()");
+
+        builder.Property(u => u.MustChangePassword)
+            .IsRequired()
+            .HasDefaultValue(false);
+
+        builder.Property(u => u.LockoutEnd);
+
+        builder.Property(u => u.AccessFailedCount)
+            .IsRequired()
+            .HasDefaultValue(0);
+
+        // ── Audit ──────────────────────────────────────────────────────
         builder.Property(u => u.CreatedAt).IsRequired();
         builder.Property(u => u.UpdatedAt).IsRequired();
 

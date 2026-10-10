@@ -15,6 +15,8 @@ public class AttendanceRecordConfiguration : IEntityTypeConfiguration<Attendance
 
         builder.Property(r => r.Status).HasMaxLength(10).IsRequired();
         builder.Property(r => r.Remarks).HasMaxLength(250);
+        builder.Property(r => r.CreatedAt).HasDefaultValueSql("SYSUTCDATETIME()");
+        builder.Property(r => r.UpdatedAt).HasDefaultValueSql("SYSUTCDATETIME()");
 
         builder.HasOne(r => r.Session)
             .WithMany(s => s.Records)

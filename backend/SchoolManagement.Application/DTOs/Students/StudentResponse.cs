@@ -18,4 +18,5 @@ public record StudentResponse(
     StudentHealthDto Health,
     StudentIdentityResponse Identity,
     List<PickupPersonResponse> PickupPersons,
-    List<StudentGuardianResponse> Guardians);
+    List<StudentGuardianResponse> Guardians,
+    string RowVersion);

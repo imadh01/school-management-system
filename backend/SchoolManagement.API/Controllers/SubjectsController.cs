@@ -10,6 +10,7 @@ namespace SchoolManagement.API.Controllers;
 
 [ApiController]
 [Route("api/subjects")]
+[Authorize]
 public class SubjectsController : ControllerBase
 {
     private readonly ISubjectService _subjectService;

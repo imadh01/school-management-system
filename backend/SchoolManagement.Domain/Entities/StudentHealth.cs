@@ -1,6 +1,8 @@
-﻿namespace SchoolManagement.Domain.Entities;
+﻿using SchoolManagement.Domain.Auditing;
+namespace SchoolManagement.Domain.Entities;
 
 /// <summary>Health and insurance details of a student (1:1 with Student, shares its key).</summary>
+[AuditMasked]
 public class StudentHealth
 {
     public int StudentId { get; set; }
@@ -16,4 +18,6 @@ public class StudentHealth
 
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
+    public int? CreatedBy { get; set; }
+    public int? UpdatedBy { get; set; }
 }

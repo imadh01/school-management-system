@@ -26,7 +26,10 @@ public interface IStudentRepository
     /// <summary>Student with class, admission, health, identity and pickup persons loaded (tracked, for editing).</summary>
     Task<Student?> GetDetailByIdAsync(int id, CancellationToken cancellationToken);
     Task<bool> ExistsByAdmNoAsync(string admNo, CancellationToken cancellationToken);
+    /// <summary>True if an ACTIVE enrollment in this class already uses the roll number (students who left do not hold one).</summary>
     Task<bool> ExistsByRollNumberInClassAsync(int classSectionId, string rollNumber, CancellationToken cancellationToken);
+    /// <summary>True if the student has any enrollment period or attendance record; such a student must not be deleted.</summary>
+    Task<bool> HasAcademicHistoryAsync(int studentId, CancellationToken cancellationToken);
     Task<bool> ExistsByAadhaarAsync(string aadhaarNumber, int excludeStudentId, CancellationToken cancellationToken);
     /// <summary>All enrollment periods of a student, newest first (read-only projection).</summary>
     Task<List<StudentEnrollmentRow>> GetEnrollmentsAsync(int studentId, CancellationToken cancellationToken);

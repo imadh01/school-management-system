@@ -1,5 +1,6 @@
 ﻿using FluentValidation;
 using SchoolManagement.Application.DTOs.Students;
+using SchoolManagement.Domain.Entities;
 
 namespace SchoolManagement.Application.Validators;
 
@@ -14,8 +15,9 @@ public class CreateStudentRequestValidator : AbstractValidator<CreateStudentRequ
         RuleFor(x => x.LastName).NotEmpty().MaximumLength(50);
         RuleFor(x => x.Gender).NotEmpty();
         RuleFor(x => x.DateOfBirth).LessThan(DateOnly.FromDateTime(DateTime.UtcNow));
-        RuleFor(x => x.Category).NotEmpty().MaximumLength(20);
-        RuleFor(x => x.AdmissionType).NotEmpty().MaximumLength(30);
+        RuleFor(x => x.Category).NotEmpty().MaximumLength(FieldLimits.Category);
+        RuleFor(x => x.AdmissionType).Must(AdmissionTypes.IsValid)
+            .WithMessage("AdmissionType must be 'New' or 'Transfer'.");
         RuleFor(x => x.Email).EmailAddress().MaximumLength(100).When(x => !string.IsNullOrWhiteSpace(x.Email));
         RuleFor(x => x.FeeConcessionPercent).InclusiveBetween(0m, 100m).When(x => x.FeeConcessionPercent.HasValue);
 
@@ -24,4 +26,4 @@ public class CreateStudentRequestValidator : AbstractValidator<CreateStudentRequ
         RuleFor(x => x.PickupPersons).Must(StudentRequestRules.PickupPersonsWithinLimit)
             .WithMessage($"A student can have at most {StudentRequestRules.MaxPickupPersons} authorised pickup persons.");
     }
-} 
+}

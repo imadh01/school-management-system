@@ -2,14 +2,14 @@ import { useEffect, useMemo, useState } from "react";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { ValidationModal } from "@/components/ValidationModal";
 import { ViewDetailsModal } from "@/components/ViewDetailsModal";
-import { getApiErrors } from "@/utils/apiError";
+import { getApiErrors, isConcurrencyConflict } from "@/utils/apiError";
 import { classSectionService } from "../services/classSectionService";
 import { ClassSectionModal } from "../components/ClassSectionModal";
 import {
   CLASS_MEDIUMS,
   CLASS_STAGES,
   type ClassSectionResponse,
-  type UpdateClassSectionRequest,
+  type ClassSectionFields,
 } from "../types/classSection.types";
 
 type StatusFilter = "" | "Active" | "Inactive";
@@ -174,9 +174,18 @@ export function ClassSectionsPage() {
     setStatusFilter("");
   };
 
-  const handleSave = async (data: UpdateClassSectionRequest) => {
+  const handleSave = async (data: ClassSectionFields) => {
     if (editing) {
-      await classSectionService.update(editing.id, data);
+      try {
+        await classSectionService.update(editing.id, {
+          ...data,
+          rowVersion: editing.rowVersion,
+        });
+      } catch (err) {
+        // Someone else saved this class first: refresh the list so the next try starts fresh.
+        if (isConcurrencyConflict(err)) await loadData();
+        throw err;
+      }
     } else {
       await classSectionService.create(data);
     }

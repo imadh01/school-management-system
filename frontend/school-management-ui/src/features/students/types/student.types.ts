@@ -117,6 +117,8 @@ export interface StudentResponse {
   identity: StudentIdentityResponse;
   pickupPersons: PickupPersonResponse[];
   guardians: StudentGuardianResponse[];
+  /** Version stamp. Send it back unchanged when saving, so a concurrent edit is detected (409). */
+  rowVersion: string;
 }
 
 export interface CreateStudentRequest {
@@ -164,6 +166,7 @@ export interface UpdateStudentRequest extends Omit<
   "admNo" | "admissionDate"
 > {
   status: StudentStatus;
+  rowVersion: string;
 }
 export interface StudentEnrollmentResponse {
   id: number;

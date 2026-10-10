@@ -18,10 +18,12 @@ export interface ClassSectionResponse {
   academicYearName: string;
   classTeacherId: number | null;
   classTeacherName: string | null;
+  /** Version stamp. Send it back unchanged when saving, so a concurrent edit is detected (409). */
+  rowVersion: string;
 }
 
-// Fields shared by create and update.
-export interface UpdateClassSectionRequest {
+// Fields shared by create and update (what the form edits).
+export interface ClassSectionFields {
   name: string;
   section: string;
   grade: number | null;
@@ -35,7 +37,11 @@ export interface UpdateClassSectionRequest {
   isActive: boolean;
 }
 
-export interface CreateClassSectionRequest extends UpdateClassSectionRequest {
+export interface UpdateClassSectionRequest extends ClassSectionFields {
+  rowVersion: string;
+}
+
+export interface CreateClassSectionRequest extends ClassSectionFields {
   // null/undefined = backend uses the current academic year.
   academicYearId?: number | null;
 }

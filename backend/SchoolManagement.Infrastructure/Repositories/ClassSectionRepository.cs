@@ -1,6 +1,9 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using System.Data;
+using Microsoft.Data.SqlClient;
+using Microsoft.EntityFrameworkCore;
 using SchoolManagement.Application.Interfaces;
 using SchoolManagement.Domain.Entities;
+using SchoolManagement.Domain.Exceptions;
 using SchoolManagement.Infrastructure.Persistence;
 
 namespace SchoolManagement.Infrastructure.Repositories;
@@ -49,6 +52,26 @@ public class ClassSectionRepository : IClassSectionRepository
         _context.Students.CountAsync(
             s => s.ClassSectionId == classSectionId && s.Status == "Active",
             cancellationToken);
+
+    // sp_getapplock is SQL Server's named lock. Owner = Transaction means it is released
+    // automatically at COMMIT or ROLLBACK, so it can never be left behind by mistake.
+    // It locks a *name* (not rows), so it works the same for every code path that gives out a seat.
+    public async Task LockSeatsAsync(int classSectionId, CancellationToken cancellationToken)
+    {
+        if (_context.Database.CurrentTransaction is null)
+            throw new InvalidOperationException("LockSeatsAsync must be called inside a transaction.");
+
+        var result = new SqlParameter("@result", SqlDbType.Int) { Direction = ParameterDirection.Output };
+        await _context.Database.ExecuteSqlRawAsync(
+            "EXEC @result = sp_getapplock @Resource = @resource, @LockMode = 'Exclusive', " +
+            "@LockOwner = 'Transaction', @LockTimeout = 10000;",
+            new object[] { result, new SqlParameter("@resource", $"ClassSectionSeats:{classSectionId}") },
+            cancellationToken);
+
+        // 0 / 1 = granted. Negative = timeout (-1), cancelled (-2), deadlock victim (-3), error (-999).
+        if ((int)result.Value < 0)
+            throw new ConflictException("This class is being updated by someone else right now. Please try again.");
+    }
 
     public async Task<ClassSectionDependencies> GetDependenciesAsync(int classSectionId, CancellationToken cancellationToken)
     {

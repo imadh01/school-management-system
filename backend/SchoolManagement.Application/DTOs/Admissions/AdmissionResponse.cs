@@ -17,4 +17,5 @@ public record AdmissionResponse(
     string? EntryPoint, bool TransportRequired,
     int? AllottedClassSectionId, string? AllottedClassSectionName,
     int? StudentId,
-    List<AdmissionGuardianResponse> Guardians);
+    List<AdmissionGuardianResponse> Guardians,
+    string RowVersion);

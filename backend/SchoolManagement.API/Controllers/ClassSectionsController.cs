@@ -10,6 +10,7 @@ namespace SchoolManagement.API.Controllers;
 
 [ApiController]
 [Route("api/class-sections")]
+[Authorize]
 public class ClassSectionsController : ControllerBase
 {
     private readonly IClassSectionService _classSectionService;

@@ -8,9 +8,21 @@ public class AdmissionConfiguration : IEntityTypeConfiguration<Admission>
 {
     public void Configure(EntityTypeBuilder<Admission> builder)
     {
-        builder.ToTable("Admissions");
+        builder.ToTable("Admissions", t =>
+        {
+            t.HasCheckConstraint("CK_Admissions_Status", CheckSql.In("Status", AdmissionStatuses.All));
+            t.HasCheckConstraint("CK_Admissions_AdmissionType", CheckSql.In("AdmissionType", AdmissionTypes.All));
+            t.HasCheckConstraint("CK_Admissions_AdmissionFee", "[AdmissionFee] IS NULL OR [AdmissionFee] >= 0");
+            // State invariants: a rejected application says why; an enrolled one has everything enrolment fills in.
+            t.HasCheckConstraint("CK_Admissions_RejectedHasReason",
+                "[Status] <> 'Rejected' OR ([RejectionReason] IS NOT NULL AND LEN(LTRIM(RTRIM([RejectionReason]))) > 0)");
+            t.HasCheckConstraint("CK_Admissions_EnrolledIsComplete",
+                "[Status] <> 'Enrolled' OR ([RollNumber] IS NOT NULL AND [AdmissionNumber] IS NOT NULL " +
+                "AND [AdmissionDate] IS NOT NULL AND [AllottedClassSectionId] IS NOT NULL)");
+        });
 
         builder.HasKey(a => a.Id);
+        builder.Property(e => e.RowVersion).IsRowVersion(); // optimistic concurrency
 
         builder.Property(a => a.RegNo).HasMaxLength(30).IsRequired();
         builder.HasIndex(a => a.RegNo).IsUnique();
@@ -20,7 +32,7 @@ public class AdmissionConfiguration : IEntityTypeConfiguration<Admission>
         builder.Property(a => a.LastName).HasMaxLength(50).IsRequired();
         builder.Property(a => a.Gender).HasMaxLength(10).IsRequired();
 
-        builder.Property(a => a.AdmissionType).HasMaxLength(20).IsRequired();
+        builder.Property(a => a.AdmissionType).HasMaxLength(FieldLimits.AdmissionType).IsRequired();
         builder.Property(a => a.PreviousSchool).HasMaxLength(100);
         builder.Property(a => a.Phone).HasMaxLength(20).IsRequired();
         builder.Property(a => a.Email).HasMaxLength(100);
@@ -37,7 +49,7 @@ public class AdmissionConfiguration : IEntityTypeConfiguration<Admission>
         builder.Property(a => a.AdmissionFeeReference).HasMaxLength(30);
         builder.Property(a => a.BloodGroup).HasMaxLength(10);
         builder.Property(a => a.Religion).HasMaxLength(50);
-        builder.Property(a => a.Category).HasMaxLength(50);
+        builder.Property(a => a.Category).HasMaxLength(FieldLimits.Category);
         builder.Property(a => a.MedicalNotes).HasMaxLength(300);
         builder.Property(a => a.Remarks).HasMaxLength(300);
 

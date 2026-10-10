@@ -10,6 +10,7 @@ namespace SchoolManagement.API.Controllers;
 
 [ApiController]
 [Route("api/admissions")]
+[Authorize]
 public class AdmissionsController : ControllerBase
 {
     private readonly IAdmissionService _admissionService;

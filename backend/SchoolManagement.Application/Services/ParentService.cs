@@ -8,10 +8,12 @@ namespace SchoolManagement.Application.Services;
 public class ParentService : IParentService
 {
     private readonly IParentRepository _parentRepository;
+    private readonly IConcurrencyGuard _concurrency;
 
-    public ParentService(IParentRepository parentRepository)
+    public ParentService(IParentRepository parentRepository, IConcurrencyGuard concurrency)
     {
         _parentRepository = parentRepository;
+        _concurrency = concurrency;
     }
 
     public async Task<List<ParentResponse>> GetAllAsync(CancellationToken cancellationToken)
@@ -65,6 +67,7 @@ public class ParentService : IParentService
     public async Task<ParentResponse> UpdateAsync(int id, UpdateParentRequest request, CancellationToken cancellationToken)
     {
         var parent = await GetOrThrowAsync(id, cancellationToken);
+        _concurrency.Expect(parent, request.RowVersion); // 409 if someone saved this parent after it was loaded
 
         parent.Name = request.Name; parent.Email = request.Email; parent.Mobile = request.Mobile;
         parent.Status = request.Status;
@@ -103,5 +106,6 @@ public class ParentService : IParentService
         p.PreferredLanguage, p.PreferredContactMethod, p.Whatsapp, p.EmergencyOnly,
         p.NotifyAttendance, p.NotifyExams, p.NotifyFees, p.NotifyNotices, p.NotifyDiscipline,
         p.Employer, p.JobTitle, p.WorkEmail, p.WorkPhone, p.BillingContact,
-        p.AddressLine, p.City, p.State, p.Pincode);
+        p.AddressLine, p.City, p.State, p.Pincode,
+        Convert.ToBase64String(p.RowVersion));
 }

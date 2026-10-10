@@ -8,8 +8,9 @@ public class ParentConfiguration : IEntityTypeConfiguration<Parent>
 {
     public void Configure(EntityTypeBuilder<Parent> builder)
     {
-        builder.ToTable("Parents");
+        builder.ToTable("Parents", t => t.HasCheckConstraint("CK_Parents_Status", CheckSql.In("Status", ActiveStatuses.All)));
         builder.HasKey(p => p.Id);
+        builder.Property(e => e.RowVersion).IsRowVersion(); // optimistic concurrency
 
         builder.Property(p => p.Name).HasMaxLength(100).IsRequired();
         builder.Property(p => p.Email).HasMaxLength(100);
@@ -46,6 +47,12 @@ public class ParentConfiguration : IEntityTypeConfiguration<Parent>
         builder.Property(p => p.City).HasMaxLength(50);
         builder.Property(p => p.State).HasMaxLength(50);
         builder.Property(p => p.Pincode).HasMaxLength(10);
+
+        // One login per parent.
+        builder.HasIndex(p => p.UserId)
+            .IsUnique()
+            .HasFilter("[UserId] IS NOT NULL AND [IsDeleted] = 0")
+            .HasDatabaseName("UX_Parents_UserId");
 
         builder.HasOne(p => p.User)
             .WithMany()

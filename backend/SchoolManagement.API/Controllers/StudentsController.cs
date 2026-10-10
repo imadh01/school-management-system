@@ -11,6 +11,7 @@ namespace SchoolManagement.API.Controllers;
 
 [ApiController]
 [Route("api/students")]
+[Authorize]
 public class StudentsController : ControllerBase
 {
     private const string SensitivePermission = "Students.ViewSensitive";

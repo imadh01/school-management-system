@@ -68,6 +68,8 @@ export interface AdmissionResponse {
   allottedClassSectionName: string | null;
   studentId: number | null;
   guardians: AdmissionGuardianResponse[];
+  /** Version stamp. Send it back unchanged when saving, so a concurrent edit is detected (409). */
+  rowVersion: string;
 }
 
 export interface CreateAdmissionRequest {
@@ -89,7 +91,9 @@ export interface CreateAdmissionRequest {
   guardians: AdmissionGuardianRequest[];
 }
 
-export type UpdateAdmissionRequest = CreateAdmissionRequest;
+export interface UpdateAdmissionRequest extends CreateAdmissionRequest {
+  rowVersion: string;
+}
 
 export interface ConfirmAdmissionRequest {
   admissionFee: number | null;

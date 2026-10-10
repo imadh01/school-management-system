@@ -14,6 +14,8 @@ public class StudentGuardianConfiguration : IEntityTypeConfiguration<StudentGuar
         builder.HasKey(sg => new { sg.StudentId, sg.ParentId });
 
         builder.Property(sg => sg.RelationType).HasMaxLength(30).IsRequired();
+        builder.Property(sg => sg.CreatedAt).HasDefaultValueSql("SYSUTCDATETIME()");
+        builder.Property(sg => sg.UpdatedAt).HasDefaultValueSql("SYSUTCDATETIME()");
 
         // At most one primary contact per student.
         builder.HasIndex(sg => sg.StudentId)

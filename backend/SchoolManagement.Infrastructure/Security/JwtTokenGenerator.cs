@@ -17,22 +17,21 @@ public class JwtTokenGenerator : IJwtTokenGenerator
         _settings = settings.Value;
     }
 
-    public (string Token, DateTime ExpiresAtUtc) GenerateToken(
-        User user,
-        IReadOnlyList<string> roles,
-        IReadOnlyList<string> permissions)
+    /// <summary>
+    /// Generates a minimal JWT: sub (user id), security_stamp, jti.
+    /// No roles, no permissions — those are resolved server-side from
+    /// the permission cache on every request.
+    /// </summary>
+    public (string Token, DateTime ExpiresAtUtc) GenerateToken(User user)
     {
         var expiresAtUtc = DateTime.UtcNow.AddMinutes(_settings.ExpiryMinutes);
 
         var claims = new List<Claim>
         {
             new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
-            new(JwtRegisteredClaimNames.UniqueName, user.Username),
-            new(JwtRegisteredClaimNames.Email, user.Email),
+            new("security_stamp", user.SecurityStamp.ToString()),
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
         };
-        claims.AddRange(roles.Select(r => new Claim(ClaimTypes.Role, r)));
-        claims.AddRange(permissions.Select(p => new Claim("permission", p)));
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_settings.SigningKey));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);

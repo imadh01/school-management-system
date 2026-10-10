@@ -58,10 +58,16 @@ public class StudentRepository : IStudentRepository
     public Task<bool> ExistsByAdmNoAsync(string admNo, CancellationToken cancellationToken) =>
         _context.Students.AnyAsync(s => s.AdmNo == admNo, cancellationToken);
 
+    // Roll numbers belong to ACTIVE enrollments (the same rule as the filtered unique index
+    // UX_StudentEnrollments_Section_Roll_Active), not to the mirror columns on Students.
     public Task<bool> ExistsByRollNumberInClassAsync(int classSectionId, string rollNumber, CancellationToken cancellationToken) =>
-        _context.Students.AnyAsync(
-            s => s.ClassSectionId == classSectionId && s.RollNumber == rollNumber,
+        _context.StudentEnrollments.AnyAsync(
+            e => e.ClassSectionId == classSectionId && e.RollNumber == rollNumber && e.Status == EnrollmentStatuses.Active,
             cancellationToken);
+
+    public async Task<bool> HasAcademicHistoryAsync(int studentId, CancellationToken cancellationToken) =>
+        await _context.StudentEnrollments.AnyAsync(e => e.StudentId == studentId, cancellationToken)
+        || await _context.AttendanceRecords.AnyAsync(r => r.StudentId == studentId, cancellationToken);
 
     public Task<bool> ExistsByAadhaarAsync(string aadhaarNumber, int excludeStudentId, CancellationToken cancellationToken) =>
         _context.StudentIdentityDocuments.AnyAsync(

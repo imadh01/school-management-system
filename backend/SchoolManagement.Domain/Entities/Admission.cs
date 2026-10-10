@@ -1,6 +1,7 @@
-﻿namespace SchoolManagement.Domain.Entities;
+﻿using SchoolManagement.Domain.Auditing;
+namespace SchoolManagement.Domain.Entities;
 
-public class Admission
+public class Admission : IHasRowVersion
 {
     public int Id { get; set; }
     public string RegNo { get; set; } = string.Empty;
@@ -18,7 +19,7 @@ public class Admission
     public int AppliedForClassSectionId { get; set; }
     public ClassSection AppliedForClassSection { get; set; } = null!;
 
-    public string AdmissionType { get; set; } = "New";
+    public string AdmissionType { get; set; } = AdmissionTypes.New;
     public string? PreviousSchool { get; set; }
     public string Phone { get; set; } = string.Empty;
     public string? Email { get; set; }
@@ -35,9 +36,13 @@ public class Admission
     // Confirm Admission stage
     public decimal? AdmissionFee { get; set; }
     public string? AdmissionFeeReference { get; set; }
+    [AuditMasked]
     public string? BloodGroup { get; set; }
+    [AuditMasked]
     public string? Religion { get; set; }
+    [AuditMasked]
     public string? Category { get; set; }
+    [AuditMasked]
     public string? MedicalNotes { get; set; }
     public string? Remarks { get; set; }
 
@@ -52,6 +57,9 @@ public class Admission
 
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
+
+    /// <summary>Concurrency stamp maintained by SQL Server (rowversion). Sent to the client and sent back on update.</summary>
+    public byte[] RowVersion { get; set; } = Array.Empty<byte>();
     public int? CreatedBy { get; set; }
     public int? UpdatedBy { get; set; }
     public bool IsDeleted { get; set; }

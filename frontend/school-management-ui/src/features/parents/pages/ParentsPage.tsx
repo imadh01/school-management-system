@@ -1,3 +1,4 @@
+import { isConcurrencyConflict } from "@/utils/apiError";
 import { useEffect, useMemo, useState } from "react";
 import { parentService } from "../services/parentService";
 import type { ParentResponse } from "../types/parent.types";
@@ -405,7 +406,16 @@ export function ParentsPage() {
           await loadData();
         }}
         onUpdate={async (id, data) => {
-          await parentService.update(id, data);
+          try {
+            await parentService.update(id, {
+              ...data,
+              rowVersion: editingParent?.rowVersion ?? "",
+            });
+          } catch (err) {
+            // Someone else saved this parent first: refresh the list so the next try starts fresh.
+            if (isConcurrencyConflict(err)) await loadData();
+            throw err;
+          }
           await loadData();
         }}
       />

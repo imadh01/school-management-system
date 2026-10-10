@@ -8,7 +8,7 @@ public class AcademicYearConfiguration : IEntityTypeConfiguration<AcademicYear>
 {
     public void Configure(EntityTypeBuilder<AcademicYear> builder)
     {
-        builder.ToTable("AcademicYears");
+        builder.ToTable("AcademicYears", t => t.HasCheckConstraint("CK_AcademicYears_Dates", "[EndDate] > [StartDate]"));
 
         builder.HasKey(a => a.Id);
 

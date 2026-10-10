@@ -7,6 +7,7 @@ public class UpdateClassSectionRequestValidator : AbstractValidator<UpdateClassS
 {
     public UpdateClassSectionRequestValidator()
     {
+        RuleFor(x => x.RowVersion).Must(RowVersionRules.IsValid).WithMessage(RowVersionRules.Message);
         RuleFor(x => x.Name).NotEmpty().WithMessage("Class name is required.")
             .MaximumLength(50).WithMessage("Class name cannot exceed 50 characters.");
         RuleFor(x => x.Section).NotEmpty().WithMessage("Section is required.")

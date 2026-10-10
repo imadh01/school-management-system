@@ -6,4 +6,5 @@ public record UpdateParentRequest(
     string? PreferredLanguage, string? PreferredContactMethod, string? Whatsapp, bool EmergencyOnly,
     bool NotifyAttendance, bool NotifyExams, bool NotifyFees, bool NotifyNotices, bool NotifyDiscipline,
     string? Employer, string? JobTitle, string? WorkEmail, string? WorkPhone, bool BillingContact,
-    string? AddressLine, string? City, string? State, string? Pincode);
+    string? AddressLine, string? City, string? State, string? Pincode,
+    string RowVersion);

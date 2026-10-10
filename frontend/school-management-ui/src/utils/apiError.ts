@@ -6,6 +6,16 @@ interface ApiErrorBody {
   errors?: Record<string, string[]>;
 }
 
+/** True when the API refused a save because someone else changed the record first (HTTP 409). */
+export function isConcurrencyConflict(error: unknown): boolean {
+  return (
+    axios.isAxiosError(error) &&
+    error.response?.status === 409 &&
+    (error.response.data as ApiErrorBody | undefined)?.errorCode ===
+      "CONCURRENCY_CONFLICT"
+  );
+}
+
 export function getApiErrors(error: unknown, fallback: string): string[] {
   if (axios.isAxiosError(error)) {
     if (!error.response) {

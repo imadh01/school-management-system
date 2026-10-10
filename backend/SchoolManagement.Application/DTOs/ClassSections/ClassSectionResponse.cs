@@ -19,4 +19,5 @@ public record ClassSectionResponse(
     int AcademicYearId,
     string AcademicYearName,
     int? ClassTeacherId,
-    string? ClassTeacherName);
+    string? ClassTeacherName,
+    string RowVersion);

@@ -16,7 +16,7 @@ public class TeacherConfiguration : IEntityTypeConfiguration<Teacher>
         builder.Property(t => t.Specialization).HasMaxLength(100);
 
         // One login per teacher profile.
-        builder.HasIndex(t => t.UserId).IsUnique();
+        builder.HasIndex(t => t.UserId).IsUnique().HasFilter("[IsDeleted] = 0");
         builder.HasOne(t => t.User)
             .WithOne()
             .HasForeignKey<Teacher>(t => t.UserId)

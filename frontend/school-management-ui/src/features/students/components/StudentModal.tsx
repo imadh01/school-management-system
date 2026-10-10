@@ -96,7 +96,7 @@ const emptyForm: CreateStudentRequest = {
   homeLanguage: null,
   englishProficiency: "Native",
   curriculumTrack: "British",
-  admissionType: "Fresh Admission",
+  admissionType: "New",
   custodyArrangement: "Joint",
   mediaConsent: true,
   house: null,
@@ -710,7 +710,7 @@ export function StudentModal({
                   setForm((f) => ({ ...f, admissionType: e.target.value }))
                 }
               >
-                <option>Fresh Admission</option>
+                <option>New</option>
                 <option>Transfer</option>
               </select>
             </div>

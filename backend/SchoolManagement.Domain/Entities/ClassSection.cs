@@ -1,6 +1,6 @@
 ﻿namespace SchoolManagement.Domain.Entities;
 
-public class ClassSection
+public class ClassSection : IHasRowVersion
 {
     public int Id { get; set; }
 
@@ -29,6 +29,9 @@ public class ClassSection
 
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
+
+    /// <summary>Concurrency stamp maintained by SQL Server (rowversion). Sent to the client and sent back on update.</summary>
+    public byte[] RowVersion { get; set; } = Array.Empty<byte>();
     public int? CreatedBy { get; set; }
     public int? UpdatedBy { get; set; }
 

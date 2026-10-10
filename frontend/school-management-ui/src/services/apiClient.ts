@@ -1,32 +1,48 @@
-import axios from "axios";
+import axios, { type AxiosError, type InternalAxiosRequestConfig } from "axios";
+import { API_BASE_URL, CSRF_HEADERS } from "./apiConfig";
+import {
+  getAccessToken,
+  refreshSession,
+} from "../features/authentication/services/session";
 
 export const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL ?? "https://localhost:7100/api",
+  baseURL: API_BASE_URL,
   headers: {
     "Content-Type": "application/json",
+    ...CSRF_HEADERS,
   },
 });
 
-// Attach the JWT to every outgoing request, if we have one.
+// Attach the in-memory access token to every outgoing request, if we have one.
 apiClient.interceptors.request.use((config) => {
-  const stored = localStorage.getItem("auth_session");
-  if (stored) {
-    const { token } = JSON.parse(stored);
+  const token = getAccessToken();
+  if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
 });
 
-// A 401 means the token is missing/expired/invalid — clear the stale
-// session and send the user back to login. No silent-refresh here yet;
-// that needs backend refresh-token support we haven't built.
+type RetriableRequest = InternalAxiosRequestConfig & { _retried?: boolean };
+
+// A 401 usually means the 15-minute access token expired. Get a new one with
+// the refresh-token cookie and repeat the request ONCE. If the refresh fails,
+// the session has ended: session.ts publishes that, AuthContext switches to
+// signed-out, and ProtectedRoute sends the user to /login.
 apiClient.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem("auth_session");
-      window.location.href = "/login";
+  async (error: AxiosError) => {
+    const request = error.config as RetriableRequest | undefined;
+
+    if (error.response?.status !== 401 || !request || request._retried) {
+      return Promise.reject(error);
     }
-    return Promise.reject(error);
+
+    request._retried = true;
+    const session = await refreshSession().catch(() => null);
+    if (!session) {
+      return Promise.reject(error);
+    }
+
+    return apiClient(request); // the request interceptor attaches the new token
   },
 );

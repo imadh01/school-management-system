@@ -1,11 +1,14 @@
-﻿using System.Net;
+﻿// D1: Updated to handle the new AuthResult shape (+ MustChangePassword).
+
+using System.Net;
 using System.Net.Http.Json;
 using SchoolManagement.Application.DTOs.Auth;
 using Xunit;
 
 namespace SchoolManagement.Tests.IntegrationTests;
 
-public class AuthControllerTests : IClassFixture<CustomWebApplicationFactory>
+[Collection("LegacyApi")]
+public class AuthControllerTests
 {
     private readonly HttpClient _client;
 
@@ -17,8 +20,6 @@ public class AuthControllerTests : IClassFixture<CustomWebApplicationFactory>
     [Fact]
     public async Task Login_WithSeededAdminCredentials_Returns200AndToken()
     {
-        // Relies on the same seeded admin account (username "admin",
-        // password "Admin@123") that the migration's HasData creates.
         var response = await _client.PostAsJsonAsync("/api/auth/login",
             new LoginRequest("admin", "Admin@123"));
 
@@ -27,6 +28,7 @@ public class AuthControllerTests : IClassFixture<CustomWebApplicationFactory>
         Assert.NotNull(result);
         Assert.False(string.IsNullOrEmpty(result!.Token));
         Assert.Contains("Admin", result.Roles);
+        Assert.False(result.MustChangePassword);
     }
 
     [Fact]

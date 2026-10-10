@@ -1,6 +1,6 @@
 ﻿namespace SchoolManagement.Domain.Entities;
 
-public class Parent
+public class Parent : IHasRowVersion
 {
     public int Id { get; set; }
 
@@ -46,6 +46,9 @@ public class Parent
 
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
+
+    /// <summary>Concurrency stamp maintained by SQL Server (rowversion). Sent to the client and sent back on update.</summary>
+    public byte[] RowVersion { get; set; } = Array.Empty<byte>();
     public int? CreatedBy { get; set; }
     public int? UpdatedBy { get; set; }
     public bool IsDeleted { get; set; }

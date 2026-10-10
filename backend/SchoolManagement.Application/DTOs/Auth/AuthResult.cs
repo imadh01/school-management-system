@@ -6,4 +6,5 @@ public record AuthResult(
     string Email,
     IReadOnlyList<string> Roles,
     string Token,
-    DateTime ExpiresAtUtc);
+    DateTime ExpiresAtUtc,
+    bool MustChangePassword);

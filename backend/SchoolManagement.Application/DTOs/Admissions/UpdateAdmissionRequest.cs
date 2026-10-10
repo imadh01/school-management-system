@@ -8,4 +8,5 @@ public record UpdateAdmissionRequest(
     string Phone, string? Email,
     string? AddressLine, string? City, string? State, string? Pincode,
     string? Remarks,
-    List<AdmissionGuardianRequest>? Guardians);
+    List<AdmissionGuardianRequest>? Guardians,
+    string RowVersion);

@@ -35,6 +35,8 @@ public class ApplicationDbContext : DbContext
     public DbSet<AttendanceSession> AttendanceSessions => Set<AttendanceSession>();
     public DbSet<AttendanceRecord> AttendanceRecords => Set<AttendanceRecord>();
     public DbSet<StudentEnrollment> StudentEnrollments => Set<StudentEnrollment>();
+    public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
@@ -211,4 +213,4 @@ public class ApplicationDbContext : DbContext
             new RolePermission { RoleId = 1, PermissionId = 11 },   // Admin
             new RolePermission { RoleId = 2, PermissionId = 11 });  // Supervisor
     }
-}
+}

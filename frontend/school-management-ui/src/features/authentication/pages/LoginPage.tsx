@@ -1,6 +1,5 @@
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { authService } from "../services/authService";
 import { useAuth } from "../../../store/AuthContext";
 import logo from "../../../assets/synergein-logo.jpg";
 import "./LoginPage.css";
@@ -20,8 +19,7 @@ export function LoginPage() {
     setIsSubmitting(true);
 
     try {
-      const result = await authService.login({ usernameOrEmail, password });
-      login(result);
+      await login({ usernameOrEmail, password });
       navigate("/");
     } catch {
       setError("Invalid username/email or password.");

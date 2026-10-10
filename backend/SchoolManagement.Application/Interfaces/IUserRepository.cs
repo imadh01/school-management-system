@@ -13,4 +13,7 @@ public interface IUserRepository
 
     /// <summary>Distinct permission names granted to this user across all their roles.</summary>
     Task<IReadOnlyList<string>> GetPermissionNamesAsync(int userId, CancellationToken cancellationToken);
+
+    /// <summary>Persists changes to an already-tracked User entity.</summary>
+    Task SaveChangesAsync(CancellationToken cancellationToken);
 }

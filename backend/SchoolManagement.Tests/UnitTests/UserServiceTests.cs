@@ -3,6 +3,7 @@ using SchoolManagement.Application.DTOs.Users;
 using SchoolManagement.Application.Interfaces;
 using SchoolManagement.Application.Services;
 using SchoolManagement.Domain.Entities;
+using SchoolManagement.Domain.Exceptions;
 using Xunit;
 
 namespace SchoolManagement.Tests.UnitTests;
@@ -43,7 +44,7 @@ public class UserServiceTests
     {
         _userRepository.Setup(r => r.ExistsByUsernameAsync("newuser", default)).ReturnsAsync(true);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => _sut.CreateUserAsync(ValidRequest(), default));
+        await Assert.ThrowsAsync<ConflictException>(() => _sut.CreateUserAsync(ValidRequest(), default));
         _userRepository.Verify(r => r.AddAsync(It.IsAny<User>(), default), Times.Never);
     }
 
@@ -53,7 +54,7 @@ public class UserServiceTests
         _userRepository.Setup(r => r.ExistsByUsernameAsync("newuser", default)).ReturnsAsync(false);
         _userRepository.Setup(r => r.ExistsByEmailAsync("new@test.com", default)).ReturnsAsync(true);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => _sut.CreateUserAsync(ValidRequest(), default));
+        await Assert.ThrowsAsync<ConflictException>(() => _sut.CreateUserAsync(ValidRequest(), default));
         _userRepository.Verify(r => r.AddAsync(It.IsAny<User>(), default), Times.Never);
     }
 
@@ -64,7 +65,7 @@ public class UserServiceTests
         _userRepository.Setup(r => r.ExistsByEmailAsync("new@test.com", default)).ReturnsAsync(false);
         _roleRepository.Setup(r => r.GetByNameAsync("Teacher", default)).ReturnsAsync((Role?)null);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => _sut.CreateUserAsync(ValidRequest(), default));
+        await Assert.ThrowsAsync<NotFoundException>(() => _sut.CreateUserAsync(ValidRequest(), default));
         _userRepository.Verify(r => r.AddAsync(It.IsAny<User>(), default), Times.Never);
     }
 }

@@ -8,13 +8,22 @@ public class SubjectConfiguration : IEntityTypeConfiguration<Subject>
 {
     public void Configure(EntityTypeBuilder<Subject> builder)
     {
-        builder.ToTable("Subjects", t => t.HasCheckConstraint(
-            "CK_Subjects_MarksByType",
-            "([Type] IN ('Theory','Practical') AND [MaxMarks] IS NOT NULL AND [PassMarks] IS NOT NULL " +
-            " AND [TheoryMax] IS NULL AND [TheoryPass] IS NULL AND [PracticalMax] IS NULL AND [PracticalPass] IS NULL) " +
-            "OR " +
-            "([Type] = 'Both' AND [TheoryMax] IS NOT NULL AND [TheoryPass] IS NOT NULL " +
-            " AND [PracticalMax] IS NOT NULL AND [PracticalPass] IS NOT NULL AND [MaxMarks] IS NULL AND [PassMarks] IS NULL)"));
+        builder.ToTable("Subjects", t =>
+        {
+            t.HasCheckConstraint(
+                "CK_Subjects_MarksByType",
+                "([Type] IN ('Theory','Practical') AND [MaxMarks] IS NOT NULL AND [PassMarks] IS NOT NULL " +
+                " AND [TheoryMax] IS NULL AND [TheoryPass] IS NULL AND [PracticalMax] IS NULL AND [PracticalPass] IS NULL) " +
+                "OR " +
+                "([Type] = 'Both' AND [TheoryMax] IS NOT NULL AND [TheoryPass] IS NOT NULL " +
+                " AND [PracticalMax] IS NOT NULL AND [PracticalPass] IS NOT NULL AND [MaxMarks] IS NULL AND [PassMarks] IS NULL)");
+            t.HasCheckConstraint("CK_Subjects_Status", CheckSql.In("Status", ActiveStatuses.All));
+            // A pass mark can never be higher than its maximum (columns that are NULL for this type are skipped).
+            t.HasCheckConstraint("CK_Subjects_PassNotAboveMax",
+                "([PassMarks] IS NULL OR [MaxMarks] IS NULL OR [PassMarks] <= [MaxMarks]) " +
+                "AND ([TheoryPass] IS NULL OR [TheoryMax] IS NULL OR [TheoryPass] <= [TheoryMax]) " +
+                "AND ([PracticalPass] IS NULL OR [PracticalMax] IS NULL OR [PracticalPass] <= [PracticalMax])");
+        });
 
         builder.HasKey(s => s.Id);
 

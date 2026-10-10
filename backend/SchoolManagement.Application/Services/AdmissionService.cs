@@ -12,19 +12,22 @@ public class AdmissionService : IAdmissionService
     private readonly IStudentRepository _studentRepository;
     private readonly IParentRepository _parentRepository;
     private readonly IStudentGuardianRepository _studentGuardianRepository;
+    private readonly IConcurrencyGuard _concurrency;
 
     public AdmissionService(
         IAdmissionRepository admissionRepository,
         IClassSectionRepository classSectionRepository,
         IStudentRepository studentRepository,
         IParentRepository parentRepository,
-        IStudentGuardianRepository studentGuardianRepository)
+        IStudentGuardianRepository studentGuardianRepository,
+        IConcurrencyGuard concurrency)
     {
         _admissionRepository = admissionRepository;
         _classSectionRepository = classSectionRepository;
         _studentRepository = studentRepository;
         _parentRepository = parentRepository;
         _studentGuardianRepository = studentGuardianRepository;
+        _concurrency = concurrency;
     }
 
     public async Task<List<AdmissionResponse>> GetAllAsync(CancellationToken cancellationToken)
@@ -87,6 +90,7 @@ public class AdmissionService : IAdmissionService
     public async Task<AdmissionResponse> UpdateAsync(int id, UpdateAdmissionRequest request, CancellationToken cancellationToken)
     {
         var admission = await GetOrThrowAsync(id, cancellationToken);
+        _concurrency.Expect(admission, request.RowVersion); // 409 if someone saved this application after it was loaded
         var classSection = await GetClassSectionOrThrowAsync(request.AppliedForClassSectionId, cancellationToken);
 
         // Only a *changed* class is checked, so editing an old applicant whose
@@ -220,6 +224,8 @@ public class AdmissionService : IAdmissionService
             var allottedClassSection = await GetClassSectionOrThrowAsync(request.AllottedClassSectionId, cancellationToken);
 
             // Business rules: the section must be active and not full.
+            // The lock makes "count the seats, then take one" safe when two people enrol at once.
+            await _classSectionRepository.LockSeatsAsync(allottedClassSection.Id, cancellationToken);
             ClassSectionRules.EnsureActive(allottedClassSection);
             ClassSectionRules.EnsureHasRoom(allottedClassSection,
                 await _classSectionRepository.CountActiveStudentsAsync(allottedClassSection.Id, cancellationToken));
@@ -261,6 +267,7 @@ public class AdmissionService : IAdmissionService
                 Pincode = admission.Pincode,
                 Religion = admission.Religion,
                 Category = string.IsNullOrWhiteSpace(admission.Category) ? "General" : admission.Category,
+                AdmissionType = admission.AdmissionType,
                 PreviousSchool = admission.PreviousSchool,
                 TransportRequired = request.TransportRequired,
                 Nationality = request.Nationality,
@@ -455,5 +462,6 @@ public class AdmissionService : IAdmissionService
         a.Student?.Id,
         a.Guardians.OrderBy(g => g.Id)
             .Select(g => new AdmissionGuardianResponse(g.Id, g.RelationType, g.Name, g.Mobile, g.Email, g.IsPrimaryContact))
-            .ToList());
+            .ToList(),
+        Convert.ToBase64String(a.RowVersion));
 }

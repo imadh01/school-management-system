@@ -1,59 +1,91 @@
-import { createContext, useContext, useState, type ReactNode } from "react";
-import type { AuthResult } from "../features/authentication/types/auth.types";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from "react";
+import type {
+  AuthResult,
+  CurrentUser,
+  LoginRequest,
+} from "../features/authentication/types/auth.types";
+import { authService } from "../features/authentication/services/authService";
+import {
+  restoreSession,
+  subscribeToSession,
+} from "../features/authentication/services/session";
+
+/** "loading" only while the app checks the refresh cookie on start-up. */
+export type AuthStatus = "loading" | "authenticated" | "anonymous";
 
 interface AuthContextValue {
-  user: AuthResult | null;
+  user: CurrentUser | null;
+  status: AuthStatus;
   isAuthenticated: boolean;
-  login: (result: AuthResult) => void;
-  logout: () => void;
+  login: (request: LoginRequest) => Promise<void>;
+  logout: () => Promise<void>;
 }
 
-const STORAGE_KEY = "auth_session";
+interface AuthState {
+  status: AuthStatus;
+  user: CurrentUser | null;
+}
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-// Read the saved session synchronously so the very first render already
-// knows whether the user is logged in (otherwise ProtectedRoute redirects
-// to /login before the session is restored). Expired or corrupt sessions
-// are discarded.
-function loadStoredSession(): AuthResult | null {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (!stored) return null;
+function toState(session: AuthResult | null): AuthState {
+  if (!session) return { status: "anonymous", user: null };
 
-    const session = JSON.parse(stored) as AuthResult;
-    const expired =
-      !session.token ||
-      (session.expiresAtUtc &&
-        new Date(session.expiresAtUtc).getTime() <= Date.now());
-
-    if (expired) {
-      localStorage.removeItem(STORAGE_KEY);
-      return null;
-    }
-    return session;
-  } catch {
-    localStorage.removeItem(STORAGE_KEY);
-    return null;
-  }
+  // Keep the access token out of React state: it lives only in session.ts.
+  const { token: _token, expiresAtUtc: _expiresAtUtc, ...user } = session;
+  return { status: "authenticated", user };
 }
 
+// D2: nothing is stored in localStorage any more. On start-up the session is
+// restored from the httpOnly refresh cookie; until that answer arrives the
+// status is "loading", so ProtectedRoute waits instead of redirecting to /login.
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<AuthResult | null>(loadStoredSession);
+  const [state, setState] = useState<AuthState>({
+    status: "loading",
+    user: null,
+  });
 
-  const login = (result: AuthResult) => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(result));
-    setUser(result);
+  useEffect(() => {
+    // Every login, refresh, logout (in this tab or another) lands here.
+    const unsubscribe = subscribeToSession((session) =>
+      setState(toState(session)),
+    );
+
+    // If the server could not be reached, stop "loading" and show the login page.
+    void restoreSession().then((session) => {
+      if (!session) {
+        setState((current) =>
+          current.status === "loading" ? toState(null) : current,
+        );
+      }
+    });
+
+    return unsubscribe;
+  }, []);
+
+  const login = async (request: LoginRequest) => {
+    await authService.login(request);
   };
 
-  const logout = () => {
-    localStorage.removeItem(STORAGE_KEY);
-    setUser(null);
+  const logout = async () => {
+    await authService.logout();
   };
 
   return (
     <AuthContext.Provider
-      value={{ user, isAuthenticated: !!user, login, logout }}
+      value={{
+        user: state.user,
+        status: state.status,
+        isAuthenticated: state.status === "authenticated",
+        login,
+        logout,
+      }}
     >
       {children}
     </AuthContext.Provider>

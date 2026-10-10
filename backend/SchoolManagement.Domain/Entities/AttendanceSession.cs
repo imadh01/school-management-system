@@ -1,9 +1,11 @@
-﻿namespace SchoolManagement.Domain.Entities;
+﻿using SchoolManagement.Domain.Auditing;
+namespace SchoolManagement.Domain.Entities;
 
 /// <summary>
 /// One attendance-taking event: a class on a date, optionally for one subject.
 /// SubjectId null = daily attendance; set = subject-wise attendance.
 /// </summary>
+[AuditIgnore]
 public class AttendanceSession
 {
     public int Id { get; set; }

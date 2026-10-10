@@ -10,6 +10,7 @@ namespace SchoolManagement.API.Controllers;
 
 [ApiController]
 [Route("api/parents")]
+[Authorize]
 public class ParentsController : ControllerBase
 {
     private readonly IParentService _parentService;

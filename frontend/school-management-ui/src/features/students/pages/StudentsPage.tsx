@@ -16,7 +16,7 @@ import { LinkedParentsViewModal } from "../components/LinkedParentsViewModal";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { ViewDetailsModal } from "@/components/ViewDetailsModal";
 import { ValidationModal } from "@/components/ValidationModal";
-import { getApiErrors } from "@/utils/apiError";
+import { getApiErrors, isConcurrencyConflict } from "@/utils/apiError";
 
 const PIPELINE_STEPS: {
   key: StudentStatus | "All";
@@ -611,10 +611,17 @@ export function StudentsPage() {
               admissionDate: _admissionDate,
               ...rest
             } = data;
-            await studentService.update(editingStudent.id, {
-              ...rest,
-              status,
-            });
+            try {
+              await studentService.update(editingStudent.id, {
+                ...rest,
+                status,
+                rowVersion: editingStudent.rowVersion,
+              });
+            } catch (err) {
+              // Someone else saved this student first: refresh the list so the next try starts fresh.
+              if (isConcurrencyConflict(err)) await loadData();
+              throw err;
+            }
             // Identity numbers have their own endpoint and permission.
             if (identity) {
               await studentService.updateIdentity(editingStudent.id, identity);
