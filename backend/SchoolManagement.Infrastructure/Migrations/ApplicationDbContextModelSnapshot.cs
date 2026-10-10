@@ -1889,12 +1889,14 @@ namespace SchoolManagement.Infrastructure.Migrations
                     b.HasIndex("DeletedBy");
 
                     b.HasIndex("Email")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("[IsDeleted] = 0");
 
                     b.HasIndex("UpdatedBy");
 
                     b.HasIndex("Username")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("[IsDeleted] = 0");
 
                     b.ToTable("Users", null, t =>
                         {

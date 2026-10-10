@@ -1,6 +1,8 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.Data.SqlClient;
+using Microsoft.EntityFrameworkCore;
 using SchoolManagement.Application.Interfaces;
 using SchoolManagement.Domain.Entities;
+using SchoolManagement.Domain.Exceptions;
 using SchoolManagement.Infrastructure.Persistence;
 
 namespace SchoolManagement.Infrastructure.Repositories;
@@ -34,10 +36,23 @@ public class UserRepository : IUserRepository
     public Task<bool> ExistsByEmailAsync(string email, CancellationToken cancellationToken) =>
         _context.Users.AnyAsync(u => u.Email == email, cancellationToken);
 
+    /// <summary>
+    /// UserService checks "is this username/email taken?" first, but two admins creating the
+    /// same user at the same moment can both pass that check. The unique index then rejects
+    /// the second INSERT; report that as a 409 Conflict instead of a 500.
+    /// </summary>
     public async Task AddAsync(User user, CancellationToken cancellationToken)
     {
         await _context.Users.AddAsync(user, cancellationToken);
-        await _context.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is SqlException { Number: 2601 or 2627 })
+        {
+            throw new ConflictException(
+                "A user with this username or email was just created by someone else. Use a different one.");
+        }
     }
 
     public Task<IReadOnlyList<string>> GetRoleNamesAsync(int userId, CancellationToken cancellationToken) =>
@@ -60,4 +75,4 @@ public class UserRepository : IUserRepository
     {
         await _context.SaveChangesAsync(cancellationToken);
     }
-}
+}

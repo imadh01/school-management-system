@@ -16,12 +16,16 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.Username)
             .HasMaxLength(50)
             .IsRequired();
-        builder.HasIndex(u => u.Username).IsUnique();
 
         builder.Property(u => u.Email)
             .HasMaxLength(100)
             .IsRequired();
-        builder.HasIndex(u => u.Email).IsUnique();
+
+        // Unique among NON-deleted users only (decision #7): a soft-deleted user's
+        // username/email can be reused. This matches UserService's "already taken?"
+        // check, which also ignores deleted users through the query filter below.
+        builder.HasIndex(u => u.Username).IsUnique().HasFilter("[IsDeleted] = 0");
+        builder.HasIndex(u => u.Email).IsUnique().HasFilter("[IsDeleted] = 0");
 
         builder.Property(u => u.PasswordHash)
             .IsRequired();
@@ -74,4 +78,4 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         // Soft delete enforced here, once, not repeated in every query later.
         builder.HasQueryFilter(u => !u.IsDeleted);
     }
-}
+}
