@@ -47,43 +47,12 @@ public class ApplicationDbContext : DbContext
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(ApplicationDbContext).Assembly);
 
-        // Seed the six confirmed roles — matches database/scripts/01-create-tables-auth.sql
-        modelBuilder.Entity<Role>().HasData(
-            new Role { Id = 1, Name = "Admin" },
-            new Role { Id = 2, Name = "Supervisor" },
-            new Role { Id = 3, Name = "Clerk" },
-            new Role { Id = 4, Name = "Teacher" },
-            new Role { Id = 5, Name = "Student" },
-            new Role { Id = 6, Name = "Parent" }
-        );
-
-        modelBuilder.Entity<Permission>().HasData(new Permission
-        {
-            Id = 1,
-            Name = "Users.Create",
-            Module = "Users",
-            Description = "Create new user accounts.",
-        });
-
-        modelBuilder.Entity<RolePermission>().HasData(new RolePermission
-        {
-            RoleId = 1,   // Admin
-            PermissionId = 1,
-        });
-
-        modelBuilder.Entity<Permission>().HasData(new Permission
-        {
-            Id = 2,
-            Name = "ClassSections.Create",
-            Module = "ClassSections",
-            Description = "Create new class sections.",
-        });
-
-        modelBuilder.Entity<RolePermission>().HasData(new RolePermission
-        {
-            RoleId = 1, // Admin
-            PermissionId = 2,
-        });
+        // E1: Roles, Permissions and RolePermissions are no longer seeded with HasData.
+        //   - Permissions mirror Domain.Constants.Permissions; migrations insert new names with SQL
+        //     keyed by name, and a test checks the table equals the code catalog.
+        //   - Roles and their grants are runtime data edited through the Roles API; a HasData seed
+        //     would let a later migration re-insert or delete rows an admin changed.
+        // The rows themselves were inserted by earlier migrations and stay where they are.
 
         modelBuilder.Entity<AcademicYear>().HasData(new AcademicYear
         {
@@ -96,121 +65,6 @@ public class ApplicationDbContext : DbContext
             CreatedAt = new DateTime(2026, 9, 23, 0, 0, 0, DateTimeKind.Utc),
             UpdatedAt = new DateTime(2026, 9, 23, 0, 0, 0, DateTimeKind.Utc),
         });
-
-        modelBuilder.Entity<Permission>().HasData(new Permission
-        {
-            Id = 3,
-            Name = "Admissions.Manage",
-            Module = "Admissions",
-            Description = "Create, edit, and progress admission applications through the pipeline.",
-        });
-
-        modelBuilder.Entity<RolePermission>().HasData(new RolePermission
-        {
-            RoleId = 1, // Admin
-            PermissionId = 3,
-        });
-
-        modelBuilder.Entity<Permission>().HasData(new Permission
-        {
-            Id = 4,
-            Name = "Students.Manage",
-            Module = "Students",
-            Description = "Create and edit student records, including converting enrolled admissions.",
-        });
-
-        modelBuilder.Entity<RolePermission>().HasData(new RolePermission
-        {
-            RoleId = 1, // Admin
-            PermissionId = 4,
-        });
-        modelBuilder.Entity<Permission>().HasData(new Permission
-        {
-            Id = 5,
-            Name = "Parents.Manage",
-            Module = "Parents",
-            Description = "Create and edit parent records, and link/unlink guardians to students.",
-        });
-
-        modelBuilder.Entity<RolePermission>().HasData(new RolePermission
-        {
-            RoleId = 1,
-            PermissionId = 5,
-        });
-        modelBuilder.Entity<Permission>().HasData(new Permission
-        {
-            Id = 6,
-            Name = "Subjects.Manage",
-            Module = "Subjects",
-            Description = "Create and edit subjects, including their marks configuration.",
-        });
-
-        modelBuilder.Entity<Permission>().HasData(new Permission
-        {
-            Id = 8,
-            Name = "Teachers.Manage",
-            Module = "Teachers",
-            Description = "Create, edit and delete teachers; assign subjects and class teachers.",
-        });
-
-        modelBuilder.Entity<RolePermission>().HasData(new RolePermission
-        {
-            RoleId = 1, // Admin
-            PermissionId = 8,
-        });
-
-        modelBuilder.Entity<RolePermission>().HasData(new RolePermission
-        {
-            RoleId = 1, // Admin
-            PermissionId = 6,
-        });
-        modelBuilder.Entity<Permission>().HasData(new Permission
-        {
-            Id = 7,
-            Name = "ClassSections.Manage",
-            Module = "ClassSections",
-            Description = "Create, edit, activate/deactivate and delete class sections.",
-        });
-
-        modelBuilder.Entity<RolePermission>().HasData(new RolePermission
-        {
-            RoleId = 1, // Admin
-            PermissionId = 7,
-        });
-
-        modelBuilder.Entity<Permission>().HasData(
-        new Permission
-        {
-            Id = 9,
-            Name = "Attendance.Manage",
-            Module = "Attendance",
-            Description = "Mark and edit attendance for any class."
-        },
-        new Permission
-        {
-            Id = 10,
-            Name = "Attendance.Mark",
-            Module = "Attendance",
-            Description = "Mark attendance for own class or subjects (checked in the service)."
-        });
-
-        modelBuilder.Entity<RolePermission>().HasData(
-            new RolePermission { RoleId = 1, PermissionId = 9 },   // Admin
-            new RolePermission { RoleId = 2, PermissionId = 9 },   // Supervisor
-            new RolePermission { RoleId = 3, PermissionId = 9 },   // Clerk
-            new RolePermission { RoleId = 4, PermissionId = 10 }); // Teacher
-
-        // Full Aadhaar / passport / visa. Without this permission the API returns masked values only.
-        modelBuilder.Entity<Permission>().HasData(new Permission
-        {
-            Id = 11,
-            Name = "Students.ViewSensitive",
-            Module = "Students",
-            Description = "View and edit full Aadhaar, passport and visa details of students."
-        });
-
-        modelBuilder.Entity<RolePermission>().HasData(
-            new RolePermission { RoleId = 1, PermissionId = 11 },   // Admin
-            new RolePermission { RoleId = 2, PermissionId = 11 });  // Supervisor
     }
+
 }

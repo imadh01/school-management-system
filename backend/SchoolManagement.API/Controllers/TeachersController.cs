@@ -5,6 +5,7 @@ using SchoolManagement.API.Common;
 using SchoolManagement.API.Extensions;
 using SchoolManagement.Application.DTOs.Teachers;
 using SchoolManagement.Application.Interfaces;
+using SchoolManagement.Domain.Constants;
 
 namespace SchoolManagement.API.Controllers;
 
@@ -37,18 +38,20 @@ public class TeachersController : ControllerBase
     }
 
     [HttpGet]
+    [Authorize(Policy = Permissions.TeachersView)]
     [ProducesResponseType(typeof(List<TeacherResponse>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAll(CancellationToken ct) =>
         Ok(await _teacherService.GetAllAsync(ct));
 
     [HttpGet("{id:int}")]
+    [Authorize(Policy = Permissions.TeachersView)]
     [ProducesResponseType(typeof(TeacherResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetById(int id, CancellationToken ct) =>
         Ok(await _teacherService.GetByIdAsync(id, ct));
 
     [HttpPost]
-    [Authorize(Policy = "Teachers.Manage")]
+    [Authorize(Policy = Permissions.TeachersCreate)]
     [ProducesResponseType(typeof(TeacherResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status409Conflict)]
@@ -62,7 +65,7 @@ public class TeachersController : ControllerBase
     }
 
     [HttpPut("{id:int}")]
-    [Authorize(Policy = "Teachers.Manage")]
+    [Authorize(Policy = Permissions.TeachersEdit)]
     [ProducesResponseType(typeof(TeacherResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
@@ -76,7 +79,7 @@ public class TeachersController : ControllerBase
     }
 
     [HttpPatch("{id:int}/status")]
-    [Authorize(Policy = "Teachers.Manage")]
+    [Authorize(Policy = Permissions.TeachersEdit)]
     [ProducesResponseType(typeof(TeacherResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
@@ -89,7 +92,7 @@ public class TeachersController : ControllerBase
     }
 
     [HttpDelete("{id:int}")]
-    [Authorize(Policy = "Teachers.Manage")]
+    [Authorize(Policy = Permissions.TeachersDelete)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status409Conflict)]
@@ -102,13 +105,14 @@ public class TeachersController : ControllerBase
     // ---------- Assignments ----------
 
     [HttpGet("{id:int}/assignments")]
+    [Authorize(Policy = Permissions.TeachersView)]
     [ProducesResponseType(typeof(List<TeacherAssignmentResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetAssignments(int id, CancellationToken ct) =>
         Ok(await _teacherService.GetAssignmentsAsync(id, ct));
 
     [HttpPost("{id:int}/subjects")]
-    [Authorize(Policy = "Teachers.Manage")]
+    [Authorize(Policy = Permissions.TeachersAssign)]
     [ProducesResponseType(typeof(List<TeacherAssignmentResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
@@ -122,14 +126,14 @@ public class TeachersController : ControllerBase
     }
 
     [HttpDelete("{id:int}/subjects/{subjectId:int}")]
-    [Authorize(Policy = "Teachers.Manage")]
+    [Authorize(Policy = Permissions.TeachersAssign)]
     [ProducesResponseType(typeof(List<TeacherAssignmentResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UnassignSubject(int id, int subjectId, CancellationToken ct) =>
         Ok(await _teacherService.UnassignSubjectAsync(id, subjectId, ct));
 
     [HttpPut("{id:int}/class-teacher")]
-    [Authorize(Policy = "Teachers.Manage")]
+    [Authorize(Policy = Permissions.TeachersAssign)]
     [ProducesResponseType(typeof(List<TeacherAssignmentResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
@@ -143,7 +147,7 @@ public class TeachersController : ControllerBase
     }
 
     [HttpDelete("{id:int}/class-teacher/{classSectionId:int}")]
-    [Authorize(Policy = "Teachers.Manage")]
+    [Authorize(Policy = Permissions.TeachersAssign)]
     [ProducesResponseType(typeof(List<TeacherAssignmentResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status409Conflict)]

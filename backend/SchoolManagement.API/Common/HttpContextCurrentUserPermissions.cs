@@ -34,6 +34,14 @@ public sealed class HttpContextCurrentUserPermissions : ICurrentUserPermissions
         return info is not null && info.Roles.Contains(roleName, StringComparer.Ordinal);
     }
 
+    public async Task<IReadOnlySet<string>> GetPermissionsAsync(CancellationToken cancellationToken = default)
+    {
+        var info = await GetInfoAsync(cancellationToken);
+        return info is null
+            ? new HashSet<string>()
+            : info.Permissions.ToHashSet(StringComparer.Ordinal);
+    }
+
     private Task<CachedUserInfo?> GetInfoAsync(CancellationToken cancellationToken)
     {
         var user = _httpContextAccessor.HttpContext?.User;

@@ -5,6 +5,7 @@ using SchoolManagement.API.Common;
 using SchoolManagement.API.Extensions;
 using SchoolManagement.Application.DTOs.Parents;
 using SchoolManagement.Application.Interfaces;
+using SchoolManagement.Domain.Constants;
 
 namespace SchoolManagement.API.Controllers;
 
@@ -34,15 +35,17 @@ public class ParentsController : ControllerBase
     }
 
     [HttpGet]
+    [Authorize(Policy = Permissions.ParentsView)]
     public async Task<IActionResult> GetAll(CancellationToken cancellationToken) =>
         Ok(await _parentService.GetAllAsync(cancellationToken));
 
     [HttpGet("{id:int}")]
+    [Authorize(Policy = Permissions.ParentsView)]
     public async Task<IActionResult> GetById(int id, CancellationToken cancellationToken) =>
         Ok(await _parentService.GetByIdAsync(id, cancellationToken));
 
     [HttpPost]
-    [Authorize(Policy = "Parents.Manage")]
+    [Authorize(Policy = Permissions.ParentsCreate)]
     public async Task<IActionResult> Create(CreateParentRequest request, CancellationToken cancellationToken)
     {
         var validationResult = await _createValidator.ValidateAsync(request, cancellationToken);
@@ -62,7 +65,7 @@ public class ParentsController : ControllerBase
     }
 
     [HttpPut("{id:int}")]
-    [Authorize(Policy = "Parents.Manage")]
+    [Authorize(Policy = Permissions.ParentsEdit)]
     public async Task<IActionResult> Update(int id, UpdateParentRequest request, CancellationToken cancellationToken)
     {
         var validationResult = await _updateValidator.ValidateAsync(request, cancellationToken);
@@ -81,7 +84,7 @@ public class ParentsController : ControllerBase
     }
 
     [HttpDelete("{id:int}")]
-    [Authorize(Policy = "Parents.Manage")]
+    [Authorize(Policy = Permissions.ParentsDelete)]
     public async Task<IActionResult> Delete(int id, CancellationToken cancellationToken)
     {
         await _parentService.DeleteAsync(id, cancellationToken);
@@ -89,11 +92,12 @@ public class ParentsController : ControllerBase
     }
 
     [HttpGet("{id:int}/students")]
+    [Authorize(Policy = Permissions.ParentsView)]
     public async Task<IActionResult> GetLinkedStudents(int id, CancellationToken cancellationToken) =>
         Ok(await _guardianService.GetForParentAsync(id, cancellationToken));
 
     [HttpPost("{id:int}/students")]
-    [Authorize(Policy = "Parents.Manage")]
+    [Authorize(Policy = Permissions.ParentsEdit)]
     public async Task<IActionResult> LinkStudent(int id, LinkStudentRequest request, CancellationToken cancellationToken)
     {
         var validationResult = await _linkStudentValidator.ValidateAsync(request, cancellationToken);
@@ -113,7 +117,7 @@ public class ParentsController : ControllerBase
     }
 
     [HttpDelete("{id:int}/students/{studentId:int}")]
-    [Authorize(Policy = "Parents.Manage")]
+    [Authorize(Policy = Permissions.ParentsEdit)]
     public async Task<IActionResult> UnlinkStudent(int id, int studentId, CancellationToken cancellationToken)
     {
         await _guardianService.UnlinkAsync(studentId, id, cancellationToken);
@@ -121,10 +125,10 @@ public class ParentsController : ControllerBase
     }
 
     [HttpPost("{id:int}/students/{studentId:int}/primary")]
-    [Authorize(Policy = "Parents.Manage")]
+    [Authorize(Policy = Permissions.ParentsEdit)]
     public async Task<IActionResult> SetPrimaryStudent(int id, int studentId, CancellationToken cancellationToken)
     {
         await _guardianService.SetPrimaryAsync(id, studentId, cancellationToken);
         return NoContent();
     }
-}
+}

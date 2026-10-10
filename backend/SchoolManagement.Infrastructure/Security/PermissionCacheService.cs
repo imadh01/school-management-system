@@ -69,7 +69,12 @@ public class PermissionCacheService : IPermissionCacheService
         if (user is null)
             return null;
 
-        var roleNames = user.UserRoles
+        // E1: an inactive role grants nothing and does not count as held.
+        var activeRoles = user.UserRoles
+            .Where(ur => ur.Role.IsActive)
+            .ToList();
+
+        var roleNames = activeRoles
             .Select(ur => ur.Role.Name)
             .ToList();
 
@@ -81,7 +86,7 @@ public class PermissionCacheService : IPermissionCacheService
         }
         else
         {
-            permissions = user.UserRoles
+            permissions = activeRoles
                 .SelectMany(ur => ur.Role.RolePermissions)
                 .Select(rp => rp.Permission.Name)
                 .Distinct()

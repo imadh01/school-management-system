@@ -14,6 +14,7 @@ using SchoolManagement.Application.DTOs.Admissions;
 using SchoolManagement.Application.DTOs.Auth;
 using SchoolManagement.Application.DTOs.ClassSections;
 using SchoolManagement.Application.DTOs.Parents;
+using SchoolManagement.Application.DTOs.Roles;
 using SchoolManagement.Application.DTOs.Students;
 using SchoolManagement.Application.DTOs.Subjects;
 using SchoolManagement.Application.DTOs.Teachers;
@@ -63,6 +64,12 @@ builder.Services.AddSingleton<IAuthorizationHandler, PermissionAuthorizationHand
 
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IRoleRepository, RoleRepository>();
+// E1: Roles API (guards live in RoleService).
+builder.Services.AddScoped<IRoleService, RoleService>();
+builder.Services.AddScoped<IValidator<CreateRoleRequest>, CreateRoleRequestValidator>();
+builder.Services.AddScoped<IValidator<UpdateRoleRequest>, UpdateRoleRequestValidator>();
+builder.Services.AddScoped<IValidator<SetRolePermissionsRequest>, SetRolePermissionsRequestValidator>();
+builder.Services.AddScoped<IValidator<ChangeRoleStatusRequest>, ChangeRoleStatusRequestValidator>();
 
 builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
 builder.Services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();

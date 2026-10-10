@@ -34,6 +34,7 @@ public class AttendanceController : ControllerBase
     /// last-7 dots, and whether the caller may edit it.
     /// </summary>
     [HttpGet("roster")]
+    [Authorize(Policy = Permissions.AttendanceView)]
     [ProducesResponseType(typeof(AttendanceRosterResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status422UnprocessableEntity)]
@@ -63,6 +64,7 @@ public class AttendanceController : ControllerBase
 
     /// <summary>One student's attendance history and summary (defaults to the last 30 days).</summary>
     [HttpGet("students/{studentId:int}")]
+    [Authorize(Policy = Permissions.AttendanceView)]
     [ProducesResponseType(typeof(StudentAttendanceResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status422UnprocessableEntity)]
@@ -72,6 +74,7 @@ public class AttendanceController : ControllerBase
 
     /// <summary>Per-student totals and percentages for a class over a date range (daily attendance only).</summary>
     [HttpGet("summary")]
+    [Authorize(Policy = Permissions.AttendanceView)]
     [ProducesResponseType(typeof(ClassAttendanceSummaryResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status422UnprocessableEntity)]

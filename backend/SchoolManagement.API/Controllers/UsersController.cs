@@ -5,6 +5,7 @@ using SchoolManagement.API.Common;
 using SchoolManagement.API.Extensions;
 using SchoolManagement.Application.DTOs.Users;
 using SchoolManagement.Application.Interfaces;
+using SchoolManagement.Domain.Constants;
 
 namespace SchoolManagement.API.Controllers;
 
@@ -22,7 +23,7 @@ public class UsersController : ControllerBase
     }
 
     [HttpPost]
-    [Authorize(Policy = "Users.Create")]
+    [Authorize(Policy = Permissions.UsersCreate)]
     [ProducesResponseType(typeof(UserResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status403Forbidden)]
@@ -44,4 +45,4 @@ public class UsersController : ControllerBase
         var user = await _userService.CreateUserAsync(request, cancellationToken);
         return Created($"api/users/{user.Id}", user);
     }
-}
+}

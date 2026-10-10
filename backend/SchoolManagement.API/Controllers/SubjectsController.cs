@@ -5,6 +5,7 @@ using SchoolManagement.API.Common;
 using SchoolManagement.API.Extensions;
 using SchoolManagement.Application.DTOs.Subjects;
 using SchoolManagement.Application.Interfaces;
+using SchoolManagement.Domain.Constants;
 
 namespace SchoolManagement.API.Controllers;
 
@@ -28,15 +29,17 @@ public class SubjectsController : ControllerBase
     }
 
     [HttpGet]
+    [Authorize(Policy = Permissions.SubjectsView)]
     public async Task<IActionResult> GetAll(CancellationToken cancellationToken) =>
         Ok(await _subjectService.GetAllAsync(cancellationToken));
 
     [HttpGet("{id:int}")]
+    [Authorize(Policy = Permissions.SubjectsView)]
     public async Task<IActionResult> GetById(int id, CancellationToken cancellationToken) =>
         Ok(await _subjectService.GetByIdAsync(id, cancellationToken));
 
     [HttpPost]
-    [Authorize(Policy = "Subjects.Manage")]
+    [Authorize(Policy = Permissions.SubjectsCreate)]
     public async Task<IActionResult> Create(CreateSubjectRequest request, CancellationToken cancellationToken)
     {
         var validationResult = await _createValidator.ValidateAsync(request, cancellationToken);
@@ -56,7 +59,7 @@ public class SubjectsController : ControllerBase
     }
 
     [HttpPut("{id:int}")]
-    [Authorize(Policy = "Subjects.Manage")]
+    [Authorize(Policy = Permissions.SubjectsEdit)]
     public async Task<IActionResult> Update(int id, UpdateSubjectRequest request, CancellationToken cancellationToken)
     {
         var validationResult = await _updateValidator.ValidateAsync(request, cancellationToken);
@@ -75,7 +78,7 @@ public class SubjectsController : ControllerBase
     }
 
     [HttpDelete("{id:int}")]
-    [Authorize(Policy = "Subjects.Manage")]
+    [Authorize(Policy = Permissions.SubjectsDelete)]
     public async Task<IActionResult> Delete(int id, CancellationToken cancellationToken)
     {
         await _subjectService.DeleteAsync(id, cancellationToken);

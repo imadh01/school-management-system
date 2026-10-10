@@ -5,6 +5,7 @@ using SchoolManagement.API.Common;
 using SchoolManagement.API.Extensions;
 using SchoolManagement.Application.DTOs.ClassSections;
 using SchoolManagement.Application.Interfaces;
+using SchoolManagement.Domain.Constants;
 
 namespace SchoolManagement.API.Controllers;
 
@@ -28,18 +29,20 @@ public class ClassSectionsController : ControllerBase
     }
 
     [HttpGet]
+    [Authorize(Policy = Permissions.ClassSectionsView)]
     [ProducesResponseType(typeof(List<ClassSectionResponse>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAll(CancellationToken cancellationToken) =>
         Ok(await _classSectionService.GetAllAsync(cancellationToken));
 
     [HttpGet("{id:int}")]
+    [Authorize(Policy = Permissions.ClassSectionsView)]
     [ProducesResponseType(typeof(ClassSectionResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetById(int id, CancellationToken cancellationToken) =>
         Ok(await _classSectionService.GetByIdAsync(id, cancellationToken));
 
     [HttpPost]
-    [Authorize(Policy = "ClassSections.Manage")]
+    [Authorize(Policy = Permissions.ClassSectionsCreate)]
     [ProducesResponseType(typeof(ClassSectionResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
@@ -55,7 +58,7 @@ public class ClassSectionsController : ControllerBase
     }
 
     [HttpPut("{id:int}")]
-    [Authorize(Policy = "ClassSections.Manage")]
+    [Authorize(Policy = Permissions.ClassSectionsEdit)]
     [ProducesResponseType(typeof(ClassSectionResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
@@ -70,14 +73,14 @@ public class ClassSectionsController : ControllerBase
     }
 
     [HttpPatch("{id:int}/status")]
-    [Authorize(Policy = "ClassSections.Manage")]
+    [Authorize(Policy = Permissions.ClassSectionsEdit)]
     [ProducesResponseType(typeof(ClassSectionResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> ChangeStatus(int id, ChangeClassSectionStatusRequest request, CancellationToken cancellationToken) =>
         Ok(await _classSectionService.ChangeStatusAsync(id, request.IsActive, cancellationToken));
 
     [HttpDelete("{id:int}")]
-    [Authorize(Policy = "ClassSections.Manage")]
+    [Authorize(Policy = Permissions.ClassSectionsDelete)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status409Conflict)]
@@ -95,4 +98,4 @@ public class ClassSectionsController : ControllerBase
             Errors = result.ToErrorDictionary(),
             TraceId = HttpContext.GetCorrelationId(),
         });
-}
+}

@@ -836,85 +836,6 @@ namespace SchoolManagement.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("Permissions", (string)null);
-
-                    b.HasData(
-                        new
-                        {
-                            Id = 1,
-                            Description = "Create new user accounts.",
-                            Module = "Users",
-                            Name = "Users.Create"
-                        },
-                        new
-                        {
-                            Id = 2,
-                            Description = "Create new class sections.",
-                            Module = "ClassSections",
-                            Name = "ClassSections.Create"
-                        },
-                        new
-                        {
-                            Id = 3,
-                            Description = "Create, edit, and progress admission applications through the pipeline.",
-                            Module = "Admissions",
-                            Name = "Admissions.Manage"
-                        },
-                        new
-                        {
-                            Id = 4,
-                            Description = "Create and edit student records, including converting enrolled admissions.",
-                            Module = "Students",
-                            Name = "Students.Manage"
-                        },
-                        new
-                        {
-                            Id = 5,
-                            Description = "Create and edit parent records, and link/unlink guardians to students.",
-                            Module = "Parents",
-                            Name = "Parents.Manage"
-                        },
-                        new
-                        {
-                            Id = 6,
-                            Description = "Create and edit subjects, including their marks configuration.",
-                            Module = "Subjects",
-                            Name = "Subjects.Manage"
-                        },
-                        new
-                        {
-                            Id = 8,
-                            Description = "Create, edit and delete teachers; assign subjects and class teachers.",
-                            Module = "Teachers",
-                            Name = "Teachers.Manage"
-                        },
-                        new
-                        {
-                            Id = 7,
-                            Description = "Create, edit, activate/deactivate and delete class sections.",
-                            Module = "ClassSections",
-                            Name = "ClassSections.Manage"
-                        },
-                        new
-                        {
-                            Id = 9,
-                            Description = "Mark and edit attendance for any class.",
-                            Module = "Attendance",
-                            Name = "Attendance.Manage"
-                        },
-                        new
-                        {
-                            Id = 10,
-                            Description = "Mark attendance for own class or subjects (checked in the service).",
-                            Module = "Attendance",
-                            Name = "Attendance.Mark"
-                        },
-                        new
-                        {
-                            Id = 11,
-                            Description = "View and edit full Aadhaar, passport and visa details of students.",
-                            Module = "Students",
-                            Name = "Students.ViewSensitive"
-                        });
                 });
 
             modelBuilder.Entity("SchoolManagement.Domain.Entities.RefreshToken", b =>
@@ -1005,14 +926,42 @@ namespace SchoolManagement.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedBy")
+                        .HasColumnType("int");
+
                     b.Property<string>("Description")
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
+                    b.Property<bool>("IsSystem")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(30)
                         .HasColumnType("nvarchar(30)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UpdatedBy")
+                        .HasColumnType("int");
 
                     b.HasKey("Id");
 
@@ -1020,38 +969,6 @@ namespace SchoolManagement.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("Roles", (string)null);
-
-                    b.HasData(
-                        new
-                        {
-                            Id = 1,
-                            Name = "Admin"
-                        },
-                        new
-                        {
-                            Id = 2,
-                            Name = "Supervisor"
-                        },
-                        new
-                        {
-                            Id = 3,
-                            Name = "Clerk"
-                        },
-                        new
-                        {
-                            Id = 4,
-                            Name = "Teacher"
-                        },
-                        new
-                        {
-                            Id = 5,
-                            Name = "Student"
-                        },
-                        new
-                        {
-                            Id = 6,
-                            Name = "Parent"
-                        });
                 });
 
             modelBuilder.Entity("SchoolManagement.Domain.Entities.RolePermission", b =>
@@ -1067,78 +984,6 @@ namespace SchoolManagement.Infrastructure.Migrations
                     b.HasIndex("PermissionId");
 
                     b.ToTable("RolePermissions", (string)null);
-
-                    b.HasData(
-                        new
-                        {
-                            RoleId = 1,
-                            PermissionId = 1
-                        },
-                        new
-                        {
-                            RoleId = 1,
-                            PermissionId = 2
-                        },
-                        new
-                        {
-                            RoleId = 1,
-                            PermissionId = 3
-                        },
-                        new
-                        {
-                            RoleId = 1,
-                            PermissionId = 4
-                        },
-                        new
-                        {
-                            RoleId = 1,
-                            PermissionId = 5
-                        },
-                        new
-                        {
-                            RoleId = 1,
-                            PermissionId = 8
-                        },
-                        new
-                        {
-                            RoleId = 1,
-                            PermissionId = 6
-                        },
-                        new
-                        {
-                            RoleId = 1,
-                            PermissionId = 7
-                        },
-                        new
-                        {
-                            RoleId = 1,
-                            PermissionId = 9
-                        },
-                        new
-                        {
-                            RoleId = 2,
-                            PermissionId = 9
-                        },
-                        new
-                        {
-                            RoleId = 3,
-                            PermissionId = 9
-                        },
-                        new
-                        {
-                            RoleId = 4,
-                            PermissionId = 10
-                        },
-                        new
-                        {
-                            RoleId = 1,
-                            PermissionId = 11
-                        },
-                        new
-                        {
-                            RoleId = 2,
-                            PermissionId = 11
-                        });
                 });
 
             modelBuilder.Entity("SchoolManagement.Domain.Entities.Student", b =>

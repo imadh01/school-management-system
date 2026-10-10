@@ -8,6 +8,7 @@ using SchoolManagement.API.Extensions;
 using SchoolManagement.API.Filters;
 using SchoolManagement.Application.DTOs.Auth;
 using SchoolManagement.Application.Interfaces;
+using SchoolManagement.Domain.Constants;
 
 namespace SchoolManagement.API.Controllers;
 
@@ -176,7 +177,7 @@ public class AuthController : ControllerBase
     /// Clears LockoutEnd and AccessFailedCount.
     /// </summary>
     [HttpPost("unlock/{userId:int}")]
-    [Authorize(Policy = "Users.Create")] // Re-uses existing user-management permission
+    [Authorize(Policy = Permissions.UsersChangeStatus)]
     public async Task<IActionResult> UnlockUser(int userId, CancellationToken cancellationToken)
     {
         await _authService.UnlockUserAsync(userId, cancellationToken);

@@ -16,4 +16,7 @@ public interface ICurrentUserPermissions
 
     /// <summary>False when nobody is signed in.</summary>
     Task<bool> IsInRoleAsync(string roleName, CancellationToken cancellationToken = default);
+
+    /// <summary>Every permission the caller holds (the whole catalog for Admin). Empty when nobody is signed in.</summary>
+    Task<IReadOnlySet<string>> GetPermissionsAsync(CancellationToken cancellationToken = default);
 }

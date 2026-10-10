@@ -62,15 +62,17 @@ public class StudentsController : ControllerBase
     }
 
     [HttpGet]
+    [Authorize(Policy = Permissions.StudentsView)]
     public async Task<IActionResult> GetAll(CancellationToken cancellationToken) =>
         Ok(await _studentService.GetAllAsync(cancellationToken));
 
     [HttpGet("{id:int}")]
+    [Authorize(Policy = Permissions.StudentsView)]
     public async Task<IActionResult> GetById(int id, CancellationToken cancellationToken) =>
         Ok(await _studentService.GetByIdAsync(id, await CanViewSensitiveAsync(cancellationToken), cancellationToken));
 
     [HttpPost]
-    [Authorize(Policy = "Students.Manage")]
+    [Authorize(Policy = Permissions.StudentsCreate)]
     public async Task<IActionResult> Create(CreateStudentRequest request, CancellationToken cancellationToken)
     {
         var validationError = await ValidateAsync(_createValidator, request, cancellationToken);
@@ -81,7 +83,7 @@ public class StudentsController : ControllerBase
     }
 
     [HttpPut("{id:int}")]
-    [Authorize(Policy = "Students.Manage")]
+    [Authorize(Policy = Permissions.StudentsEdit)]
     public async Task<IActionResult> Update(int id, UpdateStudentRequest request, CancellationToken cancellationToken)
     {
         var validationError = await ValidateAsync(_updateValidator, request, cancellationToken);
@@ -92,8 +94,8 @@ public class StudentsController : ControllerBase
 
     /// <summary>Set Aadhaar / passport / visa details. Requires Students.ViewSensitive (and Students.Manage).</summary>
     [HttpPut("{id:int}/identity")]
-    [Authorize(Policy = "Students.Manage")]
-    [Authorize(Policy = "Students.ViewSensitive")]
+    [Authorize(Policy = Permissions.StudentsEdit)]
+    [Authorize(Policy = Permissions.StudentsViewSensitive)]
     public async Task<IActionResult> UpdateIdentity(int id, UpdateStudentIdentityRequest request, CancellationToken cancellationToken)
     {
         var validationError = await ValidateAsync(_identityValidator, request, cancellationToken);
@@ -104,15 +106,17 @@ public class StudentsController : ControllerBase
 
     /// <summary>The student's academic history, newest period first. Read-only.</summary>
     [HttpGet("{id:int}/enrollments")]
+    [Authorize(Policy = Permissions.StudentsView)]
     public async Task<IActionResult> GetEnrollments(int id, CancellationToken cancellationToken) =>
         Ok(await _studentService.GetEnrollmentsAsync(id, cancellationToken));
 
     [HttpGet("{id:int}/guardians")]
+    [Authorize(Policy = Permissions.StudentsView)]
     public async Task<IActionResult> GetGuardians(int id, CancellationToken cancellationToken) =>
         Ok(await _guardianService.GetForStudentAsync(id, cancellationToken));
 
     [HttpPost("{id:int}/guardians")]
-    [Authorize(Policy = "Parents.Manage")]
+    [Authorize(Policy = Permissions.ParentsEdit)]
     public async Task<IActionResult> LinkGuardian(int id, LinkGuardianRequest request, CancellationToken cancellationToken)
     {
         var validationError = await ValidateAsync(_linkValidator, request, cancellationToken);
@@ -123,7 +127,7 @@ public class StudentsController : ControllerBase
     }
 
     [HttpDelete("{id:int}/guardians/{parentId:int}")]
-    [Authorize(Policy = "Parents.Manage")]
+    [Authorize(Policy = Permissions.ParentsEdit)]
     public async Task<IActionResult> UnlinkGuardian(int id, int parentId, CancellationToken cancellationToken)
     {
         await _guardianService.UnlinkAsync(id, parentId, cancellationToken);
@@ -131,7 +135,7 @@ public class StudentsController : ControllerBase
     }
 
     [HttpDelete("{id:int}")]
-    [Authorize(Policy = "Students.Manage")]
+    [Authorize(Policy = Permissions.StudentsDelete)]
     public async Task<IActionResult> Delete(int id, CancellationToken cancellationToken)
     {
         await _studentService.DeleteAsync(id, cancellationToken);
