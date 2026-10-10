@@ -5,6 +5,7 @@ using SchoolManagement.API.Common;
 using SchoolManagement.API.Extensions;
 using SchoolManagement.Application.DTOs.Attendance;
 using SchoolManagement.Application.Interfaces;
+using SchoolManagement.Domain.Constants;
 using SchoolManagement.Domain.Exceptions;
 
 namespace SchoolManagement.API.Controllers;
@@ -16,13 +17,16 @@ public class AttendanceController : ControllerBase
 {
     private readonly IAttendanceService _attendanceService;
     private readonly IValidator<SaveAttendanceRequest> _saveValidator;
+    private readonly ICurrentUserPermissions _permissions;
 
     public AttendanceController(
         IAttendanceService attendanceService,
-        IValidator<SaveAttendanceRequest> saveValidator)
+        IValidator<SaveAttendanceRequest> saveValidator,
+        ICurrentUserPermissions permissions)
     {
         _attendanceService = attendanceService;
         _saveValidator = saveValidator;
+        _permissions = permissions;
     }
 
     /// <summary>
@@ -38,7 +42,7 @@ public class AttendanceController : ControllerBase
         [FromQuery] DateOnly date,
         [FromQuery] int? subjectId,
         CancellationToken ct) =>
-        Ok(await _attendanceService.GetRosterAsync(GetActor(), classSectionId, date, subjectId, ct));
+        Ok(await _attendanceService.GetRosterAsync(await GetActorAsync(ct), classSectionId, date, subjectId, ct));
 
     /// <summary>Creates or replaces the whole roster in one transaction.</summary>
     [HttpPut]
@@ -54,7 +58,7 @@ public class AttendanceController : ControllerBase
         var result = await _saveValidator.ValidateAsync(request, ct);
         if (!result.IsValid) return ValidationFailed(result);
 
-        return Ok(await _attendanceService.SaveAsync(GetActor(), request, ct));
+        return Ok(await _attendanceService.SaveAsync(await GetActorAsync(ct), request, ct));
     }
 
     /// <summary>One student's attendance history and summary (defaults to the last 30 days).</summary>
@@ -76,7 +80,8 @@ public class AttendanceController : ControllerBase
         Ok(await _attendanceService.GetSummaryAsync(classSectionId, from, to, ct));
 
     // Builds the caller description the service needs; the service never touches HttpContext.
-    private AttendanceActor GetActor()
+    // Permissions and roles come from the permission cache: the JWT carries neither (D1).
+    private async Task<AttendanceActor> GetActorAsync(CancellationToken ct)
     {
         var idValue = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
                       ?? User.FindFirst("sub")?.Value;
@@ -85,8 +90,8 @@ public class AttendanceController : ControllerBase
 
         return new AttendanceActor(
             userId,
-            CanManageAll: User.HasClaim("permission", "Attendance.Manage"),
-            IsAdmin: User.IsInRole("Admin"));
+            CanManageAll: await _permissions.HasPermissionAsync(Permissions.AttendanceManage, ct),
+            IsAdmin: await _permissions.IsInRoleAsync(RoleNames.Admin, ct));
     }
 
     private IActionResult ValidationFailed(FluentValidation.Results.ValidationResult result) =>

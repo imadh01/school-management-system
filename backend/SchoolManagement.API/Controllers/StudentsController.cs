@@ -6,6 +6,7 @@ using SchoolManagement.API.Extensions;
 using SchoolManagement.Application.DTOs.Students;
 using SchoolManagement.Application.DTOs.Parents;
 using SchoolManagement.Application.Interfaces;
+using SchoolManagement.Domain.Constants;
 
 namespace SchoolManagement.API.Controllers;
 
@@ -14,14 +15,13 @@ namespace SchoolManagement.API.Controllers;
 [Authorize]
 public class StudentsController : ControllerBase
 {
-    private const string SensitivePermission = "Students.ViewSensitive";
-
     private readonly IStudentService _studentService;
     private readonly IStudentGuardianService _guardianService;
     private readonly IValidator<CreateStudentRequest> _createValidator;
     private readonly IValidator<UpdateStudentRequest> _updateValidator;
     private readonly IValidator<UpdateStudentIdentityRequest> _identityValidator;
     private readonly IValidator<LinkGuardianRequest> _linkValidator;
+    private readonly ICurrentUserPermissions _permissions;
 
     public StudentsController(
         IStudentService studentService,
@@ -29,7 +29,8 @@ public class StudentsController : ControllerBase
         IValidator<CreateStudentRequest> createValidator,
         IValidator<UpdateStudentRequest> updateValidator,
         IValidator<UpdateStudentIdentityRequest> identityValidator,
-        IValidator<LinkGuardianRequest> linkValidator)
+        IValidator<LinkGuardianRequest> linkValidator,
+        ICurrentUserPermissions permissions)
     {
         _studentService = studentService;
         _guardianService = guardianService;
@@ -37,11 +38,14 @@ public class StudentsController : ControllerBase
         _updateValidator = updateValidator;
         _identityValidator = identityValidator;
         _linkValidator = linkValidator;
+        _permissions = permissions;
     }
 
     // Full Aadhaar / passport numbers are returned only to callers holding this permission;
     // everyone else gets masked values. The service never decides this itself.
-    private bool CanViewSensitive => User.HasClaim("permission", SensitivePermission);
+    // Read from the permission cache: the JWT carries no permissions (D1).
+    private Task<bool> CanViewSensitiveAsync(CancellationToken cancellationToken) =>
+        _permissions.HasPermissionAsync(Permissions.StudentsViewSensitive, cancellationToken);
 
     private async Task<IActionResult?> ValidateAsync<T>(IValidator<T> validator, T request, CancellationToken cancellationToken)
     {
@@ -63,7 +67,7 @@ public class StudentsController : ControllerBase
 
     [HttpGet("{id:int}")]
     public async Task<IActionResult> GetById(int id, CancellationToken cancellationToken) =>
-        Ok(await _studentService.GetByIdAsync(id, CanViewSensitive, cancellationToken));
+        Ok(await _studentService.GetByIdAsync(id, await CanViewSensitiveAsync(cancellationToken), cancellationToken));
 
     [HttpPost]
     [Authorize(Policy = "Students.Manage")]
@@ -72,7 +76,7 @@ public class StudentsController : ControllerBase
         var validationError = await ValidateAsync(_createValidator, request, cancellationToken);
         if (validationError is not null) return validationError;
 
-        var result = await _studentService.CreateAsync(request, CanViewSensitive, cancellationToken);
+        var result = await _studentService.CreateAsync(request, await CanViewSensitiveAsync(cancellationToken), cancellationToken);
         return Created($"api/students/{result.Id}", result);
     }
 
@@ -83,7 +87,7 @@ public class StudentsController : ControllerBase
         var validationError = await ValidateAsync(_updateValidator, request, cancellationToken);
         if (validationError is not null) return validationError;
 
-        return Ok(await _studentService.UpdateAsync(id, request, CanViewSensitive, cancellationToken));
+        return Ok(await _studentService.UpdateAsync(id, request, await CanViewSensitiveAsync(cancellationToken), cancellationToken));
     }
 
     /// <summary>Set Aadhaar / passport / visa details. Requires Students.ViewSensitive (and Students.Manage).</summary>
@@ -133,4 +137,4 @@ public class StudentsController : ControllerBase
         await _studentService.DeleteAsync(id, cancellationToken);
         return NoContent();
     }
-}
+}

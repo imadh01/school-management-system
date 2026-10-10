@@ -1,6 +1,6 @@
 ﻿namespace SchoolManagement.Application.DTOs.Attendance;
 
-/// <summary>Who is calling, as far as attendance rules care. Built by the controller from JWT claims.</summary>
+/// <summary>Who is calling, as far as attendance rules care. Built by the controller from the permission cache (not JWT claims).</summary>
 /// <param name="CanManageAll">Holds Attendance.Manage — may mark any class (Admin, Supervisor, Clerk).</param>
 /// <param name="IsAdmin">May edit attendance older than the normal edit window.</param>
 public record AttendanceActor(int UserId, bool CanManageAll, bool IsAdmin);

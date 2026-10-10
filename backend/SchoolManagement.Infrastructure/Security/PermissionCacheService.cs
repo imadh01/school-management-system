@@ -75,7 +75,7 @@ public class PermissionCacheService : IPermissionCacheService
 
         // Admin gets the entire permission catalog automatically.
         IReadOnlyList<string> permissions;
-        if (roleNames.Contains("Admin"))
+        if (roleNames.Contains(RoleNames.Admin))
         {
             permissions = Permissions.All.ToList();
         }

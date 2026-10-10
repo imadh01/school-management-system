@@ -50,6 +50,8 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUser, HttpContextCurrentUser>();
+// Permission/role checks inside actions read the permission cache, never JWT claims (hotfix after D1).
+builder.Services.AddScoped<ICurrentUserPermissions, HttpContextCurrentUserPermissions>();
 // Scoped, not singleton: the interceptor remembers the user and what to log for the save in progress.
 builder.Services.AddScoped<AuditableEntitySaveChangesInterceptor>();
 builder.Services.AddScoped<IConcurrencyGuard, ConcurrencyGuard>();
