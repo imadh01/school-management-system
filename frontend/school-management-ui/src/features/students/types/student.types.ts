@@ -66,9 +66,12 @@ export interface StudentSummaryResponse {
   curriculumTrack: string | null;
   house: string | null;
   ealCode: string | null;
+  /** The allergy text: only for Students.ViewSensitive holders, null for everyone else (U1). */
   allergies: string | null;
   admissionRegNo: string | null;
   admissionId: number | null;
+  /** Everyone who can read the student sees whether there are allergies. */
+  hasAllergies: boolean;
 }
 
 /** Full detail of one student (GET /students/{id}). */
@@ -119,6 +122,8 @@ export interface StudentResponse {
   guardians: StudentGuardianResponse[];
   /** Version stamp. Send it back unchanged when saving, so a concurrent edit is detected (409). */
   rowVersion: string;
+  /** health.allergies is null without Students.ViewSensitive; this flag is for everyone (U1). */
+  hasAllergies: boolean;
 }
 
 export interface CreateStudentRequest {

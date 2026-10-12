@@ -331,7 +331,7 @@ export function EnrollModal({
           {!isLoadingMatches && matches.length === 0 && (
             <div
               className="modal__note"
-              style={{ background: "var(--red-bg)", color: "var(--red)" }}
+              style={{ background: "var(--red-bg)", color: "var(--bad)" }}
             >
               This application has no guardians. Edit the registration and add
               at least one guardian with a mobile number.
@@ -358,7 +358,7 @@ export function EnrollModal({
                 </div>
 
                 {g.suggestedAction === "MissingMobile" ? (
-                  <div style={{ color: "var(--red)", fontSize: 13 }}>
+                  <div style={{ color: "var(--bad)", fontSize: 13 }}>
                     A mobile number is required. Edit the application and add
                     one before enrolling.
                   </div>
@@ -368,7 +368,7 @@ export function EnrollModal({
                       <div
                         style={{
                           fontSize: 12.5,
-                          color: "var(--amber)",
+                          color: "var(--warn)",
                           marginBottom: 6,
                         }}
                       >

@@ -6,17 +6,18 @@
 //
 // Left out on purpose (full-View callers only): contact details and address, category, religion,
 // nationality, custody arrangement, fee concession, admission data, identity documents, pickup persons
-// and all health fields except allergies. Students.ViewSensitive is never implied by a scoped read.
+// and all health fields. Allergies appear only as a yes/no flag (the text needs Students.ViewSensitive,
+// which a scoped read never implies).
 
 /// <summary>One row of the student list for a scoped caller.</summary>
 public record StudentScopedSummaryResponse(
     int Id, string AdmNo, string RollNumber, int ClassSectionId, string ClassSectionName,
     string Status, string? PhotoUrl,
     string FirstName, string? MiddleName, string LastName, string Gender, DateOnly DateOfBirth,
-    string? House, string? Allergies);
+    string? House, bool HasAllergies);
 
-/// <summary>Allergies only: a safety need in class. The rest of the health block stays with full View.</summary>
-public record StudentScopedHealthResponse(string? Allergies);
+/// <summary>Only whether the student has allergies: a safety flag for class. The details need Students.ViewSensitive.</summary>
+public record StudentScopedHealthResponse(bool HasAllergies);
 
 /// <summary>A guardian as a scoped caller sees them: who to call, nothing more.</summary>
 public record GuardianContactResponse(

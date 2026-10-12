@@ -2,11 +2,26 @@
   box-sizing: border-box;
 }
 
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
 body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
   font-family: var(--font-family);
-  background: var(--page-bg);
-  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.5;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--accent-text);
+}
+
+#root {
+  min-height: 100vh;
 }

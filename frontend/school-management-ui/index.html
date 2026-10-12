@@ -5,6 +5,18 @@
     <link rel="icon" type="image/jpeg" href="/synergein-mark.jpg?v=1" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Synergein School ERP</title>
+    <script>
+      // U1: apply the saved (or system) theme before the first paint, so dark mode never flashes white.
+      // Same key as src/store/ThemeContext.tsx.
+      (function () {
+        var theme = null;
+        try { theme = localStorage.getItem("eschool-theme"); } catch (e) {}
+        if (theme !== "light" && theme !== "dark") {
+          theme = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+        }
+        document.documentElement.setAttribute("data-theme", theme);
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

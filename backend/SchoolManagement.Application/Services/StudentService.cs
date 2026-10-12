@@ -29,10 +29,11 @@ public class StudentService : IStudentService
     }
 
     // The health block and identity numbers are sensitive: every opening of a detail leaves a "Read"
-    // audit row (F1). List rows (allergies only) and write responses do not; writes have their own rows.
+    // audit row (F1). List rows (allergy flag, or text for ViewSensitive) and write responses do not;
+    // writes have their own rows. Allergy TEXT needs Students.ViewSensitive everywhere (U1 decision).
     private const string AuditTable = "Students";
 
-    public async Task<List<StudentSummaryResponse>> GetAllAsync(CancellationToken cancellationToken)
+    public async Task<List<StudentSummaryResponse>> GetAllAsync(bool includeSensitive, CancellationToken cancellationToken)
     {
         var rows = await _studentRepository.GetSummariesAsync(DataScope.Unrestricted, cancellationToken);
         return rows.Select(r => new StudentSummaryResponse(
@@ -42,7 +43,8 @@ public class StudentService : IStudentService
             r.FirstName, r.MiddleName, r.LastName, r.Gender, r.DateOfBirth,
             r.Mobile, r.Category, r.TransportRequired,
             r.Nationality, r.CurriculumTrack, r.House, r.EalCode,
-            r.Allergies, r.AdmissionRegNo, r.AdmissionId)).ToList();
+            includeSensitive ? r.Allergies : null, r.AdmissionRegNo, r.AdmissionId,
+            HasText(r.Allergies))).ToList();
     }
 
     public async Task<List<StudentScopedSummaryResponse>> GetAllScopedAsync(DataScope scope, CancellationToken cancellationToken)
@@ -53,7 +55,7 @@ public class StudentService : IStudentService
             ClassSection.BuildDisplayName(r.ClassName, r.ClassSection, r.AcademicYearName),
             r.Status, r.PhotoUrl,
             r.FirstName, r.MiddleName, r.LastName, r.Gender, r.DateOfBirth,
-            r.House, r.Allergies)).ToList();
+            r.House, HasText(r.Allergies))).ToList();
     }
 
     public async Task<StudentResponse> GetByIdAsync(int id, bool includeSensitive, CancellationToken cancellationToken)
@@ -82,10 +84,10 @@ public class StudentService : IStudentService
             student.Status, student.PhotoUrl,
             student.FirstName, student.MiddleName, student.LastName, student.PreferredName,
             student.Gender, student.DateOfBirth, student.House,
-            new StudentScopedHealthResponse(student.Health?.Allergies),
+            new StudentScopedHealthResponse(HasText(student.Health?.Allergies)),
             guardians);
 
-        await _sensitiveReads.RecordAsync(AuditTable, student.Id, new[] { "Health (allergies)" }, cancellationToken);
+        await _sensitiveReads.RecordAsync(AuditTable, student.Id, new[] { "Health (allergy flag)" }, cancellationToken);
         return response;
     }
 
@@ -227,7 +229,11 @@ public class StudentService : IStudentService
             if (request.Health is not null)
             {
                 student.Health ??= new StudentHealth();
+                // Callers without Students.ViewSensitive never saw the allergy text, so what they send
+                // back for it means nothing: keep the stored value instead of wiping it.
+                var keptAllergies = student.Health.Allergies;
                 ApplyHealth(student.Health, request.Health);
+                if (!includeSensitive) student.Health.Allergies = keptAllergies;
                 student.Health.UpdatedAt = DateTime.UtcNow;
             }
             if (request.PickupPersons is not null)
@@ -404,7 +410,7 @@ public class StudentService : IStudentService
 
         var h = s.Health;
         var health = new StudentHealthDto(
-            h?.BloodGroup, h?.Allergies, h?.DietaryRequirements, h?.MedicalNotes,
+            h?.BloodGroup, includeSensitive ? h?.Allergies : null, h?.DietaryRequirements, h?.MedicalNotes,
             h?.SpecialEducationalNeeds, h?.InsuranceProvider, h?.InsurancePolicyExpiry);
 
         var d = s.IdentityDocument;
@@ -430,6 +436,9 @@ public class StudentService : IStudentService
             s.PickupPersons.OrderBy(p => p.Id)
                 .Select(p => new PickupPersonResponse(p.Id, p.Name, p.Relation, p.Phone, p.IdNote)).ToList(),
             guardians,
-            Convert.ToBase64String(s.RowVersion));
+            Convert.ToBase64String(s.RowVersion),
+            HasText(h?.Allergies));
     }
+
+    private static bool HasText(string? value) => !string.IsNullOrWhiteSpace(value);
 }

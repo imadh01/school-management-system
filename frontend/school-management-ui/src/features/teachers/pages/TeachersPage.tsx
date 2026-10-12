@@ -1,3 +1,7 @@
+import { useToast } from "@/components/Toast";
+import { PageHero } from "@/components/PageHero";
+import { Plus, Star, UserRound } from "lucide-react";
+import { StatCard, StatGrid } from "@/components/StatCard";
 import { useEffect, useMemo, useState } from "react";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { ValidationModal } from "@/components/ValidationModal";
@@ -60,6 +64,7 @@ function downloadCsv(rows: TeacherResponse[]) {
 }
 
 export function TeachersPage() {
+  const toast = useToast();
   const [teachers, setTeachers] = useState<TeacherResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -168,39 +173,42 @@ export function TeachersPage() {
     },
   ];
 
-  const statCard = (value: number, label: string, color?: string) => (
-    <div className="card" style={{ minWidth: 160, padding: "12px 18px" }}>
-      <div style={{ fontSize: 24, fontWeight: 700, color }}>{value}</div>
-      <div style={{ fontSize: 12, color: "var(--muted)" }}>{label}</div>
-    </div>
-  );
-
   return (
     <div>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 16,
-        }}
-      >
-        <h1 style={{ fontSize: 19, margin: 0 }}>Teachers Management</h1>
-        <button
-          className="btn btn--primary"
-          onClick={() => {
-            setEditing(null);
-            setIsModalOpen(true);
-          }}
-        >
-          + Add Teacher
-        </button>
-      </div>
-
-      <div style={{ display: "flex", gap: 14, marginBottom: 16 }}>
-        {statCard(counts.all, "Total Teachers")}
-        {statCard(counts.classTeachers, "Class Teachers", "var(--amber)")}
-      </div>
+      <PageHero
+        title="Teachers"
+        subtitle="Teaching staff, the subjects they teach and their class-teacher duties."
+        actions={
+          <>
+            <button
+              className="btn btn--primary"
+              onClick={() => {
+                setEditing(null);
+                setIsModalOpen(true);
+              }}
+            >
+              <Plus size={16} aria-hidden="true" />
+              Add teacher
+            </button>
+          </>
+        }
+        stats={
+          <StatGrid>
+            <StatCard
+              label="Teachers"
+              value={counts.all}
+              icon={UserRound}
+              tone="info"
+            />
+            <StatCard
+              label="Class teachers"
+              value={counts.classTeachers}
+              icon={Star}
+              tone="accent"
+            />
+          </StatGrid>
+        }
+      />
 
       <div className="card">
         <div className="pipeline">
@@ -243,7 +251,9 @@ export function TeachersPage() {
             </button>
             <button
               className="export-btn export-btn--pdf"
-              onClick={() => alert("PDF export coming soon.")}
+              onClick={() =>
+                toast.info("PDF export is coming in a later release.")
+              }
             >
               PDF
             </button>

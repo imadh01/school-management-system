@@ -118,9 +118,9 @@ public class DataScopeTests
         using var json = await JsonAsync(await GetAsync(w.T1, "/api/students"));
         var row = json.RootElement.EnumerateArray().First(e => e.GetProperty("id").GetInt32() == w.SA);
 
-        foreach (var hidden in new[] { "mobile", "category", "nationality", "admissionRegNo", "admissionId", "admissionDate" })
+        foreach (var hidden in new[] { "mobile", "category", "nationality", "admissionRegNo", "admissionId", "admissionDate", "allergies" })
             Assert.False(row.TryGetProperty(hidden, out _), $"scoped list row must not contain '{hidden}'");
-        Assert.Equal("Allergic to peanuts", row.GetProperty("allergies").GetString());
+        Assert.True(row.GetProperty("hasAllergies").GetBoolean(), "teachers see that there are allergies, not what they are");
     }
 
     [Fact]
@@ -138,7 +138,8 @@ public class DataScopeTests
             Assert.False(root.TryGetProperty(hidden, out _), $"scoped detail must not contain '{hidden}'");
 
         var health = root.GetProperty("health");
-        Assert.Equal("Allergic to peanuts", health.GetProperty("allergies").GetString());
+        Assert.True(health.GetProperty("hasAllergies").GetBoolean());
+        Assert.False(health.TryGetProperty("allergies", out _), "allergy text needs Students.ViewSensitive");
         Assert.False(health.TryGetProperty("medicalNotes", out _));
 
         var guardian = Assert.Single(root.GetProperty("guardians").EnumerateArray());
@@ -310,7 +311,7 @@ public class DataScopeTests
             .Where(l => l.Action == AuditActions.Read && l.TableName == "Students" && l.RecordId == w.SA.ToString())
             .ToListAsync();
 
-        Assert.Contains(reads, r => r.UserId == w.T1.UserId && r.Changes!.Contains("Health (allergies)"));
+        Assert.Contains(reads, r => r.UserId == w.T1.UserId && r.Changes!.Contains("Health (allergy flag)"));
         Assert.Contains(reads, r => r.UserId != w.T1.UserId && r.Changes!.Contains("Identity"));
         Assert.All(reads, r => Assert.DoesNotContain("peanuts", r.Changes!)); // what was shown, never the values
     }

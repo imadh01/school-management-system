@@ -16,7 +16,7 @@ function Loading() {
  *   1. wait while the session is restored (D2) and the permissions load (F1);
  *   2. not signed in → /login;
  *   3. a password change is required → the change-password page, before anything else
- *      (the API refuses every other call until then anyway).
+ *      (the API refuses every other call until then anyway). Others may open that page too.
  * Per-page permission checks are RequirePermission's job.
  */
 export function ProtectedRoute() {
@@ -24,15 +24,13 @@ export function ProtectedRoute() {
   const location = useLocation();
 
   if (status === "loading") return <Loading />;
-  if (status !== "authenticated" || !user) return <Navigate to="/login" replace />;
+  if (status !== "authenticated" || !user)
+    return <Navigate to="/login" replace />;
   if (permissions === null) return <Loading />;
 
   const onChangePassword = location.pathname === CHANGE_PASSWORD_PATH;
   if (user.mustChangePassword && !onChangePassword) {
     return <Navigate to={CHANGE_PASSWORD_PATH} replace />;
-  }
-  if (!user.mustChangePassword && onChangePassword) {
-    return <Navigate to="/" replace />;
   }
 
   return <Outlet />;

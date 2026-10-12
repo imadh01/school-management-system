@@ -172,9 +172,9 @@ export function TeacherManageModal({ teacher, onClose, onChanged }: Props) {
             </div>
 
             <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
-              {statTile(assignments.length, "Classes", "var(--blue)")}
+              {statTile(assignments.length, "Classes", "var(--info)")}
               {statTile(totalSubjects, "Subjects", "var(--purple)")}
-              {statTile(classTeacherOf, "Class Teacher Of", "var(--amber)")}
+              {statTile(classTeacherOf, "Class Teacher Of", "var(--warn)")}
             </div>
 
             <div style={sectionTitle}>

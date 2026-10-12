@@ -14,13 +14,20 @@ import { RequirePermission } from "./RequirePermission";
 import { PAGE_PERMISSIONS } from "./permissions";
 import { AttendancePage } from "../features/attendance/pages/AttendancePage";
 import { AppLayout } from "../layouts/AppLayout";
+import { ALL_NAV_ITEMS } from "../layouts/navConfig";
+import { ComingSoonPage } from "../components/ComingSoonPage";
 
 /** A page behind the permissions listed for its path in PAGE_PERMISSIONS (F1). */
 function guarded(path: string, page: ReactNode) {
   return (
     <Route
+      key={path}
       path={path}
-      element={<RequirePermission anyOf={PAGE_PERMISSIONS[path]}>{page}</RequirePermission>}
+      element={
+        <RequirePermission anyOf={PAGE_PERMISSIONS[path]}>
+          {page}
+        </RequirePermission>
+      }
     />
   );
 }
@@ -30,7 +37,10 @@ export function AppRoutes() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route element={<ProtectedRoute />}>
-        <Route path={CHANGE_PASSWORD_PATH} element={<ChangePasswordRequiredPage />} />
+        <Route
+          path={CHANGE_PASSWORD_PATH}
+          element={<ChangePasswordRequiredPage />}
+        />
         <Route element={<AppLayout />}>
           <Route path="/dashboard" element={<DashboardPage />} />
           {guarded("/admissions", <AdmissionsPage />)}
@@ -40,6 +50,10 @@ export function AppRoutes() {
           {guarded("/subjects", <SubjectsPage />)}
           {guarded("/teachers", <TeachersPage />)}
           {guarded("/attendance", <AttendancePage />)}
+          {/* Modules from the prototype that are not built yet. */}
+          {ALL_NAV_ITEMS.filter((i) => !i.built).map((i) =>
+            guarded(i.path, <ComingSoonPage />),
+          )}
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
         </Route>
       </Route>

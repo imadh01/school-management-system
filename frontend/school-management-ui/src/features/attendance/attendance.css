@@ -20,7 +20,7 @@
 }
 .att-tab--active {
   color: #fff;
-  background: var(--blue);
+  background: var(--info-solid);
 }
 
 .att-last7 {
@@ -35,22 +35,24 @@
   background: var(--gray-bg);
 }
 .att-last7__dot--present {
-  background: var(--green);
+  background: var(--ok-solid);
 }
 .att-last7__dot--absent {
-  background: var(--red);
+  background: var(--bad-solid);
 }
 .att-last7__dot--other {
-  background: var(--amber);
+  background: var(--warn-solid);
 }
 
 .att-status-btn {
   border: 1px solid var(--border);
   background: var(--surface);
-  color: var(--muted);
+  color: var(--text-muted);
   border-radius: 999px;
-  padding: 5px 10px;
-  font-size: 11.5px;
+  min-height: 32px;
+  padding: 0 12px;
+  font: inherit;
+  font-size: 12.5px;
   font-weight: 600;
   cursor: pointer;
   margin-right: 4px;
@@ -60,37 +62,41 @@
   opacity: 0.6;
 }
 .att-status-btn--green {
-  background: var(--green);
-  border-color: var(--green);
+  background: var(--ok-solid);
+  border-color: var(--ok-solid);
   color: #fff;
 }
 .att-status-btn--red {
-  background: var(--red);
-  border-color: var(--red);
+  background: var(--bad-solid);
+  border-color: var(--bad-solid);
   color: #fff;
 }
 .att-status-btn--amber {
-  background: var(--amber);
-  border-color: var(--amber);
+  background: var(--warn-solid);
+  border-color: var(--warn-solid);
   color: #fff;
 }
 .att-status-btn--blue {
-  background: var(--blue);
-  border-color: var(--blue);
+  background: var(--info-solid);
+  border-color: var(--info-solid);
   color: #fff;
 }
 .att-status-btn--purple {
-  background: var(--purple);
-  border-color: var(--purple);
+  background: var(--purple-solid);
+  border-color: var(--purple-solid);
   color: #fff;
 }
 
 .att-remarks {
-  border: 1px solid var(--border);
+  border: 1px solid var(--input-border);
   border-radius: var(--radius-sm);
-  padding: 6px 8px;
-  font-size: 12px;
+  min-height: 36px;
+  padding: 0 10px;
+  font: inherit;
+  font-size: 13px;
   width: 100%;
+  background: var(--surface);
+  color: var(--text);
 }
 
 .att-progress {
@@ -102,7 +108,7 @@
 }
 .att-progress__fill {
   height: 100%;
-  background: var(--green);
+  background: var(--ok-solid);
   transition: width 0.2s;
 }
 

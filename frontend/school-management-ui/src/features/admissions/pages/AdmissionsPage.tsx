@@ -1,3 +1,6 @@
+import { useToast } from "@/components/Toast";
+import { PageHero } from "@/components/PageHero";
+import { Plus } from "lucide-react";
 import { isConcurrencyConflict } from "@/utils/apiError";
 import { useEffect, useMemo, useState } from "react";
 import { admissionService } from "../services/admissionService";
@@ -87,6 +90,7 @@ function toCsv(rows: AdmissionResponse[]): string {
 }
 
 export function AdmissionsPage() {
+  const toast = useToast();
   const [admissions, setAdmissions] = useState<AdmissionResponse[]>([]);
   const [classSections, setClassSections] = useState<ClassSectionResponse[]>(
     [],
@@ -263,14 +267,16 @@ export function AdmissionsPage() {
 
   return (
     <div>
-      <div className="page-head">
-        <div />
-        <div className="page-head__actions">
+      <PageHero
+        title="Admissions"
+        subtitle="Applications from registration to confirmation and enrolment."
+        actions={
           <button className="btn btn--primary" onClick={openCreate}>
-            + New Registration
+            <Plus size={16} aria-hidden="true" />
+            New registration
           </button>
-        </div>
-      </div>
+        }
+      />
 
       <div className="card">
         <div className="pipeline">
@@ -370,15 +376,17 @@ export function AdmissionsPage() {
           <div style={{ display: "flex", gap: 8 }}>
             <button
               className="export-btn"
-              style={{ background: "var(--green)" }}
+              style={{ background: "var(--ok-solid)" }}
               onClick={handleExportCsv}
             >
               CSV
             </button>
             <button
               className="export-btn"
-              style={{ background: "var(--red)" }}
-              onClick={() => window.alert("PDF export not implemented yet.")}
+              style={{ background: "var(--bad-solid)" }}
+              onClick={() =>
+                toast.info("PDF export is coming in a later release.")
+              }
             >
               PDF
             </button>
@@ -495,7 +503,7 @@ export function AdmissionsPage() {
                           <button
                             className="btn--icon"
                             title="View Rejection Reason"
-                            style={{ color: "var(--amber)" }}
+                            style={{ color: "var(--warn)" }}
                             onClick={() =>
                               setViewReason(
                                 a.rejectionReason || "No reason recorded.",
@@ -532,7 +540,7 @@ export function AdmissionsPage() {
                             <button
                               className="btn--icon"
                               title="Confirm Admission"
-                              style={{ color: "var(--green)" }}
+                              style={{ color: "var(--ok)" }}
                               onClick={() => setConfirmTarget(a)}
                             >
                               ✓
@@ -542,7 +550,7 @@ export function AdmissionsPage() {
                             <button
                               className="btn--icon"
                               title="Enroll to Class"
-                              style={{ color: "var(--blue)" }}
+                              style={{ color: "var(--info)" }}
                               onClick={() => setEnrollTarget(a)}
                             >
                               🎓

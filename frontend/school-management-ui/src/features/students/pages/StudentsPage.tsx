@@ -1,4 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
+import {
+  CircleCheck,
+  CircleMinus,
+  Download,
+  Eye,
+  GraduationCap,
+  HeartPulse,
+  History,
+  LogOut,
+  Pencil,
+  Printer,
+  Search,
+  Trash,
+  Users,
+} from "lucide-react";
 import { studentService } from "../services/studentService";
 import { classSectionService } from "@/features/class-sections/services/classSectionService";
 import type {
@@ -11,11 +26,19 @@ import type {
 import type { ClassSectionResponse } from "@/features/class-sections/types/classSection.types";
 import { StudentHistoryModal } from "../components/StudentHistoryModal";
 import { StudentModal } from "../components/StudentModal";
-import { NotYetAvailableModal } from "../components/NotYetAvailableModal";
 import { LinkedParentsViewModal } from "../components/LinkedParentsViewModal";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { ViewDetailsModal } from "@/components/ViewDetailsModal";
 import { ValidationModal } from "@/components/ValidationModal";
+import { PageHero } from "@/components/PageHero";
+import { StatCard, StatGrid } from "@/components/StatCard";
+import { Panel } from "@/components/Panel";
+import { FilterBar } from "@/components/FilterBar";
+import { DataTable, type Column } from "@/components/DataTable";
+import { StatusBadge } from "@/components/Badge";
+import { IconButton } from "@/components/IconButton";
+import { EmptyState } from "@/components/EmptyState";
+import { useToast } from "@/components/Toast";
 import {
   getApiErrors,
   getReadErrors,
@@ -23,64 +46,68 @@ import {
 } from "@/utils/apiError";
 import { useAuth } from "@/store/AuthContext";
 import { Permission } from "@/routes/permissions";
+import { initialsOf } from "@/utils/initials";
 
-const PIPELINE_STEPS: {
-  key: StudentStatus | "All";
-  label: string;
-  activeClass: string;
-}[] = [
-  { key: "All", label: "All", activeClass: "pipeline__step--dark" },
-  { key: "Active", label: "Active", activeClass: "pipeline__step--green" },
-  { key: "Inactive", label: "Inactive", activeClass: "" },
-  { key: "Left", label: "Left", activeClass: "pipeline__step--purple" },
-];
+function unique(values: (string | null | undefined)[]): string[] {
+  return [...new Set(values.filter((v): v is string => !!v))].sort();
+}
 
-const STATUS_BADGE_CLASS: Record<string, string> = {
-  Active: "badge--active",
-  Inactive: "badge--inactive",
-  Left: "badge--purple",
-};
-
-function unique(values: (string | null)[]): string[] {
-  const seen = new Set<string>();
-  const out: string[] = [];
-  values.forEach((v) => {
-    if (v && !seen.has(v)) {
-      seen.add(v);
-      out.push(v);
-    }
-  });
-  return out.sort();
+function fullName(s: { firstName: string; lastName: string }) {
+  return `${s.firstName} ${s.lastName}`;
 }
 
 function toCsv(rows: StudentSummaryResponse[]): string {
   const headers = [
     "Adm #",
     "Student",
+    "Class",
+    "Gender",
+    "House",
     "Nationality",
     "Curriculum",
     "EAL",
-    "Class",
     "Status",
-    "House",
     "Allergies",
   ];
   const lines = rows.map((s) =>
     [
       s.admNo,
-      `${s.firstName} ${s.lastName}`,
+      fullName(s),
+      s.classSectionName,
+      s.gender,
+      s.house ?? "",
       s.nationality ?? "",
       s.curriculumTrack ?? "",
       s.ealCode ?? "",
-      s.classSectionName,
       s.status,
-      s.house ?? "",
-      s.allergies ?? "",
+      // The text only for Students.ViewSensitive holders; everyone else exports the flag.
+      s.allergies ?? (s.hasAllergies ? "Yes" : ""),
     ]
       .map((v) => `"${String(v).replace(/"/g, '""')}"`)
       .join(","),
   );
   return [headers.join(","), ...lines].join("\n");
+}
+
+/** The allergy flag (U1): an icon for everyone; the text, as a tooltip, only for ViewSensitive holders. */
+function AllergyFlag({ student }: { student: StudentSummaryResponse }) {
+  if (!student.hasAllergies) {
+    return (
+      <span className="cell-muted">
+        <span aria-hidden="true">—</span>
+        <span className="visually-hidden">No allergies recorded</span>
+      </span>
+    );
+  }
+  const label = student.allergies
+    ? `Allergies: ${student.allergies}`
+    : "Has allergies";
+  return (
+    <span className="flag" title={label}>
+      <HeartPulse size={16} aria-hidden="true" />
+      <span className="visually-hidden">{label}</span>
+    </span>
+  );
 }
 
 export function StudentsPage() {
@@ -89,36 +116,27 @@ export function StudentsPage() {
   const { hasAnyPermission } = useAuth();
   const canEdit = hasAnyPermission([Permission.StudentsEdit]);
   const canDelete = hasAnyPermission([Permission.StudentsDelete]);
+  const toast = useToast();
 
   const [students, setStudents] = useState<StudentSummaryResponse[]>([]);
   const [classSections, setClassSections] = useState<ClassSectionResponse[]>(
     [],
   );
-  const [statusFilter, setStatusFilter] = useState<StudentStatus | "All">(
-    "All",
-  );
+  const [isLoading, setIsLoading] = useState(true);
+
+  const [statusFilter, setStatusFilter] = useState<StudentStatus | "">("");
   const [search, setSearch] = useState("");
-  const [quickSearch, setQuickSearch] = useState("");
   const [classFilter, setClassFilter] = useState("");
   const [genderFilter, setGenderFilter] = useState("");
   const [curriculumFilter, setCurriculumFilter] = useState("");
   const [ealFilter, setEalFilter] = useState("");
   const [houseFilter, setHouseFilter] = useState("");
-  const [hasAllergies, setHasAllergies] = useState(false);
-  const [pageSize, setPageSize] = useState(10);
-  const [page, setPage] = useState(1);
-  const [isLoading, setIsLoading] = useState(true);
+  const [allergiesOnly, setAllergiesOnly] = useState(false);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<StudentResponse | null>(
     null,
   );
-  const [feeSummaryTarget, setFeeSummaryTarget] =
-    useState<StudentSummaryResponse | null>(null);
-  const [attendanceTarget, setAttendanceTarget] =
-    useState<StudentSummaryResponse | null>(null);
-  const [reportCardTarget, setReportCardTarget] =
-    useState<StudentSummaryResponse | null>(null);
   const [linkedParentsTarget, setLinkedParentsTarget] =
     useState<StudentSummaryResponse | null>(null);
   const [historyTarget, setHistoryTarget] =
@@ -132,17 +150,22 @@ export function StudentsPage() {
 
   const loadData = async () => {
     setIsLoading(true);
-    const [studentsData, classSectionsData] = await Promise.all([
-      studentService.getAll(),
-      classSectionService.getAll(),
-    ]);
-    setStudents(studentsData);
-    setClassSections(classSectionsData);
-    setIsLoading(false);
+    try {
+      const [studentsData, classSectionsData] = await Promise.all([
+        studentService.getAll(),
+        classSectionService.getAll(),
+      ]);
+      setStudents(studentsData);
+      setClassSections(classSectionsData);
+    } catch (err) {
+      setErrors(getReadErrors(err, "Could not load students."));
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   useEffect(() => {
-    loadData();
+    void loadData();
   }, []);
 
   const classNames = useMemo(
@@ -163,38 +186,28 @@ export function StudentsPage() {
   );
 
   const counts = useMemo(() => {
-    const c: Record<string, number> = {
-      All: students.length,
-      Active: 0,
-      Inactive: 0,
-      Left: 0,
-    };
+    const c = { Active: 0, Inactive: 0, Left: 0 };
     students.forEach((s) => {
-      c[s.status] = (c[s.status] ?? 0) + 1;
+      if (s.status in c) c[s.status as keyof typeof c] += 1;
     });
     return c;
   }, [students]);
 
   const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
     return students.filter((s) => {
-      if (statusFilter !== "All" && s.status !== statusFilter) return false;
+      if (statusFilter && s.status !== statusFilter) return false;
       if (classFilter && s.classSectionName !== classFilter) return false;
       if (genderFilter && s.gender !== genderFilter) return false;
       if (curriculumFilter && s.curriculumTrack !== curriculumFilter)
         return false;
       if (ealFilter && s.ealCode !== ealFilter) return false;
       if (houseFilter && s.house !== houseFilter) return false;
-      if (hasAllergies && !s.allergies) return false;
-
-      if (search) {
+      if (allergiesOnly && !s.hasAllergies) return false;
+      if (q) {
         const haystack =
-          `${s.firstName} ${s.lastName} ${s.admNo} ${s.rollNumber}`.toLowerCase();
-        if (!haystack.includes(search.toLowerCase())) return false;
-      }
-      if (quickSearch) {
-        const everything =
-          `${s.firstName} ${s.lastName} ${s.admNo} ${s.rollNumber} ${s.classSectionName} ${s.status}`.toLowerCase();
-        if (!everything.includes(quickSearch.toLowerCase())) return false;
+          `${s.firstName} ${s.lastName} ${s.admNo} ${s.rollNumber} ${s.classSectionName}`.toLowerCase();
+        if (!haystack.includes(q)) return false;
       }
       return true;
     });
@@ -202,51 +215,47 @@ export function StudentsPage() {
     students,
     statusFilter,
     search,
-    quickSearch,
     classFilter,
     genderFilter,
     curriculumFilter,
     ealFilter,
     houseFilter,
-    hasAllergies,
+    allergiesOnly,
   ]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const pageRows = filtered.slice((page - 1) * pageSize, page * pageSize);
-
-  useEffect(() => {
-    setPage(1);
-  }, [
+  const filterKey = [
     statusFilter,
     search,
-    quickSearch,
     classFilter,
     genderFilter,
     curriculumFilter,
     ealFilter,
     houseFilter,
-    hasAllergies,
-    pageSize,
-  ]);
+    allergiesOnly,
+  ].join("|");
+  const anyFilter =
+    !!(
+      statusFilter ||
+      search ||
+      classFilter ||
+      genderFilter ||
+      curriculumFilter ||
+      ealFilter ||
+      houseFilter
+    ) || allergiesOnly;
 
   const clearFilters = () => {
     setSearch("");
-    setQuickSearch("");
     setClassFilter("");
     setGenderFilter("");
     setCurriculumFilter("");
     setEalFilter("");
     setHouseFilter("");
-    setHasAllergies(false);
-    setStatusFilter("All");
+    setAllergiesOnly(false);
+    setStatusFilter("");
   };
 
-  // const openCreate = () => {
-  //   setEditingStudent(null);
-  //   setIsModalOpen(true);
-  // };
-  // The list only carries summary fields, so the full record is fetched
-  // when a student is opened for editing or viewing.
+  // The list carries summary fields only, so the full record is fetched when opened.
   const openEdit = async (s: StudentSummaryResponse) => {
     try {
       setEditingStudent(await studentService.getById(s.id));
@@ -264,18 +273,15 @@ export function StudentsPage() {
     }
   };
 
-  const handleDelete = (s: StudentSummaryResponse) => {
-    setDeleteTarget(s);
-  };
-
   const confirmDelete = async () => {
     if (!deleteTarget) return;
+    const target = deleteTarget;
+    setDeleteTarget(null);
     try {
-      await studentService.delete(deleteTarget.id);
-      setDeleteTarget(null);
+      await studentService.delete(target.id);
+      toast.success(`${fullName(target)} was deleted.`);
       await loadData();
     } catch (err) {
-      setDeleteTarget(null);
       setErrors(getApiErrors(err, "Could not delete this student."));
     }
   };
@@ -292,324 +298,343 @@ export function StudentsPage() {
     URL.revokeObjectURL(url);
   };
 
+  const columns: Column<StudentSummaryResponse>[] = [
+    {
+      key: "admNo",
+      header: "Adm #",
+      sortValue: (s) => s.admNo,
+      render: (s) => (
+        <span
+          className="cell-strong"
+          title={
+            s.admissionRegNo ? `From admission ${s.admissionRegNo}` : undefined
+          }
+        >
+          {s.admNo}
+        </span>
+      ),
+    },
+    {
+      key: "name",
+      header: "Student",
+      sortValue: (s) => fullName(s),
+      render: (s) => (
+        <div className="person">
+          <span className="avatar" aria-hidden="true">
+            {initialsOf(fullName(s))}
+          </span>
+          <div>
+            <div className="person__name">{fullName(s)}</div>
+            <div className="person__sub">Roll {s.rollNumber}</div>
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: "class",
+      header: "Class",
+      sortValue: (s) => s.classSectionName,
+      render: (s) => s.classSectionName,
+    },
+    {
+      key: "gender",
+      header: "Gender",
+      hideBelow: "md",
+      sortValue: (s) => s.gender,
+      render: (s) => s.gender,
+    },
+    {
+      key: "house",
+      header: "House",
+      hideBelow: "md",
+      sortValue: (s) => s.house,
+      render: (s) => s.house ?? <span className="cell-muted">—</span>,
+    },
+    {
+      key: "allergies",
+      header: "Allergies",
+      render: (s) => <AllergyFlag student={s} />,
+    },
+    {
+      key: "status",
+      header: "Status",
+      sortValue: (s) => s.status,
+      render: (s) => <StatusBadge status={s.status} />,
+    },
+    {
+      key: "actions",
+      header: "Actions",
+      render: (s) => (
+        <div className="row-actions">
+          <IconButton
+            icon={Eye}
+            label={`View ${fullName(s)}`}
+            onClick={() => openDetails(s)}
+          />
+          <IconButton
+            icon={Users}
+            label={`Parents of ${fullName(s)}`}
+            onClick={() => setLinkedParentsTarget(s)}
+          />
+          <IconButton
+            icon={History}
+            label={`Academic history of ${fullName(s)}`}
+            onClick={() => setHistoryTarget(s)}
+          />
+          {canEdit && (
+            <IconButton
+              icon={Pencil}
+              tone="info"
+              label={`Edit ${fullName(s)}`}
+              onClick={() => openEdit(s)}
+            />
+          )}
+          {canDelete && (
+            <IconButton
+              icon={Trash}
+              tone="bad"
+              label={`Delete ${fullName(s)}`}
+              onClick={() => setDeleteTarget(s)}
+            />
+          )}
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div>
-      <div className="page-head">
-        <div />
-      </div>
-
-      <div className="card">
-        <div className="pipeline">
-          {PIPELINE_STEPS.map((step) => (
-            <button
-              key={step.key}
-              className={`pipeline__step ${statusFilter === step.key ? step.activeClass : ""}`}
-              onClick={() => setStatusFilter(step.key)}
-            >
-              {step.label} ({counts[step.key] ?? 0})
-            </button>
-          ))}
-        </div>
-
-        <div className="filters">
-          <div className="field">
-            <label>Search</label>
-            <input
-              placeholder="Search students..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
+      <PageHero
+        title="Students"
+        subtitle="Enrolled students, their classes, guardians and academic history."
+        actions={
+          <button
+            type="button"
+            className="btn btn--secondary"
+            onClick={() => window.print()}
+          >
+            <Printer size={16} aria-hidden="true" />
+            Print
+          </button>
+        }
+        stats={
+          <StatGrid>
+            <StatCard
+              label="Total"
+              value={students.length}
+              icon={GraduationCap}
+              tone="info"
             />
-          </div>
-          <div className="field">
-            <label>Class</label>
+            <StatCard
+              label="Active"
+              value={counts.Active}
+              icon={CircleCheck}
+              tone="ok"
+            />
+            <StatCard
+              label="Inactive"
+              value={counts.Inactive}
+              icon={CircleMinus}
+              tone="neutral"
+            />
+            <StatCard
+              label="Left"
+              value={counts.Left}
+              icon={LogOut}
+              tone="purple"
+            />
+          </StatGrid>
+        }
+      />
+
+      <Panel
+        title="All students"
+        subtitle={`${students.length} students · ${filtered.length} shown`}
+        icon={GraduationCap}
+        actions={
+          <button
+            type="button"
+            className="btn btn--secondary"
+            onClick={handleExportCsv}
+            disabled={filtered.length === 0}
+          >
+            <Download size={16} aria-hidden="true" />
+            Export CSV
+          </button>
+        }
+      >
+        <FilterBar>
+          <label>
+            <span className="visually-hidden">Class</span>
             <select
+              className="select"
               value={classFilter}
               onChange={(e) => setClassFilter(e.target.value)}
             >
-              <option value="">All Classes</option>
+              <option value="">All classes</option>
               {classNames.map((c) => (
                 <option key={c} value={c}>
                   {c}
                 </option>
               ))}
             </select>
-          </div>
-          <div className="field">
-            <label>Gender</label>
+          </label>
+          <label>
+            <span className="visually-hidden">Gender</span>
             <select
+              className="select"
               value={genderFilter}
               onChange={(e) => setGenderFilter(e.target.value)}
             >
-              <option value="">All Genders</option>
+              <option value="">All genders</option>
               <option>Male</option>
               <option>Female</option>
             </select>
-          </div>
-          <div className="field">
-            <label>Curriculum</label>
+          </label>
+          <label>
+            <span className="visually-hidden">House</span>
             <select
-              value={curriculumFilter}
-              onChange={(e) => setCurriculumFilter(e.target.value)}
-            >
-              <option value="">All Curricula</option>
-              {curricula.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="field">
-            <label>English Level</label>
-            <select
-              value={ealFilter}
-              onChange={(e) => setEalFilter(e.target.value)}
-            >
-              <option value="">All Levels</option>
-              {ealLevels.map((l) => (
-                <option key={l} value={l}>
-                  {l}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="field">
-            <label>House</label>
-            <select
+              className="select"
               value={houseFilter}
               onChange={(e) => setHouseFilter(e.target.value)}
             >
-              <option value="">All Houses</option>
+              <option value="">All houses</option>
               {houses.map((h) => (
                 <option key={h} value={h}>
                   {h}
                 </option>
               ))}
             </select>
-          </div>
-          <div className="field" style={{ justifyContent: "flex-end" }}>
-            <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <input
-                type="checkbox"
-                checked={hasAllergies}
-                onChange={(e) => setHasAllergies(e.target.checked)}
-              />{" "}
-              Has Allergies
-            </label>
-          </div>
-          <button
-            className="btn btn--secondary filters__clear"
-            onClick={clearFilters}
-          >
-            Clear
-          </button>
-        </div>
-
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: 12,
-            flexWrap: "wrap",
-            gap: 8,
-          }}
-        >
-          <div style={{ display: "flex", gap: 8 }}>
-            <button
-              className="export-btn"
-              style={{ background: "var(--green)" }}
-              onClick={handleExportCsv}
+          </label>
+          <label>
+            <span className="visually-hidden">Status</span>
+            <select
+              className="select"
+              value={statusFilter}
+              onChange={(e) =>
+                setStatusFilter(e.target.value as StudentStatus | "")
+              }
             >
-              CSV
-            </button>
-            <button
-              className="export-btn"
-              style={{ background: "var(--red)" }}
-              onClick={() => window.alert("PDF export not implemented yet.")}
-            >
-              PDF
-            </button>
-            <button
-              className="export-btn"
-              style={{ background: "var(--navy-700)" }}
-              onClick={() => window.print()}
-            >
-              PRINT
-            </button>
-          </div>
-          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-            <span style={{ fontSize: 12.5, color: "var(--muted)" }}>
-              Show{" "}
+              <option value="">All statuses</option>
+              <option>Active</option>
+              <option>Inactive</option>
+              <option>Left</option>
+            </select>
+          </label>
+          {curricula.length > 0 && (
+            <label>
+              <span className="visually-hidden">Curriculum</span>
               <select
-                value={pageSize}
-                onChange={(e) => setPageSize(Number(e.target.value))}
+                className="select"
+                value={curriculumFilter}
+                onChange={(e) => setCurriculumFilter(e.target.value)}
               >
-                <option value={10}>10</option>
-                <option value={25}>25</option>
-              </select>{" "}
-              entries
-            </span>
-            <input
-              className="search-box"
-              type="search"
-              placeholder="Search..."
-              value={quickSearch}
-              onChange={(e) => setQuickSearch(e.target.value)}
-            />
-          </div>
-        </div>
-
-        {isLoading ? (
-          <div className="empty-state">Loading…</div>
-        ) : pageRows.length === 0 ? (
-          <div className="empty-state">No students found.</div>
-        ) : (
-          <div style={{ overflowX: "auto" }}>
-            <table>
-              <thead>
-                <tr>
-                  <th>Adm #</th>
-                  <th>Student</th>
-                  <th>Nationality</th>
-                  <th>Curriculum</th>
-                  <th>EAL</th>
-                  <th>Class</th>
-                  <th>Status</th>
-                  <th>House</th>
-                  <th>Allergies</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pageRows.map((s) => (
-                  <tr key={s.id}>
-                    <td>
-                      {s.admNo}
-                      {s.admissionRegNo && (
-                        <span title={`From admission ${s.admissionRegNo}`}>
-                          {" "}
-                          🔗
-                        </span>
-                      )}
-                    </td>
-                    <td>
-                      {s.firstName} {s.lastName}
-                    </td>
-                    <td>{s.nationality ?? "—"}</td>
-                    <td>{s.curriculumTrack ?? "—"}</td>
-                    <td>{s.ealCode ?? "—"}</td>
-                    <td>{s.classSectionName}</td>
-                    <td>
-                      <span
-                        className={`badge ${STATUS_BADGE_CLASS[s.status] ?? "badge--gray"}`}
-                      >
-                        {s.status}
-                      </span>
-                    </td>
-                    <td>{s.house ?? "—"}</td>
-                    <td>{s.allergies || "—"}</td>
-                    <td style={{ whiteSpace: "nowrap" }}>
-                      <button
-                        className="btn--icon"
-                        title="View Details"
-                        onClick={() => openDetails(s)}
-                      >
-                        👁
-                      </button>
-                      <button
-                        className="btn--icon"
-                        title="Fee Summary"
-                        style={{ color: "var(--green)" }}
-                        onClick={() => setFeeSummaryTarget(s)}
-                      >
-                        💳
-                      </button>
-                      <button
-                        className="btn--icon"
-                        title="Attendance Report"
-                        style={{ color: "var(--amber)" }}
-                        onClick={() => setAttendanceTarget(s)}
-                      >
-                        📅
-                      </button>
-                      <button
-                        className="btn--icon"
-                        title="Report Card"
-                        style={{ color: "var(--blue)" }}
-                        onClick={() => setReportCardTarget(s)}
-                      >
-                        🎓
-                      </button>
-                      <button
-                        className="btn--icon"
-                        title="Linked Parents"
-                        style={{ color: "var(--purple)" }}
-                        onClick={() => setLinkedParentsTarget(s)}
-                      >
-                        👪
-                      </button>
-                      <button
-                        className="btn--icon"
-                        title="Academic History"
-                        onClick={() => setHistoryTarget(s)}
-                      >
-                        📚
-                      </button>
-
-                      {canEdit && (
-                        <button
-                          className="btn--icon"
-                          title="Edit"
-                          onClick={() => openEdit(s)}
-                        >
-                          ✎
-                        </button>
-                      )}
-                      {canDelete && (
-                        <button
-                          className="btn--icon danger"
-                          title="Delete"
-                          onClick={() => handleDelete(s)}
-                        >
-                          🗑
-                        </button>
-                      )}
-                    </td>
-                  </tr>
+                <option value="">All curricula</option>
+                {curricula.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
                 ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+              </select>
+            </label>
+          )}
+          {ealLevels.length > 0 && (
+            <label>
+              <span className="visually-hidden">English level</span>
+              <select
+                className="select"
+                value={ealFilter}
+                onChange={(e) => setEalFilter(e.target.value)}
+              >
+                <option value="">All English levels</option>
+                {ealLevels.map((l) => (
+                  <option key={l} value={l}>
+                    {l}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          <label className="checkbox-row" style={{ marginTop: 0 }}>
+            <input
+              type="checkbox"
+              checked={allergiesOnly}
+              onChange={(e) => setAllergiesOnly(e.target.checked)}
+            />
+            Has allergies
+          </label>
+          <label
+            className="search-box"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              marginLeft: "auto",
+            }}
+          >
+            <Search size={16} aria-hidden="true" />
+            <span className="visually-hidden">Search students</span>
+            <input
+              type="search"
+              placeholder="Name, admission no., roll"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              style={{
+                border: 0,
+                outline: "none",
+                background: "transparent",
+                color: "inherit",
+                font: "inherit",
+                width: "100%",
+              }}
+            />
+          </label>
+          {anyFilter && (
+            <button
+              type="button"
+              className="btn btn--secondary btn--sm"
+              onClick={clearFilters}
+            >
+              Clear
+            </button>
+          )}
+        </FilterBar>
 
-        <div className="table-footer">
-          <span>
-            Showing {pageRows.length ? (page - 1) * pageSize + 1 : 0} to{" "}
-            {(page - 1) * pageSize + pageRows.length} of {filtered.length}{" "}
-            entries
-          </span>
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <button
-              className="btn btn--secondary btn--sm"
-              disabled={page <= 1}
-              onClick={() => setPage((p) => p - 1)}
-            >
-              Previous
-            </button>
-            <span>
-              {page} / {totalPages}
-            </span>
-            <button
-              className="btn btn--secondary btn--sm"
-              disabled={page >= totalPages}
-              onClick={() => setPage((p) => p + 1)}
-            >
-              Next
-            </button>
-          </div>
-        </div>
-      </div>
+        <DataTable
+          caption="Students"
+          columns={columns}
+          rows={filtered}
+          rowKey={(s) => s.id}
+          loading={isLoading}
+          resetPageKey={filterKey}
+          empty={
+            <EmptyState
+              icon={GraduationCap}
+              title={
+                students.length === 0
+                  ? "No students yet"
+                  : "No students match these filters"
+              }
+              message={
+                students.length === 0
+                  ? "Students appear here once they are enrolled from Admissions."
+                  : undefined
+              }
+              action={
+                students.length > 0 ? (
+                  <button
+                    type="button"
+                    className="btn btn--secondary"
+                    onClick={clearFilters}
+                  >
+                    Clear filters
+                  </button>
+                ) : undefined
+              }
+            />
+          }
+        />
+      </Panel>
 
       <StudentModal
         isOpen={isModalOpen}
@@ -642,34 +667,15 @@ export function StudentsPage() {
             if (identity) {
               await studentService.updateIdentity(editingStudent.id, identity);
             }
+            toast.success(`${fullName(data)} was saved.`);
           } else {
             await studentService.create(data);
+            toast.success(`${fullName(data)} was added.`);
           }
           await loadData();
         }}
       />
 
-      <NotYetAvailableModal
-        title="Fee Summary"
-        icon="💳"
-        requiredModule="Fees Collection"
-        isOpen={!!feeSummaryTarget}
-        onClose={() => setFeeSummaryTarget(null)}
-      />
-      <NotYetAvailableModal
-        title="Attendance Report"
-        icon="📅"
-        requiredModule="Attendance"
-        isOpen={!!attendanceTarget}
-        onClose={() => setAttendanceTarget(null)}
-      />
-      <NotYetAvailableModal
-        title="Report Card"
-        icon="🎓"
-        requiredModule="Exams / Results"
-        isOpen={!!reportCardTarget}
-        onClose={() => setReportCardTarget(null)}
-      />
       <LinkedParentsViewModal
         student={linkedParentsTarget}
         onClose={() => setLinkedParentsTarget(null)}
@@ -680,10 +686,10 @@ export function StudentsPage() {
       />
       <ConfirmDialog
         isOpen={deleteTarget !== null}
-        title="Delete Student"
+        title="Delete student"
         message={
           deleteTarget
-            ? `Delete ${deleteTarget.firstName} ${deleteTarget.lastName} (${deleteTarget.admNo})? This cannot be undone.`
+            ? `Delete ${fullName(deleteTarget)} (${deleteTarget.admNo})? This cannot be undone.`
             : ""
         }
         confirmLabel="Delete"
@@ -695,11 +701,7 @@ export function StudentsPage() {
 
       <ViewDetailsModal
         isOpen={detailsTarget !== null}
-        title={
-          detailsTarget
-            ? `${detailsTarget.firstName} ${detailsTarget.lastName}`
-            : ""
-        }
+        title={detailsTarget ? fullName(detailsTarget) : ""}
         subtitle={detailsTarget?.admNo}
         onClose={() => setDetailsTarget(null)}
         sections={
@@ -713,13 +715,10 @@ export function StudentsPage() {
                       label: "Date of Birth",
                       value: detailsTarget.dateOfBirth,
                     },
-                    {
-                      label: "Nationality",
-                      value: detailsTarget.nationality,
-                    },
+                    { label: "Nationality", value: detailsTarget.nationality },
                     {
                       label: "Blood Group",
-                      value: detailsTarget.health.bloodGroup,
+                      value: detailsTarget.health?.bloodGroup,
                     },
                   ],
                 },
@@ -742,15 +741,19 @@ export function StudentsPage() {
                   rows: [
                     {
                       label: "Allergies",
-                      value: detailsTarget.health.allergies,
+                      value:
+                        detailsTarget.health?.allergies ??
+                        (detailsTarget.hasAllergies
+                          ? "Yes (details need sensitive-data access)"
+                          : "None recorded"),
                     },
                     {
                       label: "Dietary Requirements",
-                      value: detailsTarget.health.dietaryRequirements,
+                      value: detailsTarget.health?.dietaryRequirements,
                     },
                     {
                       label: "Medical Notes",
-                      value: detailsTarget.health.medicalNotes,
+                      value: detailsTarget.health?.medicalNotes,
                     },
                   ],
                 },

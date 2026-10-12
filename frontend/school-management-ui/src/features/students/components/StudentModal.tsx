@@ -133,6 +133,9 @@ export function StudentModal({
   const [errors, setErrors] = useState<string[] | null>(null);
 
   const identityHidden = editingStudent?.identity.isMasked ?? true;
+  // U1: allergy text needs Students.ViewSensitive, like the identity numbers. Without it the API
+  // keeps the stored text whatever is sent, so the field is shown read-only instead of empty.
+  const allergyHidden = !!editingStudent && editingStudent.identity.isMasked;
 
   useEffect(() => {
     if (editingStudent) {
@@ -858,13 +861,26 @@ export function StudentModal({
           </div>
           <div className="modal__grid">
             <div className="field" style={{ gridColumn: "span 2" }}>
-              <label>Allergies</label>
-              <textarea
-                rows={2}
-                value={health.allergies ?? ""}
-                onChange={(e) => healthField("allergies", e.target.value)}
-                placeholder="Critical: peanut, treenut, dairy, penicillin, etc. — staff sees this everywhere"
-              />
+              <label htmlFor="student-allergies">Allergies</label>
+              {allergyHidden ? (
+                <div
+                  id="student-allergies"
+                  className="info-banner"
+                  style={{ marginBottom: 0 }}
+                >
+                  {editingStudent?.hasAllergies
+                    ? "This student has allergies on record. Viewing or changing the details needs sensitive-data access."
+                    : "No allergies recorded. Adding them needs sensitive-data access."}
+                </div>
+              ) : (
+                <textarea
+                  id="student-allergies"
+                  rows={2}
+                  value={health.allergies ?? ""}
+                  onChange={(e) => healthField("allergies", e.target.value)}
+                  placeholder="e.g. peanuts, dairy, penicillin"
+                />
+              )}
             </div>
             <div className="field">
               <label>Insurance Provider</label>

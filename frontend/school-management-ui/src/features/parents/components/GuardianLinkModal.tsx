@@ -294,7 +294,7 @@ export function GuardianLinkModal({ student, onClose, onLinked }: Props) {
           {error && (
             <div
               className="modal__note"
-              style={{ background: "var(--red-bg)", color: "var(--red)" }}
+              style={{ background: "var(--red-bg)", color: "var(--bad)" }}
             >
               {error}
             </div>

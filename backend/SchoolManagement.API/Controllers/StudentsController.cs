@@ -77,7 +77,7 @@ public class StudentsController : ControllerBase
     {
         var scope = await StudentScopeAsync(cancellationToken);
         return scope.IsUnrestricted
-            ? Ok(await _studentService.GetAllAsync(cancellationToken))
+            ? Ok(await _studentService.GetAllAsync(await CanViewSensitiveAsync(cancellationToken), cancellationToken))
             : Ok(await _studentService.GetAllScopedAsync(scope, cancellationToken));
     }
 
@@ -174,4 +174,4 @@ public class StudentsController : ControllerBase
         await _studentService.DeleteAsync(id, cancellationToken);
         return NoContent();
     }
-}
+}

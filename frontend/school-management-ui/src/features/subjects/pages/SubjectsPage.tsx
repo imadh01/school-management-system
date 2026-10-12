@@ -1,3 +1,6 @@
+import { useToast } from "@/components/Toast";
+import { PageHero } from "@/components/PageHero";
+import { Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { ValidationModal } from "@/components/ValidationModal";
@@ -83,6 +86,7 @@ function downloadCsv(rows: SubjectResponse[]) {
 }
 
 export function SubjectsPage() {
+  const toast = useToast();
   const [subjects, setSubjects] = useState<SubjectResponse[]>([]);
   const [classSections, setClassSections] = useState<ClassSectionResponse[]>(
     [],
@@ -233,25 +237,24 @@ export function SubjectsPage() {
 
   return (
     <div>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 16,
-        }}
-      >
-        <h1 style={{ fontSize: 19, margin: 0 }}>Subjects</h1>
-        <button
-          className="btn btn--primary"
-          onClick={() => {
-            setEditing(null);
-            setIsModalOpen(true);
-          }}
-        >
-          + Add Subject
-        </button>
-      </div>
+      <PageHero
+        title="Subjects"
+        subtitle="Subjects taught in each class, their teachers and marks rules."
+        actions={
+          <>
+            <button
+              className="btn btn--primary"
+              onClick={() => {
+                setEditing(null);
+                setIsModalOpen(true);
+              }}
+            >
+              <Plus size={16} aria-hidden="true" />
+              Add subject
+            </button>
+          </>
+        }
+      />
 
       <div className="card">
         <div className="pipeline">
@@ -330,7 +333,9 @@ export function SubjectsPage() {
             </button>
             <button
               className="export-btn export-btn--pdf"
-              onClick={() => alert("PDF export coming soon.")}
+              onClick={() =>
+                toast.info("PDF export is coming in a later release.")
+              }
             >
               PDF
             </button>

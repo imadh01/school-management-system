@@ -1,3 +1,4 @@
+import { PageHero } from "@/components/PageHero";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { ValidationModal } from "@/components/ValidationModal";
@@ -368,16 +369,10 @@ export function AttendancePage() {
 
   return (
     <div>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 16,
-        }}
-      >
-        <h1 style={{ fontSize: 19, margin: 0 }}>Attendance</h1>
-      </div>
+      <PageHero
+        title="Attendance"
+        subtitle="Daily and subject-wise attendance, marked by class."
+      />
 
       <div className="att-tabs">
         <button
@@ -489,9 +484,9 @@ export function AttendancePage() {
           {notAssigned && (
             <div className="info-banner">
               🔒 You are not assigned to this{" "}
-              {tab === "subject" ? "subject" : "class as its class teacher"} this
-              academic year, so its attendance is not available to you. Choose
-              one of your own classes or subjects.
+              {tab === "subject" ? "subject" : "class as its class teacher"}{" "}
+              this academic year, so its attendance is not available to you.
+              Choose one of your own classes or subjects.
             </div>
           )}
           {roster && !roster.canEdit && roster.cannotEditReason && (
@@ -512,7 +507,7 @@ export function AttendancePage() {
             </strong>
             <div style={{ fontSize: 20, fontWeight: 700 }}>
               {students.length} ·{" "}
-              <span style={{ color: "var(--green)" }}>
+              <span style={{ color: "var(--ok)" }}>
                 {percentage === null ? "—" : `${percentage}% present`}
               </span>
             </div>
@@ -556,7 +551,7 @@ export function AttendancePage() {
           <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
             <button
               className="btn btn--info"
-              style={{ background: "var(--green)" }}
+              style={{ background: "var(--ok-solid)" }}
               disabled={!canEdit}
               onClick={() => markAll("Present")}
             >
@@ -564,7 +559,7 @@ export function AttendancePage() {
             </button>
             <button
               className="btn btn--info"
-              style={{ background: "var(--red)" }}
+              style={{ background: "var(--bad-solid)" }}
               disabled={!canEdit}
               onClick={() => markAll("Absent")}
             >
@@ -683,9 +678,9 @@ export function AttendancePage() {
                 fontSize: 12.5,
                 fontWeight: 600,
                 color: isDirty
-                  ? "var(--amber)"
+                  ? "var(--warn)"
                   : roster?.isSaved
-                    ? "var(--green)"
+                    ? "var(--ok)"
                     : "var(--muted)",
               }}
             >

@@ -2,7 +2,10 @@
 
 namespace SchoolManagement.Application.DTOs.Students;
 
-/// <summary>Full detail of one student (GET /api/students/{id}, create, update).</summary>
+/// <summary>
+/// Full detail of one student (GET /api/students/{id}, create, update).
+/// Health.Allergies is null unless the caller holds Students.ViewSensitive; <see cref="HasAllergies"/> is for everyone.
+/// </summary>
 public record StudentResponse(
     int Id, string AdmNo, string RollNumber, int ClassSectionId, string ClassSectionName,
     DateOnly AdmissionDate, string Status, string? PhotoUrl,
@@ -19,4 +22,5 @@ public record StudentResponse(
     StudentIdentityResponse Identity,
     List<PickupPersonResponse> PickupPersons,
     List<StudentGuardianResponse> Guardians,
-    string RowVersion);
+    string RowVersion,
+    bool HasAllergies);

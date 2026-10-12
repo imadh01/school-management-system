@@ -1,32 +1,173 @@
+/*
+ * U1 design tokens. Every colour in the app comes from here.
+ *
+ * Two layers:
+ *   1. Semantic tokens (--bg, --surface, --text, --ok, --ok-bg ...). They have a light value
+ *      (:root) and a dark value ([data-theme="dark"]), so a component written with them is
+ *      correct in both themes without any dark-mode override.
+ *   2. "Solid" fills (--ok-solid, --accent-solid ...) for buttons, chips and dots that carry
+ *      white text. They stay the same in both themes and keep white text at >= 4.5:1.
+ *
+ * Rules: never hard-code a colour in a component; text uses --text / --text-muted / a status
+ * token; a filled background with white text uses a *-solid token.
+ *
+ * The old names (--ink, --muted, --blue, --green ...) at the bottom are kept as aliases so
+ * screens not yet converted keep working; new code should not use them.
+ */
+
 :root {
+  color-scheme: light;
+
+  /* Surfaces */
+  --bg: #f3f5f9;
+  --surface: #ffffff;
+  --surface-2: #f7f9fc;
+  --surface-3: #eef1f6;
+  --border: #e1e6ee;
+  --input-border: #cfd6e2;
+
+  /* Text */
+  --text: #14203a;
+  --text-muted: #5a6579;
+  --text-on-solid: #ffffff;
+
+  /* Brand */
+  --primary: #1b2f5b;
+  --primary-soft: #e6ecf6;
+  --accent: #e8622c; /* decoration only (lines, icons): 3.4:1 on white */
+  --accent-solid: #c4491a; /* buttons with white text: 4.9:1 */
+  --accent-text: #b8441a; /* orange text on light surfaces: 5.4:1 */
+  --accent-soft: #fdeee6;
+
+  /* Navigation */
+  --nav-bg: #ffffff;
+  --nav-text: #2a3650;
+  --nav-icon-bg: #f1f4f9;
+  --nav-active-bg: #fff1e9;
+  --nav-active-text: #b8441a;
+
+  /* Tables */
+  --thead-bg: #1b2f5b;
+  --thead-text: #ffffff;
+  --row-hover: #f6f8fc;
+
+  /* Status: text on its own soft background (all >= 4.5:1) */
+  --ok: #137a46;
+  --ok-bg: #e3f5ea;
+  --warn: #8a5a00;
+  --warn-bg: #fdf2d8;
+  --bad: #b42323;
+  --bad-bg: #fbe6e6;
+  --info: #24508f;
+  --info-bg: #e6eefa;
+  --neutral: #4b5568;
+  --neutral-bg: #eceff4;
+  --purple: #5b3fb5;
+  --purple-bg: #efeafc;
+
+  /* Solid fills (same in both themes; white text >= 4.5:1) */
+  --ok-solid: #137a46;
+  --warn-solid: #8a5a00;
+  --bad-solid: #b42323;
+  --info-solid: #24508f;
+  --neutral-solid: #4b5568;
+  --purple-solid: #5b3fb5;
+
+  /* Effects */
+  --focus-ring: 0 0 0 3px rgba(232, 98, 44, 0.3);
+  --shadow-sm: 0 1px 2px rgba(16, 32, 64, 0.06);
+  --shadow-card:
+    0 1px 2px rgba(16, 32, 64, 0.06), 0 8px 24px rgba(16, 32, 64, 0.06);
+  --shadow-pop: 0 20px 60px rgba(11, 26, 51, 0.3);
+  --overlay: rgba(11, 26, 51, 0.5);
+  --hero-gradient: linear-gradient(
+    115deg,
+    #13254b 0%,
+    #1e3a6e 55%,
+    #8a4a3a 100%
+  );
+
+  /* Shape and type */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --font-family:
+    "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --control-height: 44px;
+
+  /* ---- Old names (aliases; do not use in new code) ---- */
+  --ink: var(--text);
+  --muted: var(--text-muted);
+  --page-bg: var(--bg);
   --navy-900: #101d3a;
   --navy-800: #182c53;
   --navy-700: #243c6d;
   --sidebar-text: #9fb0cc;
-  --ink: #1b2536;
-  --muted: #6b7688;
-  --border: #e3e7ee;
-  --surface: #ffffff;
-  --page-bg: #f4f6fa;
-  --blue: #2f5a99;
-  --blue-bg: #eaf1fa;
-  --orange: #e35f2e;
-  --orange-bg: #fdece3;
-  --red: #d94a4a;
-  --red-bg: #fbe9e9;
-  --green: #1a9c5a;
-  --green-bg: #e6f7ee;
-  --amber: #d9a520;
-  --amber-bg: #fbf3de;
-  --purple: #7c5cd6;
-  --purple-bg: #f0ecfc;
-  --gray-bg: #eef0f4;
+  --orange: var(--accent-solid);
+  --orange-bg: var(--accent-soft);
+  --blue: var(--info-solid);
+  --blue-bg: var(--info-bg);
+  --green: var(--ok-solid);
+  --green-bg: var(--ok-bg);
+  --red: var(--bad-solid);
+  --red-bg: var(--bad-bg);
+  --amber: var(--warn-solid);
+  --amber-bg: var(--warn-bg);
+  --gray-bg: var(--neutral-bg);
+}
 
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --shadow-card:
-    0 1px 2px rgba(16, 35, 74, 0.06), 0 8px 24px rgba(16, 35, 74, 0.05);
+:root[data-theme="dark"] {
+  color-scheme: dark;
 
-  --font-family:
-    -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif;
+  --bg: #0c1322;
+  --surface: #141d31;
+  --surface-2: #19243c;
+  --surface-3: #202d49;
+  --border: #273450;
+  --input-border: #3a4b72;
+
+  --text: #e9eef7;
+  --text-muted: #a3b0c6;
+
+  --primary: #3d63a8;
+  --primary-soft: rgba(110, 150, 255, 0.14);
+  --accent: #f0804f;
+  --accent-text: #ffab84; /* 9.1:1 on --surface */
+  --accent-soft: rgba(240, 128, 79, 0.14);
+
+  --nav-bg: #111a2c;
+  --nav-text: #c9d3e4;
+  --nav-icon-bg: #1a2540;
+  --nav-active-bg: rgba(240, 128, 79, 0.14);
+  --nav-active-text: #ffab84;
+
+  --thead-bg: #1e2c4a;
+  --thead-text: #e9eef7;
+  --row-hover: #1a2540;
+
+  --ok: #5fd896;
+  --ok-bg: rgba(52, 199, 120, 0.15);
+  --warn: #f3c96b;
+  --warn-bg: rgba(243, 201, 107, 0.14);
+  --bad: #ff8a8a;
+  --bad-bg: rgba(255, 99, 99, 0.14);
+  --info: #8fb4ff;
+  --info-bg: rgba(110, 150, 255, 0.15);
+  --neutral: #b7c2d6;
+  --neutral-bg: rgba(183, 194, 214, 0.12);
+  --purple: #b9a3ff;
+  --purple-bg: rgba(160, 130, 255, 0.15);
+
+  --focus-ring: 0 0 0 3px rgba(240, 128, 79, 0.4);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.25);
+  --shadow-pop: 0 20px 60px rgba(0, 0, 0, 0.55);
+  --overlay: rgba(3, 7, 16, 0.7);
+  --hero-gradient: linear-gradient(
+    115deg,
+    #0f1d3b 0%,
+    #1c335f 55%,
+    #6e3b30 100%
+  );
 }

@@ -1,3 +1,6 @@
+import { useToast } from "@/components/Toast";
+import { PageHero } from "@/components/PageHero";
+import { Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { ValidationModal } from "@/components/ValidationModal";
@@ -72,6 +75,7 @@ function downloadCsv(rows: ClassSectionResponse[]) {
 }
 
 export function ClassSectionsPage() {
+  const toast = useToast();
   const [rows, setRows] = useState<ClassSectionResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -237,25 +241,24 @@ export function ClassSectionsPage() {
 
   return (
     <div>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 16,
-        }}
-      >
-        <h1 style={{ fontSize: 19, margin: 0 }}>Classes &amp; Sections</h1>
-        <button
-          className="btn btn--primary"
-          onClick={() => {
-            setEditing(null);
-            setIsModalOpen(true);
-          }}
-        >
-          + Add Class
-        </button>
-      </div>
+      <PageHero
+        title="Classes & Sections"
+        subtitle="Classes and sections of each academic year, their capacity and class teachers."
+        actions={
+          <>
+            <button
+              className="btn btn--primary"
+              onClick={() => {
+                setEditing(null);
+                setIsModalOpen(true);
+              }}
+            >
+              <Plus size={16} aria-hidden="true" />
+              Add class
+            </button>
+          </>
+        }
+      />
 
       <div className="card">
         <div className="pipeline">
@@ -346,7 +349,9 @@ export function ClassSectionsPage() {
             </button>
             <button
               className="export-btn export-btn--pdf"
-              onClick={() => alert("PDF export coming soon.")}
+              onClick={() =>
+                toast.info("PDF export is coming in a later release.")
+              }
             >
               PDF
             </button>

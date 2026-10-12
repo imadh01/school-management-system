@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { parentService } from "../services/parentService";
 import { studentService } from "@/features/students/services/studentService";
 import type {
@@ -25,6 +26,10 @@ export function LinkedChildrenModal({
   parent,
   onChanged,
 }: Props) {
+  const [unlinking, setUnlinking] = useState<{
+    id: number;
+    name: string;
+  } | null>(null);
   const [linked, setLinked] = useState<LinkedStudentResponse[]>([]);
   const [allStudents, setAllStudents] = useState<StudentSummaryResponse[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -86,11 +91,20 @@ export function LinkedChildrenModal({
     }
   };
 
-  const handleUnlink = async (studentId: number, studentName: string) => {
-    if (!confirm(`Unlink ${studentName} from ${parent.name}?`)) return;
-    await parentService.unlinkStudent(parent.id, studentId);
-    await load();
-    onChanged?.();
+  const handleUnlink = (studentId: number, studentName: string) =>
+    setUnlinking({ id: studentId, name: studentName });
+
+  const confirmUnlink = async () => {
+    const target = unlinking;
+    setUnlinking(null);
+    if (!target) return;
+    try {
+      await parentService.unlinkStudent(parent.id, target.id);
+      await load();
+      onChanged?.();
+    } catch {
+      setError("Could not unlink this student.");
+    }
   };
 
   const handleMakePrimary = async (studentId: number) => {
@@ -136,7 +150,7 @@ export function LinkedChildrenModal({
                       className="avatar-circle"
                       style={{
                         background: "var(--blue-bg)",
-                        color: "var(--blue)",
+                        color: "var(--info)",
                       }}
                     >
                       S
@@ -231,7 +245,7 @@ export function LinkedChildrenModal({
                   className="modal__note"
                   style={{
                     background: "var(--red-bg)",
-                    color: "var(--red)",
+                    color: "var(--bad)",
                     marginTop: 14,
                   }}
                 >
@@ -247,6 +261,15 @@ export function LinkedChildrenModal({
           </button>
         </div>
       </div>
+      <ConfirmDialog
+        isOpen={unlinking !== null}
+        title="Unlink student?"
+        message={`Unlink ${unlinking?.name ?? ""} from ${parent.name}?`}
+        confirmLabel="Unlink"
+        danger
+        onConfirm={confirmUnlink}
+        onCancel={() => setUnlinking(null)}
+      />
     </div>
   );
 }

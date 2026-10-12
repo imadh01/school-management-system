@@ -1,3 +1,7 @@
+import { PageHero } from "@/components/PageHero";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { useToast } from "@/components/Toast";
+import { Plus } from "lucide-react";
 import { isConcurrencyConflict } from "@/utils/apiError";
 import { useEffect, useMemo, useState } from "react";
 import { parentService } from "../services/parentService";
@@ -58,6 +62,13 @@ export function ParentsPage() {
   const canEdit = hasAnyPermission([Permission.ParentsEdit]);
   const canDelete = hasAnyPermission([Permission.ParentsDelete]);
 
+  const toast = useToast();
+  const [viewingParent, setViewingParent] = useState<ParentResponse | null>(
+    null,
+  );
+  const [deletingParent, setDeletingParent] = useState<ParentResponse | null>(
+    null,
+  );
   const [parents, setParents] = useState<ParentResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -128,19 +139,23 @@ export function ParentsPage() {
     setStatusFilter("");
   };
 
-  const handleView = (p: ParentResponse) => {
-    alert(
-      `${p.name}\n` +
-        `Status: ${p.status}\n` +
-        `Mobile: ${p.mobile}${p.email ? " · " + p.email : ""}\n` +
-        `Preferred contact: ${p.preferredContactMethod ?? "—"} (${p.preferredLanguage ?? "—"})`,
-    );
-  };
+  const handleView = (p: ParentResponse) => setViewingParent(p);
 
-  const handleDelete = async (p: ParentResponse) => {
-    if (!confirm(`Delete ${p.name}? This cannot be undone.`)) return;
-    await parentService.delete(p.id);
-    await loadData();
+  const handleDelete = (p: ParentResponse) => setDeletingParent(p);
+
+  const confirmDelete = async () => {
+    const p = deletingParent;
+    setDeletingParent(null);
+    if (!p) return;
+    try {
+      await parentService.delete(p.id);
+      toast.success(`${p.name} was deleted.`);
+      await loadData();
+    } catch {
+      toast.error(
+        `Could not delete ${p.name}. They may still be linked to students.`,
+      );
+    }
   };
 
   const pipelineSteps: {
@@ -167,27 +182,26 @@ export function ParentsPage() {
 
   return (
     <div>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 16,
-        }}
-      >
-        <h1 style={{ fontSize: 19, margin: 0 }}>Parents Management</h1>
-        {canCreate && (
-          <button
-            className="btn btn--primary"
-            onClick={() => {
-              setEditingParent(null);
-              setIsModalOpen(true);
-            }}
-          >
-            + Add Parent
-          </button>
-        )}
-      </div>
+      <PageHero
+        title="Parents"
+        subtitle="Parents and guardians, and the students they are linked to."
+        actions={
+          <>
+            {canCreate && (
+              <button
+                className="btn btn--primary"
+                onClick={() => {
+                  setEditingParent(null);
+                  setIsModalOpen(true);
+                }}
+              >
+                <Plus size={16} aria-hidden="true" />
+                Add parent
+              </button>
+            )}
+          </>
+        }
+      />
 
       <div className="card">
         <div className="pipeline">
@@ -243,7 +257,9 @@ export function ParentsPage() {
             </button>
             <button
               className="export-btn export-btn--pdf"
-              onClick={() => alert("PDF export coming soon.")}
+              onClick={() =>
+                toast.info("PDF export is coming in a later release.")
+              }
             >
               PDF
             </button>
@@ -342,7 +358,7 @@ export function ParentsPage() {
                       <button
                         className="btn--icon"
                         title="Linked Children"
-                        style={{ color: "var(--blue)" }}
+                        style={{ color: "var(--info)" }}
                         onClick={() => setLinkedChildrenParent(p)}
                       >
                         👪
@@ -350,7 +366,7 @@ export function ParentsPage() {
                       <button
                         className="btn--icon"
                         title="Fee Records"
-                        style={{ color: "var(--green)" }}
+                        style={{ color: "var(--ok)" }}
                         onClick={() => setFeeRecordsParent(p)}
                       >
                         💳
@@ -478,6 +494,62 @@ export function ParentsPage() {
           </div>
         </div>
       )}
+
+      {viewingParent && (
+        <div className="modal-backdrop open">
+          <div
+            className="modal"
+            style={{ maxWidth: 480 }}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="parent-view-title"
+          >
+            <div className="modal__header">
+              <h2 id="parent-view-title">{viewingParent.name}</h2>
+              <button
+                className="modal__close"
+                aria-label="Close"
+                onClick={() => setViewingParent(null)}
+              >
+                ✕
+              </button>
+            </div>
+            <div className="modal__body">
+              <dl className="detail-list">
+                <dt>Status</dt>
+                <dd>{viewingParent.status}</dd>
+                <dt>Mobile</dt>
+                <dd>{viewingParent.mobile}</dd>
+                <dt>Email</dt>
+                <dd>{viewingParent.email || "—"}</dd>
+                <dt>Preferred contact</dt>
+                <dd>
+                  {viewingParent.preferredContactMethod ?? "—"} (
+                  {viewingParent.preferredLanguage ?? "—"})
+                </dd>
+              </dl>
+            </div>
+            <div className="modal__footer">
+              <button
+                className="btn btn--secondary"
+                onClick={() => setViewingParent(null)}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <ConfirmDialog
+        isOpen={deletingParent !== null}
+        title="Delete parent?"
+        message={`Delete ${deletingParent?.name ?? ""}? This cannot be undone.`}
+        confirmLabel="Delete"
+        danger
+        onConfirm={confirmDelete}
+        onCancel={() => setDeletingParent(null)}
+      />
     </div>
   );
 }
