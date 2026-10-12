@@ -64,11 +64,17 @@ public class AttendanceRepository : IAttendanceRepository
             .ToListAsync(cancellationToken);
     }
 
-    public Task<AttendanceStudentInfo?> GetStudentAsync(int studentId, CancellationToken cancellationToken) =>
+    public Task<AttendanceStudentInfo?> GetStudentAsync(int studentId, DataScope scope, CancellationToken cancellationToken) =>
         _context.Students.AsNoTracking()
+            .VisibleTo(_context, scope)
             .Where(s => s.Id == studentId)
             .Select(s => new AttendanceStudentInfo(
                 s.Id, s.RollNumber, s.FirstName, s.MiddleName, s.LastName, s.AdmNo, s.ClassSectionId, s.Status))
+            .FirstOrDefaultAsync(cancellationToken);
+
+    public async Task<bool> CanSeeSessionsAsync(
+        int classSectionId, int? subjectId, DataScope scope, CancellationToken cancellationToken) =>
+        await DataScopeQueries.CanSeeSessions(_context, scope, classSectionId, subjectId)
             .FirstOrDefaultAsync(cancellationToken);
 
     public Task<List<AttendanceSessionRef>> GetRecentSessionsAsync(
@@ -91,8 +97,9 @@ public class AttendanceRepository : IAttendanceRepository
     }
 
     public Task<List<StudentAttendanceRow>> GetStudentRecordsAsync(
-        int studentId, DateOnly from, DateOnly to, CancellationToken cancellationToken) =>
+        int studentId, DateOnly from, DateOnly to, DataScope scope, CancellationToken cancellationToken) =>
         _context.AttendanceRecords.AsNoTracking()
+            .VisibleTo(_context, scope)
             .Where(r => r.StudentId == studentId && r.Session.Date >= from && r.Session.Date <= to)
             .OrderByDescending(r => r.Session.Date)
             .ThenBy(r => r.Session.SubjectId)

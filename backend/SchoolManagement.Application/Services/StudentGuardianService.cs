@@ -1,4 +1,5 @@
 ﻿using SchoolManagement.Application.DTOs.Parents;
+using SchoolManagement.Application.DTOs.Students;
 using SchoolManagement.Application.Interfaces;
 using SchoolManagement.Domain.Entities;
 using SchoolManagement.Domain.Exceptions;
@@ -23,8 +24,21 @@ public class StudentGuardianService : IStudentGuardianService
 
     public async Task<List<StudentGuardianResponse>> GetForStudentAsync(int studentId, CancellationToken cancellationToken)
     {
+        // F1: an unknown student is a 404 now (it used to be an empty list), like every other student read.
+        await GetStudentAccessOrThrowAsync(studentId, DataScope.Unrestricted, cancellationToken);
         var links = await _guardianRepository.GetForStudentAsync(studentId, cancellationToken);
         return links.Select(ToResponse).ToList();
+    }
+
+    public async Task<List<GuardianContactResponse>> GetContactsForStudentAsync(
+        int studentId, DataScope scope, CancellationToken cancellationToken)
+    {
+        var access = await GetStudentAccessOrThrowAsync(studentId, scope, cancellationToken);
+        var links = await _guardianRepository.GetForStudentAsync(studentId, cancellationToken);
+        return StudentGuardianRules.VisibleLinks(links, access, scope)
+            .OrderByDescending(l => l.IsPrimaryContact).ThenBy(l => l.Parent.Name)
+            .Select(StudentGuardianRules.ToContact)
+            .ToList();
     }
 
     public async Task<StudentGuardianResponse> LinkAsync(int studentId, LinkGuardianRequest request, CancellationToken cancellationToken)
@@ -56,9 +70,13 @@ public class StudentGuardianService : IStudentGuardianService
         await _guardianRepository.RemoveLinkAsync(link, cancellationToken);
     }
 
-    public async Task<List<LinkedStudentResponse>> GetForParentAsync(int parentId, CancellationToken cancellationToken)
+    public async Task<List<LinkedStudentResponse>> GetForParentAsync(int parentId, DataScope scope, CancellationToken cancellationToken)
     {
-        var links = await _guardianRepository.GetForParentAsync(parentId, cancellationToken);
+        // F1: an unknown OR out-of-scope parent is the same 404 (it used to be an empty list).
+        _ = await _parentRepository.GetVisibleByIdAsync(parentId, scope, cancellationToken)
+            ?? throw new NotFoundException($"Parent {parentId} does not exist.");
+
+        var links = await _guardianRepository.GetForParentAsync(parentId, scope, cancellationToken);
         return links.Select(ToLinkedStudentResponse).ToList();
     }
 
@@ -85,6 +103,14 @@ public class StudentGuardianService : IStudentGuardianService
 
     public Task SetPrimaryAsync(int parentId, int studentId, CancellationToken cancellationToken) =>
         _guardianRepository.SetPrimaryAsync(studentId, parentId, cancellationToken);
+
+    private async Task<StudentAccess> GetStudentAccessOrThrowAsync(int studentId, DataScope scope, CancellationToken cancellationToken)
+    {
+        var access = await _studentRepository.GetAccessAsync(studentId, scope, cancellationToken);
+        return access == StudentAccess.None
+            ? throw new NotFoundException($"Student {studentId} does not exist.")
+            : access;
+    }
 
     private static StudentGuardianResponse ToResponse(StudentGuardian sg) => new(
         sg.ParentId, sg.Parent.Name, sg.Parent.Mobile, sg.Parent.Email,

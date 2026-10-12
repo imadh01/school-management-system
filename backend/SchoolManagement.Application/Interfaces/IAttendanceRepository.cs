@@ -33,7 +33,14 @@ public interface IAttendanceRepository
     Task<List<AttendanceStudentInfo>> GetRosterStudentsAsync(
         int classSectionId, IReadOnlyCollection<int> extraStudentIds, CancellationToken cancellationToken);
 
-    Task<AttendanceStudentInfo?> GetStudentAsync(int studentId, CancellationToken cancellationToken);
+    /// <summary>The student if it exists AND is visible under <paramref name="scope"/>; otherwise null (F1).</summary>
+    Task<AttendanceStudentInfo?> GetStudentAsync(int studentId, DataScope scope, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// May the caller open this class's roster/summary (F1)? Unrestricted: yes. Scoped: class teacher of
+    /// the class this year (every session), or teacher of <paramref name="subjectId"/> (that subject only).
+    /// </summary>
+    Task<bool> CanSeeSessionsAsync(int classSectionId, int? subjectId, DataScope scope, CancellationToken cancellationToken);
 
     /// <summary>The most recent sessions of the same kind before a date, newest first.</summary>
     Task<List<AttendanceSessionRef>> GetRecentSessionsAsync(
@@ -42,8 +49,9 @@ public interface IAttendanceRepository
     Task<List<AttendanceStatusRow>> GetStatusRowsAsync(
         IReadOnlyCollection<int> sessionIds, CancellationToken cancellationToken);
 
+    /// <summary>The student's records in the range, only from sessions visible under <paramref name="scope"/> (F1).</summary>
     Task<List<StudentAttendanceRow>> GetStudentRecordsAsync(
-        int studentId, DateOnly from, DateOnly to, CancellationToken cancellationToken);
+        int studentId, DateOnly from, DateOnly to, DataScope scope, CancellationToken cancellationToken);
 
     Task<List<AttendanceCountRow>> GetDailyCountsAsync(
         int classSectionId, DateOnly from, DateOnly to, CancellationToken cancellationToken);

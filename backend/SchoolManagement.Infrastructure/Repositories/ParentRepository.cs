@@ -14,8 +14,18 @@ public class ParentRepository : IParentRepository
         _context = context;
     }
 
-    public Task<List<Parent>> GetAllAsync(CancellationToken cancellationToken) =>
-        _context.Parents.OrderByDescending(p => p.Id).ToListAsync(cancellationToken);
+    public Task<List<Parent>> GetAllAsync(DataScope scope, CancellationToken cancellationToken) =>
+        _context.Parents
+            .AsNoTracking()
+            .VisibleTo(_context, scope)
+            .OrderByDescending(p => p.Id)
+            .ToListAsync(cancellationToken);
+
+    public Task<Parent?> GetVisibleByIdAsync(int id, DataScope scope, CancellationToken cancellationToken) =>
+        _context.Parents
+            .AsNoTracking()
+            .VisibleTo(_context, scope)
+            .FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
 
     public Task<Parent?> GetByIdAsync(int id, CancellationToken cancellationToken) =>
         _context.Parents.FirstOrDefaultAsync(p => p.Id == id, cancellationToken);

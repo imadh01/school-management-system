@@ -4,6 +4,7 @@ namespace SchoolManagement.Domain.Entities;
 
 /// <summary>
 /// One row per create / edit / delete of a record: who did it, when, and which fields changed.
+/// Also one row each time someone opens sensitive data (Action = Read).
 /// Written automatically on save (see AuditableEntitySaveChangesInterceptor); never edited or deleted by the app.
 /// </summary>
 [AuditIgnore] // the audit log does not audit itself
@@ -23,7 +24,10 @@ public class AuditLog
     /// <summary>The username at that moment (a snapshot, so the log stays readable if the user is renamed).</summary>
     public string? UserName { get; set; }
 
-    /// <summary>Insert | Update | Delete (a soft delete is logged as Delete).</summary>
+    /// <summary>
+    /// Insert | Update | Delete (a soft delete is logged as Delete) | Read (someone opened sensitive data,
+    /// such as a student's health or identity details; written by ISensitiveReadLog, not by the interceptor).
+    /// </summary>
     public string Action { get; set; } = string.Empty;
 
     /// <summary>Database table of the record, e.g. "Students".</summary>
@@ -47,6 +51,8 @@ public static class AuditActions
     public const string Insert = "Insert";
     public const string Update = "Update";
     public const string Delete = "Delete";
+    /// <summary>Sensitive data was opened (F1). Changes holds what was shown, never the values.</summary>
+    public const string Read = "Read";
 
-    public static readonly string[] All = { Insert, Update, Delete };
+    public static readonly string[] All = { Insert, Update, Delete, Read };
 }

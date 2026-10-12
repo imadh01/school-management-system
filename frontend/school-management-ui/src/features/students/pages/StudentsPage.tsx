@@ -16,7 +16,13 @@ import { LinkedParentsViewModal } from "../components/LinkedParentsViewModal";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { ViewDetailsModal } from "@/components/ViewDetailsModal";
 import { ValidationModal } from "@/components/ValidationModal";
-import { getApiErrors, isConcurrencyConflict } from "@/utils/apiError";
+import {
+  getApiErrors,
+  getReadErrors,
+  isConcurrencyConflict,
+} from "@/utils/apiError";
+import { useAuth } from "@/store/AuthContext";
+import { Permission } from "@/routes/permissions";
 
 const PIPELINE_STEPS: {
   key: StudentStatus | "All";
@@ -78,6 +84,12 @@ function toCsv(rows: StudentSummaryResponse[]): string {
 }
 
 export function StudentsPage() {
+  // F1: hide what this role cannot do (the API refuses it anyway). A teacher
+  // holding only Students.ViewScoped sees their own students, read-only.
+  const { hasAnyPermission } = useAuth();
+  const canEdit = hasAnyPermission([Permission.StudentsEdit]);
+  const canDelete = hasAnyPermission([Permission.StudentsDelete]);
+
   const [students, setStudents] = useState<StudentSummaryResponse[]>([]);
   const [classSections, setClassSections] = useState<ClassSectionResponse[]>(
     [],
@@ -240,7 +252,7 @@ export function StudentsPage() {
       setEditingStudent(await studentService.getById(s.id));
       setIsModalOpen(true);
     } catch (err) {
-      setErrors(getApiErrors(err, "Could not load this student."));
+      setErrors(getReadErrors(err, "Could not load this student."));
     }
   };
 
@@ -248,7 +260,7 @@ export function StudentsPage() {
     try {
       setDetailsTarget(await studentService.getById(s.id));
     } catch (err) {
-      setErrors(getApiErrors(err, "Could not load this student."));
+      setErrors(getReadErrors(err, "Could not load this student."));
     }
   };
 
@@ -545,20 +557,24 @@ export function StudentsPage() {
                         📚
                       </button>
 
-                      <button
-                        className="btn--icon"
-                        title="Edit"
-                        onClick={() => openEdit(s)}
-                      >
-                        ✎
-                      </button>
-                      <button
-                        className="btn--icon danger"
-                        title="Delete"
-                        onClick={() => handleDelete(s)}
-                      >
-                        🗑
-                      </button>
+                      {canEdit && (
+                        <button
+                          className="btn--icon"
+                          title="Edit"
+                          onClick={() => openEdit(s)}
+                        >
+                          ✎
+                        </button>
+                      )}
+                      {canDelete && (
+                        <button
+                          className="btn--icon danger"
+                          title="Delete"
+                          onClick={() => handleDelete(s)}
+                        >
+                          🗑
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}

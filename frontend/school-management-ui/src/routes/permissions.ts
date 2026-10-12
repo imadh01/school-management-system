@@ -1,0 +1,46 @@
+/*
+ * F1: which permission opens which page. Used by the sidebar (hide what you
+ * cannot open) and by RequirePermission (guard the URL itself).
+ *
+ * This is cosmetic: the API enforces every permission on its own. A page lists
+ * "any one of" its permissions, so a teacher holding only Students.ViewScoped
+ * still sees Students (filtered to their classes by the API).
+ *
+ * Names must match backend Domain/Constants/Permissions.cs.
+ */
+
+export const Permission = {
+  UsersView: "Users.View",
+  SettingsView: "Settings.View",
+  ClassSectionsView: "ClassSections.View",
+  SubjectsView: "Subjects.View",
+  TeachersView: "Teachers.View",
+  AdmissionsView: "Admissions.View",
+
+  StudentsView: "Students.View",
+  StudentsViewScoped: "Students.ViewScoped",
+  StudentsEdit: "Students.Edit",
+  StudentsDelete: "Students.Delete",
+
+  ParentsView: "Parents.View",
+  ParentsViewScoped: "Parents.ViewScoped",
+  ParentsCreate: "Parents.Create",
+  ParentsEdit: "Parents.Edit",
+  ParentsDelete: "Parents.Delete",
+
+  AttendanceView: "Attendance.View",
+  AttendanceViewScoped: "Attendance.ViewScoped",
+} as const;
+
+/** Path → any one of these permissions opens it. Paths not listed are open to every signed-in user. */
+export const PAGE_PERMISSIONS: Readonly<Record<string, readonly string[]>> = {
+  "/admissions": [Permission.AdmissionsView],
+  "/students": [Permission.StudentsView, Permission.StudentsViewScoped],
+  "/parents": [Permission.ParentsView, Permission.ParentsViewScoped],
+  "/classes-sections": [Permission.ClassSectionsView],
+  "/subjects": [Permission.SubjectsView],
+  "/teachers": [Permission.TeachersView],
+  "/attendance": [Permission.AttendanceView, Permission.AttendanceViewScoped],
+  "/users-staff": [Permission.UsersView],
+  "/settings": [Permission.SettingsView],
+};

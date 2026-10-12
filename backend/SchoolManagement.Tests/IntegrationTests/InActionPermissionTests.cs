@@ -7,6 +7,8 @@
 //   1. Attendance.Manage holders (Admin, Supervisor, Clerk) may mark ANY class.
 //   2. Only Admin may change attendance older than the edit window.
 //   3. Only Students.ViewSensitive holders see full Aadhaar numbers.
+//      (Teachers are not in that test since F1: an unrelated student is a 404 for them, and the
+//      scoped shape has no identity block at all. See DataScopeTests.)
 
 using System.Net;
 using System.Text.Json;
@@ -98,7 +100,6 @@ public class InActionPermissionTests
     [InlineData(RoleNames.Admin, false)]
     [InlineData(RoleNames.Supervisor, false)]
     [InlineData(RoleNames.Clerk, true)]
-    [InlineData(RoleNames.Teacher, true)]
     public async Task Aadhaar_is_shown_in_full_only_to_Students_ViewSensitive_holders(string role, bool expectMasked)
     {
         var aadhaar = Random.Shared.NextInt64(100_000_000_000, 999_999_999_999).ToString();

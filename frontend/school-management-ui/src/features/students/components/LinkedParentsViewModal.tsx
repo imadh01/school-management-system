@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { parentService } from "@/features/parents/services/parentService";
 import type { StudentGuardianResponse } from "@/features/parents/types/parent.types";
 import type { StudentSummaryResponse } from "../types/student.types";
+import { getReadErrors } from "@/utils/apiError";
 
 interface Props {
   student: StudentSummaryResponse | null;
@@ -11,14 +12,20 @@ interface Props {
 export function LinkedParentsViewModal({ student, onClose }: Props) {
   const [guardians, setGuardians] = useState<StudentGuardianResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!student) return;
     setIsLoading(true);
-    parentService.getGuardiansForStudent(student.id).then((data) => {
-      setGuardians(data);
-      setIsLoading(false);
-    });
+    setLoadError(null);
+    parentService
+      .getGuardiansForStudent(student.id)
+      .then((data) => setGuardians(data))
+      .catch((err) => {
+        setGuardians([]);
+        setLoadError(getReadErrors(err, "Could not load the parents.")[0]);
+      })
+      .finally(() => setIsLoading(false));
   }, [student]);
 
   if (!student) return null;
@@ -64,6 +71,8 @@ export function LinkedParentsViewModal({ student, onClose }: Props) {
 
           {isLoading ? (
             <div className="empty-state">Loading…</div>
+          ) : loadError ? (
+            <div className="empty-state">{loadError}</div>
           ) : guardians.length === 0 ? (
             <div className="empty-state">
               No parents linked to this student yet.

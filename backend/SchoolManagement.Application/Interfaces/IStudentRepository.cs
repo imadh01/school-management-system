@@ -21,7 +21,13 @@ public record StudentEnrollmentRow(
 public interface IStudentRepository
 {
     Task<List<Student>> GetAllAsync(CancellationToken cancellationToken);
-    Task<List<StudentSummaryRow>> GetSummariesAsync(CancellationToken cancellationToken);
+    /// <summary>List rows, filtered to <paramref name="scope"/> inside the query (F1).</summary>
+    Task<List<StudentSummaryRow>> GetSummariesAsync(DataScope scope, CancellationToken cancellationToken);
+    /// <summary>
+    /// How the caller reaches this student under <paramref name="scope"/> (F1).
+    /// <see cref="StudentAccess.None"/> = missing OR out of scope; callers answer both with the same 404.
+    /// </summary>
+    Task<StudentAccess> GetAccessAsync(int studentId, DataScope scope, CancellationToken cancellationToken);
     Task<Student?> GetByIdAsync(int id, CancellationToken cancellationToken);
     /// <summary>Student with class, admission, health, identity and pickup persons loaded (tracked, for editing).</summary>
     Task<Student?> GetDetailByIdAsync(int id, CancellationToken cancellationToken);

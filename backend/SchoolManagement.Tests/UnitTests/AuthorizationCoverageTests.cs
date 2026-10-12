@@ -25,13 +25,9 @@ namespace SchoolManagement.Tests.UnitTests;
 
 public class AuthorizationCoverageTests
 {
-    // Manually registered composite policies that are NOT single-
-    // permission names.  Add to this list whenever you register a
-    // composite policy in Program.cs.
-    private static readonly HashSet<string> CompositePolices = new()
-    {
-        "Attendance.Write"
-    };
+    // "Any one of" policies that are NOT single permission names. Program.cs registers exactly
+    // this list (CompositePolicies.AnyOf), so the test and the app cannot disagree.
+    private static readonly IReadOnlySet<string> CompositePolices = CompositePolicies.AnyOf.Keys.ToHashSet();
 
     /// <summary>
     /// Returns all controller types in the API assembly.

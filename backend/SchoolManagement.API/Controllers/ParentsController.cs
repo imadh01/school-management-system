@@ -19,30 +19,53 @@ public class ParentsController : ControllerBase
     private readonly IValidator<CreateParentRequest> _createValidator;
     private readonly IValidator<UpdateParentRequest> _updateValidator;
     private readonly IValidator<LinkStudentRequest> _linkStudentValidator;
+    private readonly IDataScopeResolver _scopes;
 
     public ParentsController(
         IParentService parentService,
         IStudentGuardianService guardianService,
         IValidator<CreateParentRequest> createValidator,
         IValidator<UpdateParentRequest> updateValidator,
-        IValidator<LinkStudentRequest> linkStudentValidator)
+        IValidator<LinkStudentRequest> linkStudentValidator,
+        IDataScopeResolver scopes)
     {
         _parentService = parentService;
         _guardianService = guardianService;
         _createValidator = createValidator;
         _updateValidator = updateValidator;
         _linkStudentValidator = linkStudentValidator;
+        _scopes = scopes;
     }
 
-    [HttpGet]
-    [Authorize(Policy = Permissions.ParentsView)]
-    public async Task<IActionResult> GetAll(CancellationToken cancellationToken) =>
-        Ok(await _parentService.GetAllAsync(cancellationToken));
+    // F1: reads accept Parents.View (every parent, full shape) or Parents.ViewScoped (parents of
+    // students you teach and your own record; name and mobile only). Out of scope = 404, like missing.
+    private Task<DataScope> ParentScopeAsync(CancellationToken cancellationToken) =>
+        _scopes.ResolveAsync(Permissions.ParentsView, Permissions.ParentsViewScoped, cancellationToken);
 
+    /// <summary>Parents.View: ParentResponse list. Parents.ViewScoped: ParentContactResponse list.</summary>
+    [HttpGet]
+    [Authorize(Policy = CompositePolicies.ParentsRead)]
+    [ProducesResponseType(typeof(List<ParentResponse>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
+    {
+        var scope = await ParentScopeAsync(cancellationToken);
+        return scope.IsUnrestricted
+            ? Ok(await _parentService.GetAllAsync(cancellationToken))
+            : Ok(await _parentService.GetAllScopedAsync(scope, cancellationToken));
+    }
+
+    /// <summary>Parents.View: ParentResponse. Parents.ViewScoped: ParentContactResponse.</summary>
     [HttpGet("{id:int}")]
-    [Authorize(Policy = Permissions.ParentsView)]
-    public async Task<IActionResult> GetById(int id, CancellationToken cancellationToken) =>
-        Ok(await _parentService.GetByIdAsync(id, cancellationToken));
+    [Authorize(Policy = CompositePolicies.ParentsRead)]
+    [ProducesResponseType(typeof(ParentResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetById(int id, CancellationToken cancellationToken)
+    {
+        var scope = await ParentScopeAsync(cancellationToken);
+        return scope.IsUnrestricted
+            ? Ok(await _parentService.GetByIdAsync(id, cancellationToken))
+            : Ok(await _parentService.GetByIdScopedAsync(id, scope, cancellationToken));
+    }
 
     [HttpPost]
     [Authorize(Policy = Permissions.ParentsCreate)]
@@ -91,10 +114,13 @@ public class ParentsController : ControllerBase
         return NoContent();
     }
 
+    /// <summary>The parent's children. Scoped callers see only the children inside their scope.</summary>
     [HttpGet("{id:int}/students")]
-    [Authorize(Policy = Permissions.ParentsView)]
+    [Authorize(Policy = CompositePolicies.ParentsRead)]
+    [ProducesResponseType(typeof(List<LinkedStudentResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetLinkedStudents(int id, CancellationToken cancellationToken) =>
-        Ok(await _guardianService.GetForParentAsync(id, cancellationToken));
+        Ok(await _guardianService.GetForParentAsync(id, await ParentScopeAsync(cancellationToken), cancellationToken));
 
     [HttpPost("{id:int}/students")]
     [Authorize(Policy = Permissions.ParentsEdit)]
@@ -131,4 +157,4 @@ public class ParentsController : ControllerBase
         await _guardianService.SetPrimaryAsync(id, studentId, cancellationToken);
         return NoContent();
     }
-}
+}

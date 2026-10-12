@@ -56,6 +56,9 @@ builder.Services.AddScoped<ICurrentUserPermissions, HttpContextCurrentUserPermis
 // Scoped, not singleton: the interceptor remembers the user and what to log for the save in progress.
 builder.Services.AddScoped<AuditableEntitySaveChangesInterceptor>();
 builder.Services.AddScoped<IConcurrencyGuard, ConcurrencyGuard>();
+// F1: "which records may this caller read?" (View → all, ViewScoped → related) and the sensitive-read audit row.
+builder.Services.AddScoped<IDataScopeResolver, DataScopeResolver>();
+builder.Services.AddScoped<ISensitiveReadLog, SensitiveReadLog>();
 
 // ── D1: Permission infrastructure (Singleton) ─────────────────────────
 builder.Services.AddSingleton<IPermissionCacheService, PermissionCacheService>();
@@ -246,12 +249,10 @@ builder.Services.AddAuthorization(options =>
         .RequireAuthenticatedUser()
         .Build();
 
-    // Attendance.Write = Attendance.Manage OR Attendance.Mark
-    options.AddPolicy("Attendance.Write", policy =>
-        policy.AddRequirements(
-            new AnyPermissionRequirement(
-                Permissions.AttendanceManage,
-                Permissions.AttendanceMark)));
+    // "Any one of" policies, e.g. Attendance.Write = Manage OR Mark, Students.Read = View OR ViewScoped.
+    // The list lives in CompositePolicies so the tests read the same definitions.
+    foreach (var (name, anyOf) in CompositePolicies.AnyOf)
+        options.AddPolicy(name, policy => policy.AddRequirements(new AnyPermissionRequirement(anyOf)));
 });
 
 // ── D2: CORS ──────────────────────────────────────────────────────────

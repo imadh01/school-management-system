@@ -2,8 +2,11 @@
 
 // ---------- Permission catalog (GET /api/permissions) ----------
 
-/// <param name="Requires">Permissions that must be granted together with this one (see PermissionDependencies).</param>
-public record PermissionResponse(string Name, string Description, IReadOnlyList<string> Requires);
+/// <param name="Requires">
+/// What must be granted together with this permission (see PermissionDependencies). Each entry is
+/// satisfied by ANY ONE of its names, e.g. [["Attendance.View","Attendance.ViewScoped"],["ClassSections.View"]].
+/// </param>
+public record PermissionResponse(string Name, string Description, IReadOnlyList<IReadOnlyList<string>> Requires);
 
 public record PermissionModuleResponse(string Module, IReadOnlyList<PermissionResponse> Permissions);
 

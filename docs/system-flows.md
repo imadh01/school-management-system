@@ -55,25 +55,25 @@ sequenceDiagram
     Note over S: Permissions are baked into the token.<br/>Changing permissions needs a fresh login.
 ```
 
-Seeded roles and permissions:
+Seeded roles and permissions (Batch E1 catalog, Batch F1 scoped reads). The full, test-checked matrix
+lives in `ExpectedRoleMatrix.cs`; Admin holds the whole catalog in code, with no grant rows.
 
 | Permission | Admin | Supervisor | Clerk | Teacher | Used by |
 |---|:-:|:-:|:-:|:-:|---|
-| Users.Create | ✔ | | | | `POST /api/users` |
-| ClassSections.Manage | ✔ | | | | create/edit/status/delete class sections |
-| ClassSections.Create | ✔ | | | | (unused by controllers) |
-| Admissions.Manage | ✔ | | | | every write on admissions |
-| Students.Manage | ✔ | | | | create/edit/delete student |
-| Students.ViewSensitive | ✔ | ✔ | | | see full Aadhaar/passport/visa; edit identity |
-| Parents.Manage | ✔ | | | | parents + guardian links |
-| Subjects.Manage | ✔ | | | | subjects |
-| Teachers.Manage | ✔ | | | | teachers + assignments |
+| ClassSections.View / Subjects.View / Teachers.View | ✔ | ✔ | ✔ | ✔ | lists, dropdowns |
+| Students.View / Parents.View / Attendance.View | ✔ | ✔ | ✔ | | every record, full fields |
+| Students.ViewScoped / Parents.ViewScoped / Attendance.ViewScoped | ✔ | | | ✔ | related records only, reduced fields (3.8) |
+| Admissions.View | ✔ | ✔ | ✔ | | applications |
+| Students.ViewSensitive | ✔ | ✔ | | | full Aadhaar/passport/visa; edit identity |
 | Attendance.Manage | ✔ | ✔ | ✔ | | mark attendance for any class |
-| Attendance.Mark | | | | ✔ | mark own class/subject only |
+| Attendance.Mark | ✔ | | | ✔ | mark own class/subject only |
+| Users.\*, Roles.\*, Settings.\*, every Create/Edit/Delete/Assign/Enroll | ✔ | | | | writes |
 
-Roles Student (5) and Parent (6) exist but have **no permissions and no login flow yet**.
+Roles Student and Parent exist but hold **no permissions** until the portal is built (F1 decision C).
+The parent and student scopes are built and tested with roles created inside the tests.
 
-Reads (`GET`) need only a valid login, except the guardian-matches endpoint (Admissions.Manage).
+Every endpoint needs a permission. Reads of students, parents and attendance accept the full View
+**or** the ViewScoped permission (policies `Students.Read`, `Parents.Read`, `Attendance.Read`).
 
 ---
 
@@ -189,8 +189,8 @@ flowchart LR
 flowchart TD
     R["GET /attendance/roster?classSectionId&date&subjectId"] --> W{"Who is the caller?"}
     W -->|"Attendance.Manage<br/>(Admin, Supervisor, Clerk)"| OK1["Any class, any subject"]
-    W -->|"Attendance.Mark (Teacher)"| TT{"Daily: class teacher of that class?<br/>Subject: teacher of that subject?"}
-    TT -->|"No"| F1["Roster loads read-only<br/>(canEdit=false + reason); Save → 403"]
+    W -->|"Attendance.ViewScoped + Mark (Teacher)"| TT{"This academic year:<br/>daily → class teacher of that class?<br/>subject → its teacher or the class teacher?"}
+    TT -->|"No"| F1["Roster → 404 (since F1; it used to load read-only)<br/>Save → 403"]
     TT -->|"Yes"| OK2["Allowed"]
     OK1 --> D{"Date rules"}
     OK2 --> D
@@ -202,10 +202,47 @@ flowchart TD
 - Daily session (no subject) and subject sessions are separate; each unique per date.
 - Roster = Active students of the class plus anyone already recorded that day.
 - History: `GET /attendance/students/{id}?from&to`. Class summary: `GET /attendance/summary?classSectionId&from&to` (max 366 days).
+- Scoped callers (F1): the history lists and counts only the sessions they may see (a subject teacher sees
+  only their subject; a class teacher every session of their class; a parent everything of their child).
+  The class summary is daily attendance of the whole class, so it needs the class teacher.
+- **Behavior change (F1):** a teacher opening a class they do not teach this year gets **404** (same body
+  as a class that does not exist). The attendance screen shows "You are not assigned to this class".
 - Percentage: Present = 1, Late = 1, Half Day = 0.5, Absent = 0; Leave excluded from the denominator.
 - UI helpers: Mark All Present, Copy Previous Day, unsaved-changes warning, last-7-sessions dots.
 
-### 3.8 Users
+### 3.8 Read scopes (Batch F1)
+
+Who sees which students, parents and attendance when holding only a **ViewScoped** permission.
+The rule is one reusable query (`DataScopeQueries`), applied inside the SQL of every read: lists,
+detail, guardians, enrollments, a parent's children, roster, history and summary.
+
+```mermaid
+flowchart TD
+    C["Caller with X.ViewScoped"] --> T{"Teaches the student's CURRENT class<br/>this academic year?<br/>(class teacher or subject teacher)"}
+    C --> P{"Linked as the student's parent?<br/>(Parent.UserId = caller)"}
+    C --> S{"Is the student?<br/>(Student.UserId = caller)"}
+    T -->|yes| V["Visible (union of all three)"]
+    P -->|yes| V
+    S -->|yes| V
+    T -->|no| N["404 — same body as an id that does not exist"]
+```
+
+- A teacher who is also a parent at the school gets both: their classes **and** their own children.
+- Last year's classes grant nothing. A teacher with no assignment sees no students.
+- **Shapes** (same property names as the full responses, just fewer of them):
+  - student list: id, admission no, roll, class, status, photo, names, gender, birth date, house, allergies;
+  - student detail: the same plus preferred name, allergies, guardians as contacts. No identity,
+    address, category, religion, custody, fees, pickup persons or other health fields;
+  - guardians: name, mobile, relation, primary. A teacher (or the student) sees every guardian;
+    a caller who is only the parent sees **only their own link** (co-guardians stay private);
+  - parents: name and mobile only. Visible: parents of students you teach, and your own record —
+    never the co-guardians of your own child;
+  - a parent's children: only those inside your scope (a sibling in another class stays hidden).
+- `Students.ViewSensitive` is never implied by a scoped read.
+- **Sensitive-read audit:** opening a student's detail writes an `AuditLogs` row with `Action = 'Read'`
+  (what was shown: health, identity masked/full — never the values).
+
+### 3.9 Users
 
 - `POST /api/users` (Users.Create): username, email, strong password, role name. Duplicate username/email → 409. There is no user list/edit screen yet.
 

@@ -38,24 +38,79 @@ public class PermissionCatalogTests
     public void Every_dependency_points_at_a_permission_in_the_catalog()
     {
         foreach (var name in Permissions.All)
-            foreach (var required in PermissionDependencies.RequiredFor(name))
-                Assert.True(Permissions.All.Contains(required), $"{name} requires unknown {required}");
+            foreach (var requirement in PermissionDependencies.RequiredFor(name))
+                foreach (var option in requirement.AnyOf)
+                    Assert.True(Permissions.All.Contains(option), $"{name} requires unknown {option}");
     }
+
+    /// <summary>The single-option requirements of a permission, flattened (most requirements have one option).</summary>
+    private static IEnumerable<string> Requires(string permission) =>
+        PermissionDependencies.RequiredFor(permission).Where(r => r.AnyOf.Count == 1).Select(r => r.AnyOf[0]);
 
     [Fact]
     public void A_View_needs_nothing_and_any_other_action_needs_its_own_View()
     {
         Assert.Empty(PermissionDependencies.RequiredFor(Permissions.StudentsView));
-        Assert.Contains(Permissions.StudentsView, PermissionDependencies.RequiredFor(Permissions.StudentsDelete));
-        Assert.Contains(Permissions.StudentsView, PermissionDependencies.RequiredFor(Permissions.StudentsViewSensitive));
+        Assert.Contains(Permissions.StudentsView, Requires(Permissions.StudentsDelete));
+        Assert.Contains(Permissions.StudentsView, Requires(Permissions.StudentsViewSensitive));
     }
 
     [Fact]
     public void Cross_module_dependencies_cover_the_class_dropdown()
     {
-        Assert.Contains(Permissions.ClassSectionsView, PermissionDependencies.RequiredFor(Permissions.StudentsCreate));
-        Assert.Contains(Permissions.ClassSectionsView, PermissionDependencies.RequiredFor(Permissions.AdmissionsEnroll));
-        Assert.Contains(Permissions.SubjectsView, PermissionDependencies.RequiredFor(Permissions.TeachersAssign));
+        Assert.Contains(Permissions.ClassSectionsView, Requires(Permissions.StudentsCreate));
+        Assert.Contains(Permissions.ClassSectionsView, Requires(Permissions.AdmissionsEnroll));
+        Assert.Contains(Permissions.SubjectsView, Requires(Permissions.TeachersAssign));
+    }
+
+    // ── F1: scoped reads ────────────────────────────────────────────────
+
+    [Theory]
+    [InlineData(Permissions.StudentsViewScoped)]
+    [InlineData(Permissions.ParentsViewScoped)]
+    [InlineData(Permissions.AttendanceViewScoped)]
+    public void A_scoped_read_needs_nothing(string permission)
+    {
+        Assert.Empty(PermissionDependencies.RequiredFor(permission));
+        Assert.Contains(permission, Permissions.All);
+    }
+
+    [Fact]
+    public void Writes_are_not_scoped_so_a_scoped_read_is_not_enough_for_them()
+    {
+        // A "Students.ViewScoped + Students.Edit" role could edit students it cannot see.
+        var missing = PermissionDependencies.FindMissing(new[]
+        {
+            Permissions.StudentsViewScoped, Permissions.StudentsEdit, Permissions.ClassSectionsView,
+        });
+
+        Assert.Contains((Permissions.StudentsEdit, Permissions.StudentsView), missing);
+    }
+
+    [Fact]
+    public void Attendance_Mark_accepts_a_scoped_attendance_read()
+    {
+        // The service already limits Mark to your own class/subject, so the scoped read is enough.
+        var teacherLike = new[]
+        {
+            Permissions.AttendanceViewScoped, Permissions.AttendanceMark,
+            Permissions.ClassSectionsView, Permissions.SubjectsView,
+        };
+        Assert.Empty(PermissionDependencies.FindMissing(teacherLike));
+
+        var withoutAnyRead = new[] { Permissions.AttendanceMark, Permissions.ClassSectionsView, Permissions.SubjectsView };
+        Assert.Contains((Permissions.AttendanceMark, "Attendance.View or Attendance.ViewScoped"),
+            PermissionDependencies.FindMissing(withoutAnyRead));
+    }
+
+    [Fact]
+    public void Every_composite_policy_lists_real_permissions_and_is_not_itself_a_permission()
+    {
+        foreach (var (name, anyOf) in CompositePolicies.AnyOf)
+        {
+            Assert.DoesNotContain(name, Permissions.All);
+            Assert.All(anyOf, p => Assert.Contains(p, Permissions.All));
+        }
     }
 
     [Fact]

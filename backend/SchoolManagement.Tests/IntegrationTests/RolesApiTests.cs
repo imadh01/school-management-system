@@ -253,8 +253,13 @@ public class RolesApiTests
 
         var students = Assert.Single(catalog, m => m.Module == "Students");
         var edit = Assert.Single(students.Permissions, p => p.Name == Permissions.StudentsEdit);
-        Assert.Contains(Permissions.StudentsView, edit.Requires);
-        Assert.Contains(Permissions.ClassSectionsView, edit.Requires);
+        Assert.Contains(edit.Requires, r => r.SequenceEqual(new[] { Permissions.StudentsView }));
+        Assert.Contains(edit.Requires, r => r.SequenceEqual(new[] { Permissions.ClassSectionsView }));
+
+        // F1: a requirement can accept either read.
+        var attendance = Assert.Single(catalog, m => m.Module == "Attendance");
+        var mark = Assert.Single(attendance.Permissions, p => p.Name == Permissions.AttendanceMark);
+        Assert.Contains(mark.Requires, r => r.SequenceEqual(new[] { Permissions.AttendanceView, Permissions.AttendanceViewScoped }));
         Assert.Equal(Permissions.All.Count, catalog.Sum(m => m.Permissions.Count));
     }
 

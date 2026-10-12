@@ -70,6 +70,13 @@ public static class Permissions
     public const string StudentsEdit = "Students.Edit";
     public const string StudentsDelete = "Students.Delete";
     public const string StudentsViewSensitive = "Students.ViewSensitive";
+    /// <summary>
+    /// Read only the students related to you (Batch F1): the ones you teach this academic year
+    /// (class teacher or subject teacher of their current class), your own children (as their
+    /// parent) and yourself (as a student). Fields are reduced; see DataScope.
+    /// Students.View wins when both are held.
+    /// </summary>
+    public const string StudentsViewScoped = "Students.ViewScoped";
 
     // ── Parents ────────────────────────────────────────────────────────
     public const string ParentsView = "Parents.View";
@@ -77,6 +84,8 @@ public static class Permissions
     /// <summary>Edit parents and link/unlink them to students (from either side).</summary>
     public const string ParentsEdit = "Parents.Edit";
     public const string ParentsDelete = "Parents.Delete";
+    /// <summary>Name and mobile of the parents of students you teach this year, plus your own parent record (F1).</summary>
+    public const string ParentsViewScoped = "Parents.ViewScoped";
 
     // ── Attendance ─────────────────────────────────────────────────────
     public const string AttendanceView = "Attendance.View";
@@ -84,6 +93,11 @@ public static class Permissions
     public const string AttendanceMark = "Attendance.Mark";
     /// <summary>Mark attendance for any class.</summary>
     public const string AttendanceManage = "Attendance.Manage";
+    /// <summary>
+    /// Attendance of your own classes (class teacher: every session of the class) and your own
+    /// subjects this year, plus all attendance of your own children or yourself (F1).
+    /// </summary>
+    public const string AttendanceViewScoped = "Attendance.ViewScoped";
 
     /// <summary>The catalog, in display order (grouped by module).</summary>
     public static readonly IReadOnlyList<PermissionDefinition> Definitions = new PermissionDefinition[]
@@ -129,15 +143,21 @@ public static class Permissions
         new(StudentsEdit, "Students", "Edit students."),
         new(StudentsDelete, "Students", "Delete students."),
         new(StudentsViewSensitive, "Students", "See and edit full Aadhaar, passport and visa details."),
+        new(StudentsViewScoped, "Students",
+            "See only related students, with reduced details: those you teach this year (class or subject teacher), your own children, or yourself."),
 
         new(ParentsView, "Parents", "See parents and their linked children."),
         new(ParentsCreate, "Parents", "Create parents."),
         new(ParentsEdit, "Parents", "Edit parents and link/unlink them to students."),
         new(ParentsDelete, "Parents", "Delete parents."),
+        new(ParentsViewScoped, "Parents",
+            "See only the name and mobile of parents of students you teach this year, and your own parent record."),
 
         new(AttendanceView, "Attendance", "See attendance rosters, histories and summaries."),
         new(AttendanceMark, "Attendance", "Mark attendance for own class or subjects."),
         new(AttendanceManage, "Attendance", "Mark and edit attendance for any class."),
+        new(AttendanceViewScoped, "Attendance",
+            "See attendance of your own classes and subjects this year, and all attendance of your own children or yourself."),
     };
 
     /// <summary>Every permission name in the catalog. Admin holds all of these in code.</summary>
@@ -148,4 +168,12 @@ public static class Permissions
 
     /// <summary>"Students" → "Students.View".</summary>
     public static string ViewOf(string module) => module + ".View";
+
+    /// <summary>"Students" → "Students.ViewScoped" (only some modules have one).</summary>
+    public static string ViewScopedOf(string module) => module + ".ViewScoped";
+
+    /// <summary>True for the read permissions: X.View and X.ViewScoped need nothing alongside them.</summary>
+    public static bool IsRead(string permission) =>
+        permission.EndsWith(".View", StringComparison.Ordinal) ||
+        permission.EndsWith(".ViewScoped", StringComparison.Ordinal);
 }

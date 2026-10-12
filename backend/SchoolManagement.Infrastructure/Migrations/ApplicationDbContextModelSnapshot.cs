@@ -511,7 +511,7 @@ namespace SchoolManagement.Infrastructure.Migrations
 
                     b.ToTable("AuditLogs", null, t =>
                         {
-                            t.HasCheckConstraint("CK_AuditLogs_Action", "[Action] IN ('Insert','Update','Delete')");
+                            t.HasCheckConstraint("CK_AuditLogs_Action", "[Action] IN ('Insert','Update','Delete','Read')");
                         });
                 });
 

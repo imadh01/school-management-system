@@ -4,6 +4,7 @@ import {
   getAccessToken,
   refreshSession,
 } from "../features/authentication/services/session";
+import { notifyForbidden } from "./accessEvents";
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -32,6 +33,12 @@ apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
     const request = error.config as RetriableRequest | undefined;
+
+    // F1: a 403 can mean an admin changed this user's role since the permissions
+    // were loaded. Ask AuthContext to reload them (the menu then catches up).
+    if (error.response?.status === 403) {
+      notifyForbidden();
+    }
 
     if (error.response?.status !== 401 || !request || request._retried) {
       return Promise.reject(error);

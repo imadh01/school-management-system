@@ -48,6 +48,11 @@ public class AccessMatrixTests
     private static readonly Requirement SignedIn = Requirement.SignedIn;
     private static Requirement P(string permission) => Requirement.Permission(permission);
 
+    // F1: the "X.Read" policies (full View OR ViewScoped).
+    private static readonly Requirement StudentsRead = Requirement.AnyOf(Permissions.StudentsView, Permissions.StudentsViewScoped);
+    private static readonly Requirement ParentsRead = Requirement.AnyOf(Permissions.ParentsView, Permissions.ParentsViewScoped);
+    private static readonly Requirement AttendanceRead = Requirement.AnyOf(Permissions.AttendanceView, Permissions.AttendanceViewScoped);
+
     private static readonly Endpoint[] Endpoints =
     {
         // Auth
@@ -107,10 +112,10 @@ public class AccessMatrixTests
         new("DELETE", $"/api/admissions/{Missing}", P(Permissions.AdmissionsDelete)),
 
         // Students
-        new("GET",    "/api/students", P(Permissions.StudentsView)),
-        new("GET",    $"/api/students/{Missing}", P(Permissions.StudentsView)),
-        new("GET",    $"/api/students/{Missing}/enrollments", P(Permissions.StudentsView)),
-        new("GET",    $"/api/students/{Missing}/guardians", P(Permissions.StudentsView)),
+        new("GET",    "/api/students", StudentsRead),
+        new("GET",    $"/api/students/{Missing}", StudentsRead),
+        new("GET",    $"/api/students/{Missing}/enrollments", StudentsRead),
+        new("GET",    $"/api/students/{Missing}/guardians", StudentsRead),
         new("POST",   "/api/students", P(Permissions.StudentsCreate), HasBody: true),
         new("PUT",    $"/api/students/{Missing}", P(Permissions.StudentsEdit), HasBody: true),
         new("PUT",    $"/api/students/{Missing}/identity",
@@ -120,9 +125,9 @@ public class AccessMatrixTests
         new("DELETE", $"/api/students/{Missing}", P(Permissions.StudentsDelete)),
 
         // Parents
-        new("GET",    "/api/parents", P(Permissions.ParentsView)),
-        new("GET",    $"/api/parents/{Missing}", P(Permissions.ParentsView)),
-        new("GET",    $"/api/parents/{Missing}/students", P(Permissions.ParentsView)),
+        new("GET",    "/api/parents", ParentsRead),
+        new("GET",    $"/api/parents/{Missing}", ParentsRead),
+        new("GET",    $"/api/parents/{Missing}/students", ParentsRead),
         new("POST",   "/api/parents", P(Permissions.ParentsCreate), HasBody: true),
         new("PUT",    $"/api/parents/{Missing}", P(Permissions.ParentsEdit), HasBody: true),
         new("DELETE", $"/api/parents/{Missing}", P(Permissions.ParentsDelete)),
@@ -131,11 +136,11 @@ public class AccessMatrixTests
         new("POST",   $"/api/parents/{Missing}/students/{Missing}/primary", P(Permissions.ParentsEdit)),
 
         // Attendance
-        new("GET",    $"/api/attendance/roster?classSectionId={Missing}&date=2026-01-05", P(Permissions.AttendanceView)),
+        new("GET",    $"/api/attendance/roster?classSectionId={Missing}&date=2026-01-05", AttendanceRead),
         new("PUT",    "/api/attendance",
                       Requirement.AnyOf(Permissions.AttendanceManage, Permissions.AttendanceMark), HasBody: true),
-        new("GET",    $"/api/attendance/students/{Missing}", P(Permissions.AttendanceView)),
-        new("GET",    $"/api/attendance/summary?classSectionId={Missing}&from=2026-01-05&to=2026-01-06", P(Permissions.AttendanceView)),
+        new("GET",    $"/api/attendance/students/{Missing}", AttendanceRead),
+        new("GET",    $"/api/attendance/summary?classSectionId={Missing}&from=2026-01-05&to=2026-01-06", AttendanceRead),
     };
 
     public static IEnumerable<object[]> Cases() =>

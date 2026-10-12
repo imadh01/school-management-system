@@ -128,4 +128,4 @@ public class AdmissionsController : ControllerBase
         await _admissionService.DeleteAsync(id, cancellationToken);
         return NoContent();
     }
-}
+}

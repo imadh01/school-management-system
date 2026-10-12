@@ -4,6 +4,8 @@ import { parentService } from "../services/parentService";
 import type { ParentResponse } from "../types/parent.types";
 import { ParentModal } from "../components/ParentModal";
 import { LinkedChildrenModal } from "../components/LinkedChildrenModal";
+import { useAuth } from "@/store/AuthContext";
+import { Permission } from "@/routes/permissions";
 
 // function initials(name: string) {
 //   return (name || "?").trim().charAt(0).toUpperCase();
@@ -49,6 +51,13 @@ function downloadCsv(rows: ParentResponse[]) {
 }
 
 export function ParentsPage() {
+  // F1: hide what this role cannot do (the API refuses it anyway). A teacher holding
+  // only Parents.ViewScoped sees the parents of their students: name and mobile.
+  const { hasAnyPermission } = useAuth();
+  const canCreate = hasAnyPermission([Permission.ParentsCreate]);
+  const canEdit = hasAnyPermission([Permission.ParentsEdit]);
+  const canDelete = hasAnyPermission([Permission.ParentsDelete]);
+
   const [parents, setParents] = useState<ParentResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -167,15 +176,17 @@ export function ParentsPage() {
         }}
       >
         <h1 style={{ fontSize: 19, margin: 0 }}>Parents Management</h1>
-        <button
-          className="btn btn--primary"
-          onClick={() => {
-            setEditingParent(null);
-            setIsModalOpen(true);
-          }}
-        >
-          + Add Parent
-        </button>
+        {canCreate && (
+          <button
+            className="btn btn--primary"
+            onClick={() => {
+              setEditingParent(null);
+              setIsModalOpen(true);
+            }}
+          >
+            + Add Parent
+          </button>
+        )}
       </div>
 
       <div className="card">
@@ -344,23 +355,27 @@ export function ParentsPage() {
                       >
                         💳
                       </button>
-                      <button
-                        className="btn--icon"
-                        title="Edit"
-                        onClick={() => {
-                          setEditingParent(p);
-                          setIsModalOpen(true);
-                        }}
-                      >
-                        ✎
-                      </button>
-                      <button
-                        className="btn--icon danger"
-                        title="Delete"
-                        onClick={() => handleDelete(p)}
-                      >
-                        🗑
-                      </button>
+                      {canEdit && (
+                        <button
+                          className="btn--icon"
+                          title="Edit"
+                          onClick={() => {
+                            setEditingParent(p);
+                            setIsModalOpen(true);
+                          }}
+                        >
+                          ✎
+                        </button>
+                      )}
+                      {canDelete && (
+                        <button
+                          className="btn--icon danger"
+                          title="Delete"
+                          onClick={() => handleDelete(p)}
+                        >
+                          🗑
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}

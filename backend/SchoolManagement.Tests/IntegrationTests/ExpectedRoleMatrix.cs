@@ -1,6 +1,6 @@
 ﻿// File: backend/SchoolManagement.Tests/IntegrationTests/ExpectedRoleMatrix.cs
 //
-// THE agreed role → permission matrix (Batch E1), written out by hand. Two tests read it:
+// THE agreed role → permission matrix (Batch E1, F1), written out by hand. Two tests read it:
 //   - RoleMatrixSnapshotTests: the migrated database must contain exactly these grants;
 //   - AccessMatrixTests: every role × endpoint must behave as these grants say.
 // Changing who can do what = change this file, in the same commit, on purpose.
@@ -17,6 +17,14 @@ internal static class ExpectedRoleMatrix
         Permissions.StudentsView, Permissions.ParentsView, Permissions.AttendanceView,
     };
 
+    // F1: teachers read only what they are related to. Classes, subjects and teachers stay full
+    // (no personal data; the attendance screen needs the class and subject lists).
+    private static readonly string[] TeacherReads =
+    {
+        Permissions.ClassSectionsView, Permissions.SubjectsView, Permissions.TeachersView,
+        Permissions.StudentsViewScoped, Permissions.ParentsViewScoped, Permissions.AttendanceViewScoped,
+    };
+
     /// <summary>Grant rows per system role. Admin has none: it holds the whole catalog in code.</summary>
     public static readonly IReadOnlyDictionary<string, IReadOnlySet<string>> SeededGrants =
         new Dictionary<string, IReadOnlySet<string>>
@@ -31,11 +39,12 @@ internal static class ExpectedRoleMatrix
                 Permissions.AdmissionsView, Permissions.AttendanceManage,
             },
             // Deliberately no Admissions.View (applicant religion, category, medical notes).
-            [RoleNames.Teacher] = new HashSet<string>(StaffReads)
+            [RoleNames.Teacher] = new HashSet<string>(TeacherReads)
             {
                 Permissions.AttendanceMark,
             },
-            // Nothing until F1 adds ownership checks ("own child", "own record").
+            // Still nothing: the scopes exist and are tested (with roles created inside the tests),
+            // but the portal and its response shapes come later.
             [RoleNames.Student] = new HashSet<string>(),
             [RoleNames.Parent] = new HashSet<string>(),
         };

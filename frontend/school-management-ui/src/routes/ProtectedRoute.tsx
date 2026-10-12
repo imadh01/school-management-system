@@ -1,22 +1,39 @@
-import { Navigate, Outlet } from "react-router-dom";
+import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../store/AuthContext";
 
-export function ProtectedRoute() {
-  const { status } = useAuth();
+export const CHANGE_PASSWORD_PATH = "/change-password";
 
-  // D2: on a page reload the session is being restored from the refresh
-  // cookie; wait for that instead of bouncing a signed-in user to /login.
-  if (status === "loading") {
-    return (
-      <div role="status" aria-live="polite" style={{ padding: "2rem" }}>
-        Loading…
-      </div>
-    );
+function Loading() {
+  return (
+    <div role="status" aria-live="polite" style={{ padding: "2rem" }}>
+      Loading…
+    </div>
+  );
+}
+
+/**
+ * Signed-in pages. In order:
+ *   1. wait while the session is restored (D2) and the permissions load (F1);
+ *   2. not signed in → /login;
+ *   3. a password change is required → the change-password page, before anything else
+ *      (the API refuses every other call until then anyway).
+ * Per-page permission checks are RequirePermission's job.
+ */
+export function ProtectedRoute() {
+  const { status, user, permissions } = useAuth();
+  const location = useLocation();
+
+  if (status === "loading") return <Loading />;
+  if (status !== "authenticated" || !user) return <Navigate to="/login" replace />;
+  if (permissions === null) return <Loading />;
+
+  const onChangePassword = location.pathname === CHANGE_PASSWORD_PATH;
+  if (user.mustChangePassword && !onChangePassword) {
+    return <Navigate to={CHANGE_PASSWORD_PATH} replace />;
+  }
+  if (!user.mustChangePassword && onChangePassword) {
+    return <Navigate to="/" replace />;
   }
 
-  return status === "authenticated" ? (
-    <Outlet />
-  ) : (
-    <Navigate to="/login" replace />
-  );
+  return <Outlet />;
 }

@@ -22,6 +22,7 @@ public class StudentsController : ControllerBase
     private readonly IValidator<UpdateStudentIdentityRequest> _identityValidator;
     private readonly IValidator<LinkGuardianRequest> _linkValidator;
     private readonly ICurrentUserPermissions _permissions;
+    private readonly IDataScopeResolver _scopes;
 
     public StudentsController(
         IStudentService studentService,
@@ -30,7 +31,8 @@ public class StudentsController : ControllerBase
         IValidator<UpdateStudentRequest> updateValidator,
         IValidator<UpdateStudentIdentityRequest> identityValidator,
         IValidator<LinkGuardianRequest> linkValidator,
-        ICurrentUserPermissions permissions)
+        ICurrentUserPermissions permissions,
+        IDataScopeResolver scopes)
     {
         _studentService = studentService;
         _guardianService = guardianService;
@@ -39,7 +41,13 @@ public class StudentsController : ControllerBase
         _identityValidator = identityValidator;
         _linkValidator = linkValidator;
         _permissions = permissions;
+        _scopes = scopes;
     }
+
+    // F1: reads accept Students.View (everything, full shape) or Students.ViewScoped (related students
+    // only, reduced shape). Out-of-scope ids answer 404 exactly like ids that do not exist.
+    private Task<DataScope> StudentScopeAsync(CancellationToken cancellationToken) =>
+        _scopes.ResolveAsync(Permissions.StudentsView, Permissions.StudentsViewScoped, cancellationToken);
 
     // Full Aadhaar / passport numbers are returned only to callers holding this permission;
     // everyone else gets masked values. The service never decides this itself.
@@ -61,15 +69,30 @@ public class StudentsController : ControllerBase
         });
     }
 
+    /// <summary>Students.View: every student (StudentSummaryResponse). Students.ViewScoped: related students (StudentScopedSummaryResponse).</summary>
     [HttpGet]
-    [Authorize(Policy = Permissions.StudentsView)]
-    public async Task<IActionResult> GetAll(CancellationToken cancellationToken) =>
-        Ok(await _studentService.GetAllAsync(cancellationToken));
+    [Authorize(Policy = CompositePolicies.StudentsRead)]
+    [ProducesResponseType(typeof(List<StudentSummaryResponse>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
+    {
+        var scope = await StudentScopeAsync(cancellationToken);
+        return scope.IsUnrestricted
+            ? Ok(await _studentService.GetAllAsync(cancellationToken))
+            : Ok(await _studentService.GetAllScopedAsync(scope, cancellationToken));
+    }
 
+    /// <summary>Students.View: StudentResponse. Students.ViewScoped: StudentScopedResponse. Both leave a sensitive-read audit row.</summary>
     [HttpGet("{id:int}")]
-    [Authorize(Policy = Permissions.StudentsView)]
-    public async Task<IActionResult> GetById(int id, CancellationToken cancellationToken) =>
-        Ok(await _studentService.GetByIdAsync(id, await CanViewSensitiveAsync(cancellationToken), cancellationToken));
+    [Authorize(Policy = CompositePolicies.StudentsRead)]
+    [ProducesResponseType(typeof(StudentResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetById(int id, CancellationToken cancellationToken)
+    {
+        var scope = await StudentScopeAsync(cancellationToken);
+        return scope.IsUnrestricted
+            ? Ok(await _studentService.GetByIdAsync(id, await CanViewSensitiveAsync(cancellationToken), cancellationToken))
+            : Ok(await _studentService.GetByIdScopedAsync(id, scope, cancellationToken));
+    }
 
     [HttpPost]
     [Authorize(Policy = Permissions.StudentsCreate)]
@@ -106,14 +129,24 @@ public class StudentsController : ControllerBase
 
     /// <summary>The student's academic history, newest period first. Read-only.</summary>
     [HttpGet("{id:int}/enrollments")]
-    [Authorize(Policy = Permissions.StudentsView)]
+    [Authorize(Policy = CompositePolicies.StudentsRead)]
+    [ProducesResponseType(typeof(List<StudentEnrollmentResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetEnrollments(int id, CancellationToken cancellationToken) =>
-        Ok(await _studentService.GetEnrollmentsAsync(id, cancellationToken));
+        Ok(await _studentService.GetEnrollmentsAsync(id, await StudentScopeAsync(cancellationToken), cancellationToken));
 
+    /// <summary>Students.View: StudentGuardianResponse. Students.ViewScoped: GuardianContactResponse (a parent sees only their own link).</summary>
     [HttpGet("{id:int}/guardians")]
-    [Authorize(Policy = Permissions.StudentsView)]
-    public async Task<IActionResult> GetGuardians(int id, CancellationToken cancellationToken) =>
-        Ok(await _guardianService.GetForStudentAsync(id, cancellationToken));
+    [Authorize(Policy = CompositePolicies.StudentsRead)]
+    [ProducesResponseType(typeof(List<StudentGuardianResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetGuardians(int id, CancellationToken cancellationToken)
+    {
+        var scope = await StudentScopeAsync(cancellationToken);
+        return scope.IsUnrestricted
+            ? Ok(await _guardianService.GetForStudentAsync(id, cancellationToken))
+            : Ok(await _guardianService.GetContactsForStudentAsync(id, scope, cancellationToken));
+    }
 
     [HttpPost("{id:int}/guardians")]
     [Authorize(Policy = Permissions.ParentsEdit)]

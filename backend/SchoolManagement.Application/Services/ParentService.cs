@@ -18,14 +18,28 @@ public class ParentService : IParentService
 
     public async Task<List<ParentResponse>> GetAllAsync(CancellationToken cancellationToken)
     {
-        var parents = await _parentRepository.GetAllAsync(cancellationToken);
+        var parents = await _parentRepository.GetAllAsync(DataScope.Unrestricted, cancellationToken);
         return parents.Select(ToResponse).ToList();
+    }
+
+    public async Task<List<ParentContactResponse>> GetAllScopedAsync(DataScope scope, CancellationToken cancellationToken)
+    {
+        var parents = await _parentRepository.GetAllAsync(scope, cancellationToken);
+        return parents.Select(ToContact).ToList();
     }
 
     public async Task<ParentResponse> GetByIdAsync(int id, CancellationToken cancellationToken)
     {
         var parent = await GetOrThrowAsync(id, cancellationToken);
         return ToResponse(parent);
+    }
+
+    public async Task<ParentContactResponse> GetByIdScopedAsync(int id, DataScope scope, CancellationToken cancellationToken)
+    {
+        // Same message as GetOrThrowAsync: a missing and an out-of-scope parent are indistinguishable.
+        var parent = await _parentRepository.GetVisibleByIdAsync(id, scope, cancellationToken)
+            ?? throw new NotFoundException($"Parent {id} does not exist.");
+        return ToContact(parent);
     }
 
     public async Task<ParentResponse> CreateAsync(CreateParentRequest request, CancellationToken cancellationToken)
@@ -99,6 +113,8 @@ public class ParentService : IParentService
     private async Task<Parent> GetOrThrowAsync(int id, CancellationToken cancellationToken) =>
         await _parentRepository.GetByIdAsync(id, cancellationToken)
             ?? throw new NotFoundException($"Parent {id} does not exist.");
+
+    private static ParentContactResponse ToContact(Parent p) => new(p.Id, p.Name, p.Mobile);
 
     private static ParentResponse ToResponse(Parent p) => new(
         p.Id, p.Name, p.Email, p.Mobile, p.Status,

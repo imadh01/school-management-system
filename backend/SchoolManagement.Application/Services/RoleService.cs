@@ -56,7 +56,8 @@ public class RoleService : IRoleService
             .Select(g => new PermissionModuleResponse(
                 g.Key,
                 g.Select(d => new PermissionResponse(
-                        d.Name, d.Description, PermissionDependencies.RequiredFor(d.Name).ToList()))
+                        d.Name, d.Description,
+                        PermissionDependencies.RequiredFor(d.Name).Select(r => r.AnyOf).ToList()))
                     .ToList()))
             .ToList();
 

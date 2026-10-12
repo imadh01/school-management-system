@@ -25,11 +25,16 @@ public class AttendanceService : IAttendanceService
     // ---------- Roster ----------
 
     public async Task<AttendanceRosterResponse> GetRosterAsync(
-        AttendanceActor actor, int classSectionId, DateOnly date, int? subjectId, CancellationToken cancellationToken)
+        AttendanceActor actor, DataScope scope, int classSectionId, DateOnly date, int? subjectId,
+        CancellationToken cancellationToken)
     {
         if (date == default) throw new BusinessRuleException("Date is required.");
 
         var (classSection, subject) = await LoadScopeAsync(classSectionId, subjectId, cancellationToken);
+        // F1: a class you may not see answers exactly like a class that does not exist. (Before F1 a
+        // teacher got a read-only roster of any class.)
+        if (!await _attendance.CanSeeSessionsAsync(classSection.Id, subject?.Id, scope, cancellationToken))
+            throw ClassSectionNotFound();
         var access = await EvaluateAccessAsync(actor, classSection, subject, date, cancellationToken);
         return await BuildRosterAsync(classSection, subject, date, access, cancellationToken);
     }
@@ -116,16 +121,18 @@ public class AttendanceService : IAttendanceService
     // ---------- Student history ----------
 
     public async Task<StudentAttendanceResponse> GetStudentHistoryAsync(
-        int studentId, DateOnly? from, DateOnly? to, CancellationToken cancellationToken)
+        DataScope scope, int studentId, DateOnly? from, DateOnly? to, CancellationToken cancellationToken)
     {
-        var student = await _attendance.GetStudentAsync(studentId, cancellationToken)
+        // Missing and out-of-scope students give the same 404.
+        var student = await _attendance.GetStudentAsync(studentId, scope, cancellationToken)
             ?? throw new NotFoundException("Student could not be found.");
 
         var end = to ?? Today;
         var start = from ?? end.AddDays(-29);
         ValidateRange(start, end);
 
-        var rows = await _attendance.GetStudentRecordsAsync(studentId, start, end, cancellationToken);
+        // Only sessions the scope can see: a subject teacher gets their subject, not the student's other classes.
+        var rows = await _attendance.GetStudentRecordsAsync(studentId, start, end, scope, cancellationToken);
 
         // Percentage and counts use daily attendance only so subject-wise entries don't double count.
         var daily = rows.Where(r => r.SubjectName is null).ToList();
@@ -147,14 +154,17 @@ public class AttendanceService : IAttendanceService
     // ---------- Class summary ----------
 
     public async Task<ClassAttendanceSummaryResponse> GetSummaryAsync(
-        int classSectionId, DateOnly from, DateOnly to, CancellationToken cancellationToken)
+        DataScope scope, int classSectionId, DateOnly from, DateOnly to, CancellationToken cancellationToken)
     {
         if (from == default || to == default)
             throw new BusinessRuleException("Both 'from' and 'to' dates are required.");
         ValidateRange(from, to);
 
         var classSection = await _attendance.GetClassSectionAsync(classSectionId, cancellationToken)
-            ?? throw new NotFoundException("Class section could not be found.");
+            ?? throw ClassSectionNotFound();
+        // Daily attendance of the whole class: scoped callers must be its class teacher this year.
+        if (!await _attendance.CanSeeSessionsAsync(classSection.Id, subjectId: null, scope, cancellationToken))
+            throw ClassSectionNotFound();
 
         var counts = await _attendance.GetDailyCountsAsync(classSectionId, from, to, cancellationToken);
         var daysMarked = await _attendance.CountDailySessionsAsync(classSectionId, from, to, cancellationToken);
@@ -194,7 +204,7 @@ public class AttendanceService : IAttendanceService
         int classSectionId, int? subjectId, CancellationToken cancellationToken)
     {
         var classSection = await _attendance.GetClassSectionAsync(classSectionId, cancellationToken)
-            ?? throw new NotFoundException("Class section could not be found.");
+            ?? throw ClassSectionNotFound();
 
         Subject? subject = null;
         if (subjectId.HasValue)
@@ -290,6 +300,8 @@ public class AttendanceService : IAttendanceService
             PreviousSessionDate: recent.Count == 0 ? null : recent[0].Date,
             Students: rosterStudents);
     }
+
+    private static NotFoundException ClassSectionNotFound() => new("Class section could not be found.");
 
     private static AttendanceRecord NewRecord(AttendanceEntry entry) => new()
     {

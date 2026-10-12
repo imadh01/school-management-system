@@ -1,5 +1,6 @@
 import { NavLink, useNavigate } from "react-router-dom";
-import { NAV_SECTIONS, FOOTER_NAV } from "./navConfig";
+import { NAV_SECTIONS, FOOTER_NAV, type NavItem } from "./navConfig";
+import { PAGE_PERMISSIONS } from "../routes/permissions";
 import { useAuth } from "../store/AuthContext";
 import { useDarkMode } from "../hooks/useDarkMode";
 import brandMark from "../assets/synergein-mark.jpg";
@@ -9,7 +10,18 @@ import brandMark from "../assets/synergein-mark.jpg";
 const SCHOOL_NAME = "Demo School";
 
 export function Sidebar() {
-  const { user, logout } = useAuth();
+  const { user, logout, hasAnyPermission } = useAuth();
+
+  // F1: show only the pages this user can open ("View or ViewScoped" per page).
+  // Cosmetic: the route guard and the API check again.
+  const canOpen = (item: NavItem) => {
+    const required = PAGE_PERMISSIONS[item.path];
+    return !required || hasAnyPermission(required);
+  };
+  const sections = NAV_SECTIONS.map((section) => ({
+    ...section,
+    items: section.items.filter(canOpen),
+  })).filter((section) => section.items.length > 0);
   const { isDark, toggle } = useDarkMode();
   const navigate = useNavigate();
 
@@ -47,7 +59,7 @@ export function Sidebar() {
       </div>
 
       <nav className="sidebar__nav">
-        {NAV_SECTIONS.map((section) => (
+        {sections.map((section) => (
           <div key={section.label}>
             <div className="sidebar__section-label">{section.label}</div>
             {section.items.map((item) => (
@@ -60,7 +72,7 @@ export function Sidebar() {
       </nav>
 
       <div className="sidebar__footer">
-        {FOOTER_NAV.map((item) => (
+        {FOOTER_NAV.filter(canOpen).map((item) => (
           <NavLink key={item.key} to={item.path} className={linkClass}>
             {item.label}
           </NavLink>

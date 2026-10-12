@@ -20,11 +20,16 @@ public class StudentGuardianRepository : IStudentGuardianRepository
             .Where(sg => sg.StudentId == studentId)
             .ToListAsync(cancellationToken);
 
-    public Task<List<StudentGuardian>> GetForParentAsync(int parentId, CancellationToken cancellationToken) =>
-        _context.StudentGuardians
+    public Task<List<StudentGuardian>> GetForParentAsync(int parentId, DataScope studentScope, CancellationToken cancellationToken)
+    {
+        // A teacher opening a parent sees only the children they teach, not siblings in other classes.
+        var visibleStudentIds = _context.Students.VisibleTo(_context, studentScope).Select(s => s.Id);
+        return _context.StudentGuardians
+            .AsNoTracking()
             .Include(sg => sg.Student).ThenInclude(s => s.ClassSection).ThenInclude(c => c.AcademicYear)
-            .Where(sg => sg.ParentId == parentId)
+            .Where(sg => sg.ParentId == parentId && visibleStudentIds.Contains(sg.StudentId))
             .ToListAsync(cancellationToken);
+    }
 
     public Task<bool> LinkExistsAsync(int studentId, int parentId, CancellationToken cancellationToken) =>
         _context.StudentGuardians.AnyAsync(

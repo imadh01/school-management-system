@@ -98,4 +98,4 @@ public class ClassSectionsController : ControllerBase
             Errors = result.ToErrorDictionary(),
             TraceId = HttpContext.GetCorrelationId(),
         });
-}
+}

@@ -26,9 +26,11 @@ public class StudentRepository : IStudentRepository
         WithIncludes().OrderByDescending(s => s.Id).ToListAsync(cancellationToken);
 
     // List page: only the columns a row shows, no tracking, no side tables except Allergies.
-    public Task<List<StudentSummaryRow>> GetSummariesAsync(CancellationToken cancellationToken) =>
+    // The scope filter is part of the same SQL statement (F1).
+    public Task<List<StudentSummaryRow>> GetSummariesAsync(DataScope scope, CancellationToken cancellationToken) =>
         _context.Students
             .AsNoTracking()
+            .VisibleTo(_context, scope)
             .OrderByDescending(s => s.Id)
             .Select(s => new StudentSummaryRow(
                 s.Id, s.AdmNo, s.RollNumber, s.ClassSectionId,
@@ -41,6 +43,38 @@ public class StudentRepository : IStudentRepository
                 s.Admission != null ? s.Admission.RegNo : null,
                 s.AdmissionId))
             .ToListAsync(cancellationToken);
+
+    public async Task<StudentAccess> GetAccessAsync(int studentId, DataScope scope, CancellationToken cancellationToken)
+    {
+        if (scope.IsUnrestricted)
+            return await _context.Students.AnyAsync(s => s.Id == studentId, cancellationToken)
+                ? StudentAccess.Unrestricted
+                : StudentAccess.None;
+
+        // The same three relationships as DataScopeQueries.VisibleTo, kept apart so the caller
+        // knows WHICH one applies (a parent sees less of the guardians than a teacher does).
+        var userId = scope.UserId!.Value;
+        var taughtSections = DataScopeQueries.TaughtSectionIds(_context, userId);
+        var children = DataScopeQueries.ChildIds(_context, userId);
+
+        var row = await _context.Students
+            .Where(s => s.Id == studentId)
+            .Select(s => new
+            {
+                Teaches = taughtSections.Contains(s.ClassSectionId),
+                Guardian = children.Contains(s.Id),
+                Self = s.UserId == userId,
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (row is null) return StudentAccess.None;
+
+        var access = StudentAccess.None;
+        if (row.Teaches) access |= StudentAccess.Teaches;
+        if (row.Guardian) access |= StudentAccess.Guardian;
+        if (row.Self) access |= StudentAccess.Self;
+        return access;
+    }
 
     public Task<Student?> GetByIdAsync(int id, CancellationToken cancellationToken) =>
         WithIncludes().FirstOrDefaultAsync(s => s.Id == id, cancellationToken);

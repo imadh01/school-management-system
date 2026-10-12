@@ -1,7 +1,11 @@
 import { apiClient } from "../../../services/apiClient";
 import { authHttp } from "../../../services/apiConfig";
 import { endSession, startSession, withAuthLock } from "./session";
-import type { LoginRequest, AuthResult } from "../types/auth.types";
+import type {
+  LoginRequest,
+  AuthResult,
+  CurrentUserResponse,
+} from "../types/auth.types";
 
 export const authService = {
   /** Signs in; the API also sets the refresh-token cookie. */
@@ -23,6 +27,12 @@ export const authService = {
     } finally {
       endSession();
     }
+  },
+
+  /** Who is signed in, their permissions and whether they must change their password (F1). */
+  me: async (): Promise<CurrentUserResponse> => {
+    const { data } = await apiClient.get<CurrentUserResponse>("/auth/me");
+    return data;
   },
 
   /** "Sign out everywhere": ends every session of this user on every device. */

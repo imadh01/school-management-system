@@ -12,22 +12,29 @@ public class StudentService : IStudentService
     private readonly IClassSectionRepository _classSectionRepository;
     private readonly IStudentGuardianRepository _guardianRepository;
     private readonly IConcurrencyGuard _concurrency;
+    private readonly ISensitiveReadLog _sensitiveReads;
 
     public StudentService(
         IStudentRepository studentRepository,
         IClassSectionRepository classSectionRepository,
         IStudentGuardianRepository guardianRepository,
-        IConcurrencyGuard concurrency)
+        IConcurrencyGuard concurrency,
+        ISensitiveReadLog sensitiveReads)
     {
         _studentRepository = studentRepository;
         _classSectionRepository = classSectionRepository;
         _guardianRepository = guardianRepository;
         _concurrency = concurrency;
+        _sensitiveReads = sensitiveReads;
     }
+
+    // The health block and identity numbers are sensitive: every opening of a detail leaves a "Read"
+    // audit row (F1). List rows (allergies only) and write responses do not; writes have their own rows.
+    private const string AuditTable = "Students";
 
     public async Task<List<StudentSummaryResponse>> GetAllAsync(CancellationToken cancellationToken)
     {
-        var rows = await _studentRepository.GetSummariesAsync(cancellationToken);
+        var rows = await _studentRepository.GetSummariesAsync(DataScope.Unrestricted, cancellationToken);
         return rows.Select(r => new StudentSummaryResponse(
             r.Id, r.AdmNo, r.RollNumber, r.ClassSectionId,
             ClassSection.BuildDisplayName(r.ClassName, r.ClassSection, r.AcademicYearName),
@@ -38,10 +45,48 @@ public class StudentService : IStudentService
             r.Allergies, r.AdmissionRegNo, r.AdmissionId)).ToList();
     }
 
+    public async Task<List<StudentScopedSummaryResponse>> GetAllScopedAsync(DataScope scope, CancellationToken cancellationToken)
+    {
+        var rows = await _studentRepository.GetSummariesAsync(scope, cancellationToken);
+        return rows.Select(r => new StudentScopedSummaryResponse(
+            r.Id, r.AdmNo, r.RollNumber, r.ClassSectionId,
+            ClassSection.BuildDisplayName(r.ClassName, r.ClassSection, r.AcademicYearName),
+            r.Status, r.PhotoUrl,
+            r.FirstName, r.MiddleName, r.LastName, r.Gender, r.DateOfBirth,
+            r.House, r.Allergies)).ToList();
+    }
+
     public async Task<StudentResponse> GetByIdAsync(int id, bool includeSensitive, CancellationToken cancellationToken)
     {
         var student = await GetDetailOrThrowAsync(id, cancellationToken);
-        return await ToResponseAsync(student, includeSensitive, cancellationToken);
+        var response = await ToResponseAsync(student, includeSensitive, cancellationToken);
+
+        await _sensitiveReads.RecordAsync(AuditTable, student.Id,
+            new[] { "Health", includeSensitive ? "Identity" : "Identity (masked)" }, cancellationToken);
+        return response;
+    }
+
+    public async Task<StudentScopedResponse> GetByIdScopedAsync(int id, DataScope scope, CancellationToken cancellationToken)
+    {
+        var access = await GetAccessOrThrowAsync(id, scope, cancellationToken);
+        var student = await GetDetailOrThrowAsync(id, cancellationToken);
+
+        var links = await _guardianRepository.GetForStudentAsync(student.Id, cancellationToken);
+        var guardians = StudentGuardianRules.VisibleLinks(links, access, scope)
+            .OrderByDescending(l => l.IsPrimaryContact).ThenBy(l => l.Parent.Name)
+            .Select(StudentGuardianRules.ToContact)
+            .ToList();
+
+        var response = new StudentScopedResponse(
+            student.Id, student.AdmNo, student.RollNumber, student.ClassSectionId, student.ClassSection.DisplayName,
+            student.Status, student.PhotoUrl,
+            student.FirstName, student.MiddleName, student.LastName, student.PreferredName,
+            student.Gender, student.DateOfBirth, student.House,
+            new StudentScopedHealthResponse(student.Health?.Allergies),
+            guardians);
+
+        await _sensitiveReads.RecordAsync(AuditTable, student.Id, new[] { "Health (allergies)" }, cancellationToken);
+        return response;
     }
 
     public async Task<StudentResponse> CreateAsync(CreateStudentRequest request, bool includeSensitive, CancellationToken cancellationToken)
@@ -242,9 +287,9 @@ public class StudentService : IStudentService
         return await ToResponseAsync(student, includeSensitive: true, cancellationToken);
     }
 
-    public async Task<List<StudentEnrollmentResponse>> GetEnrollmentsAsync(int studentId, CancellationToken cancellationToken)
+    public async Task<List<StudentEnrollmentResponse>> GetEnrollmentsAsync(int studentId, DataScope scope, CancellationToken cancellationToken)
     {
-        await GetOrThrowAsync(studentId, cancellationToken); // 404 for an unknown student
+        await GetAccessOrThrowAsync(studentId, scope, cancellationToken); // 404: unknown OR out of scope
         var rows = await _studentRepository.GetEnrollmentsAsync(studentId, cancellationToken);
         return rows.Select(r => new StudentEnrollmentResponse(
             r.Id, r.AcademicYearId, r.AcademicYearName,
@@ -269,6 +314,15 @@ public class StudentService : IStudentService
     }
 
     // ---------------------------------------------------------------- helpers
+
+    /// <summary>Missing and out-of-scope students throw the SAME exception, so the 404 bodies are identical.</summary>
+    private async Task<StudentAccess> GetAccessOrThrowAsync(int id, DataScope scope, CancellationToken cancellationToken)
+    {
+        var access = await _studentRepository.GetAccessAsync(id, scope, cancellationToken);
+        return access == StudentAccess.None
+            ? throw new NotFoundException($"Student {id} does not exist.")
+            : access;
+    }
 
     private async Task<Student> GetOrThrowAsync(int id, CancellationToken cancellationToken) =>
         await _studentRepository.GetByIdAsync(id, cancellationToken)

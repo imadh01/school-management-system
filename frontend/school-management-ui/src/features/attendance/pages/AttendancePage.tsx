@@ -5,7 +5,7 @@ import { classSectionService } from "@/features/class-sections/services/classSec
 import type { ClassSectionResponse } from "@/features/class-sections/types/classSection.types";
 import { subjectService } from "@/features/subjects/services/subjectService";
 import type { SubjectResponse } from "@/features/subjects/types/subject.types";
-import { getApiErrors } from "@/utils/apiError";
+import { getApiErrors, getApiStatus } from "@/utils/apiError";
 import { attendanceService } from "../services/attendanceService.ts";
 import {
   ATTENDANCE_STATUSES,
@@ -99,6 +99,8 @@ export function AttendancePage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("");
   const [search, setSearch] = useState("");
   const [errors, setErrors] = useState<string[] | null>(null);
+  // F1: the API answers 404 when this class (or subject) is not yours this year.
+  const [notAssigned, setNotAssigned] = useState(false);
   const [pendingChange, setPendingChange] = useState<(() => void) | null>(null);
 
   const activeClasses = useMemo(
@@ -153,6 +155,7 @@ export function AttendancePage() {
     }
     let cancelled = false;
     setIsRosterLoading(true);
+    setNotAssigned(false);
     attendanceService
       .getRoster({
         classSectionId,
@@ -165,7 +168,10 @@ export function AttendancePage() {
       .catch((err) => {
         if (cancelled) return;
         setRoster(null);
-        setErrors(getApiErrors(err, "Could not load attendance."));
+        // A teacher may open only their own class (daily) or subject: say so in
+        // place instead of an error popup.
+        if (getApiStatus(err) === 404) setNotAssigned(true);
+        else setErrors(getApiErrors(err, "Could not load attendance."));
       })
       .finally(() => {
         if (!cancelled) setIsRosterLoading(false);
@@ -480,6 +486,14 @@ export function AttendancePage() {
         </div>
       ) : (
         <div className="card">
+          {notAssigned && (
+            <div className="info-banner">
+              🔒 You are not assigned to this{" "}
+              {tab === "subject" ? "subject" : "class as its class teacher"} this
+              academic year, so its attendance is not available to you. Choose
+              one of your own classes or subjects.
+            </div>
+          )}
           {roster && !roster.canEdit && roster.cannotEditReason && (
             <div className="info-banner">🔒 {roster.cannotEditReason}</div>
           )}
@@ -595,9 +609,11 @@ export function AttendancePage() {
                   <tr>
                     <td colSpan={5}>
                       <div className="empty-state">
-                        {students.length === 0
-                          ? "No active students in this class."
-                          : "No students match this filter."}
+                        {notAssigned
+                          ? "Not available to you."
+                          : students.length === 0
+                            ? "No active students in this class."
+                            : "No students match this filter."}
                       </div>
                     </td>
                   </tr>
