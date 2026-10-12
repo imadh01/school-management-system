@@ -8,7 +8,10 @@ import {
   findNavEntry,
   type NavItem,
 } from "./navConfig";
-import { PAGE_PERMISSIONS } from "../routes/permissions";
+import {
+  PAGE_PERMISSIONS,
+  UNBUILT_MODULES_PERMISSIONS,
+} from "../routes/permissions";
 import { useAuth } from "../store/AuthContext";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { IconButton } from "../components/IconButton";
@@ -33,7 +36,9 @@ export function Sidebar({ isOpen, onClose }: Props) {
   // F1: show only the pages this user can open ("View or ViewScoped" per page).
   // Cosmetic: the route guard and the API check again.
   const canOpen = (item: NavItem) => {
-    const required = PAGE_PERMISSIONS[item.path];
+    const required = item.built
+      ? PAGE_PERMISSIONS[item.path]
+      : UNBUILT_MODULES_PERMISSIONS;
     return !required || hasAnyPermission(required);
   };
   const sections = NAV_SECTIONS.map((section) => ({

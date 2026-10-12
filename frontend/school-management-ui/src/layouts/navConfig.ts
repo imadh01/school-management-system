@@ -3,6 +3,7 @@ import {
   Building,
   Calendar,
   CalendarCheck,
+  CalendarDays,
   ChartColumn,
   ClipboardList,
   Contact,
@@ -12,6 +13,7 @@ import {
   GraduationCap,
   Handshake,
   Info,
+  Landmark,
   LayoutDashboard,
   LibraryBig,
   LifeBuoy,
@@ -162,6 +164,13 @@ export const NAV_SECTIONS: NavSection[] = [
       },
       { key: "ptm", label: "PTM", path: "/ptm", icon: Handshake, built: false },
       {
+        key: "calendar",
+        label: "Calendar",
+        path: "/calendar",
+        icon: CalendarDays,
+        built: false,
+      },
+      {
         key: "lesson-planning",
         label: "Lesson Planning",
         path: "/lesson-planning",
@@ -232,6 +241,13 @@ export const NAV_SECTIONS: NavSection[] = [
         label: "Fees Collection",
         path: "/fees-collection",
         icon: Wallet,
+        built: false,
+      },
+      {
+        key: "daily-accounts",
+        label: "Daily Accounts",
+        path: "/daily-accounts",
+        icon: Landmark,
         built: false,
       },
       {

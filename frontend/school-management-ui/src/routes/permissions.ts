@@ -32,6 +32,16 @@ export const Permission = {
   AttendanceViewScoped: "Attendance.ViewScoped",
 } as const;
 
+/**
+ * U1: modules from the prototype that are not built yet ("Soon" in the sidebar) have no
+ * permissions of their own. Until they do, only administrators (Users.View) see them, as a
+ * roadmap; everyone else sees only pages that work. Each module gets real permissions when
+ * it is built, and this rule stops applying to it.
+ */
+export const UNBUILT_MODULES_PERMISSIONS: readonly string[] = [
+  Permission.UsersView,
+];
+
 /** Path → any one of these permissions opens it. Paths not listed are open to every signed-in user. */
 export const PAGE_PERMISSIONS: Readonly<Record<string, readonly string[]>> = {
   "/admissions": [Permission.AdmissionsView],
