@@ -185,3 +185,43 @@ export interface StudentEnrollmentResponse {
   status: "Active" | "Promoted" | "Repeated" | "Transferred" | "Left";
   remarks: string | null;
 }
+
+/** A guardian as a Students.ViewScoped caller (a teacher) sees them: who to call (F1). */
+export interface GuardianContactResponse {
+  parentId: number;
+  parentName: string;
+  parentMobile: string;
+  relationType: string;
+  isPrimaryContact: boolean;
+}
+
+/**
+ * GET /students/{id} for a caller with only Students.ViewScoped (F1): a strict subset of
+ * StudentResponse with the same property names. No contact details, identity, health text,
+ * pickup persons or fee data; allergies only as a flag.
+ */
+export interface StudentScopedResponse {
+  id: number;
+  admNo: string;
+  rollNumber: string;
+  classSectionId: number;
+  classSectionName: string;
+  status: StudentStatus;
+  photoUrl: string | null;
+  firstName: string;
+  middleName: string | null;
+  lastName: string;
+  preferredName: string | null;
+  gender: string;
+  dateOfBirth: string;
+  house: string | null;
+  health: { hasAllergies: boolean };
+  guardians: GuardianContactResponse[];
+}
+
+export type StudentDetail = StudentResponse | StudentScopedResponse;
+
+/** True when the API sent the full record (Students.View), false for the reduced one. */
+export function isFullStudent(s: StudentDetail): s is StudentResponse {
+  return "identity" in s;
+}

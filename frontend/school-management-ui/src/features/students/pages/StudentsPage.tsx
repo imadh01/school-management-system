@@ -6,29 +6,19 @@ import {
   Eye,
   GraduationCap,
   HeartPulse,
-  History,
   LogOut,
   Pencil,
   Printer,
   Search,
   Trash,
-  Users,
 } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
 import { studentService } from "../services/studentService";
-import { classSectionService } from "@/features/class-sections/services/classSectionService";
 import type {
-  StudentResponse,
   StudentSummaryResponse,
   StudentStatus,
-  CreateStudentRequest,
-  UpdateStudentIdentityRequest,
 } from "../types/student.types";
-import type { ClassSectionResponse } from "@/features/class-sections/types/classSection.types";
-import { StudentHistoryModal } from "../components/StudentHistoryModal";
-import { StudentModal } from "../components/StudentModal";
-import { LinkedParentsViewModal } from "../components/LinkedParentsViewModal";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { ViewDetailsModal } from "@/components/ViewDetailsModal";
 import { ValidationModal } from "@/components/ValidationModal";
 import { PageHero } from "@/components/PageHero";
 import { StatCard, StatGrid } from "@/components/StatCard";
@@ -39,11 +29,7 @@ import { StatusBadge } from "@/components/Badge";
 import { IconButton } from "@/components/IconButton";
 import { EmptyState } from "@/components/EmptyState";
 import { useToast } from "@/components/Toast";
-import {
-  getApiErrors,
-  getReadErrors,
-  isConcurrencyConflict,
-} from "@/utils/apiError";
+import { getApiErrors, getReadErrors } from "@/utils/apiError";
 import { useAuth } from "@/store/AuthContext";
 import { Permission } from "@/routes/permissions";
 import { initialsOf } from "@/utils/initials";
@@ -117,11 +103,9 @@ export function StudentsPage() {
   const canEdit = hasAnyPermission([Permission.StudentsEdit]);
   const canDelete = hasAnyPermission([Permission.StudentsDelete]);
   const toast = useToast();
+  const navigate = useNavigate();
 
   const [students, setStudents] = useState<StudentSummaryResponse[]>([]);
-  const [classSections, setClassSections] = useState<ClassSectionResponse[]>(
-    [],
-  );
   const [isLoading, setIsLoading] = useState(true);
 
   const [statusFilter, setStatusFilter] = useState<StudentStatus | "">("");
@@ -133,30 +117,14 @@ export function StudentsPage() {
   const [houseFilter, setHouseFilter] = useState("");
   const [allergiesOnly, setAllergiesOnly] = useState(false);
 
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingStudent, setEditingStudent] = useState<StudentResponse | null>(
-    null,
-  );
-  const [linkedParentsTarget, setLinkedParentsTarget] =
-    useState<StudentSummaryResponse | null>(null);
-  const [historyTarget, setHistoryTarget] =
-    useState<StudentSummaryResponse | null>(null);
   const [deleteTarget, setDeleteTarget] =
     useState<StudentSummaryResponse | null>(null);
-  const [detailsTarget, setDetailsTarget] = useState<StudentResponse | null>(
-    null,
-  );
   const [errors, setErrors] = useState<string[] | null>(null);
 
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const [studentsData, classSectionsData] = await Promise.all([
-        studentService.getAll(),
-        classSectionService.getAll(),
-      ]);
-      setStudents(studentsData);
-      setClassSections(classSectionsData);
+      setStudents(await studentService.getAll());
     } catch (err) {
       setErrors(getReadErrors(err, "Could not load students."));
     } finally {
@@ -255,24 +223,6 @@ export function StudentsPage() {
     setStatusFilter("");
   };
 
-  // The list carries summary fields only, so the full record is fetched when opened.
-  const openEdit = async (s: StudentSummaryResponse) => {
-    try {
-      setEditingStudent(await studentService.getById(s.id));
-      setIsModalOpen(true);
-    } catch (err) {
-      setErrors(getReadErrors(err, "Could not load this student."));
-    }
-  };
-
-  const openDetails = async (s: StudentSummaryResponse) => {
-    try {
-      setDetailsTarget(await studentService.getById(s.id));
-    } catch (err) {
-      setErrors(getReadErrors(err, "Could not load this student."));
-    }
-  };
-
   const confirmDelete = async () => {
     if (!deleteTarget) return;
     const target = deleteTarget;
@@ -324,7 +274,12 @@ export function StudentsPage() {
             {initialsOf(fullName(s))}
           </span>
           <div>
-            <div className="person__name">{fullName(s)}</div>
+            <Link
+              className="person__name person__link"
+              to={`/students/${s.id}`}
+            >
+              {fullName(s)}
+            </Link>
             <div className="person__sub">Roll {s.rollNumber}</div>
           </div>
         </div>
@@ -369,24 +324,14 @@ export function StudentsPage() {
           <IconButton
             icon={Eye}
             label={`View ${fullName(s)}`}
-            onClick={() => openDetails(s)}
-          />
-          <IconButton
-            icon={Users}
-            label={`Parents of ${fullName(s)}`}
-            onClick={() => setLinkedParentsTarget(s)}
-          />
-          <IconButton
-            icon={History}
-            label={`Academic history of ${fullName(s)}`}
-            onClick={() => setHistoryTarget(s)}
+            onClick={() => navigate(`/students/${s.id}`)}
           />
           {canEdit && (
             <IconButton
               icon={Pencil}
               tone="info"
               label={`Edit ${fullName(s)}`}
-              onClick={() => openEdit(s)}
+              onClick={() => navigate(`/students/${s.id}/edit`)}
             />
           )}
           {canDelete && (
@@ -636,54 +581,6 @@ export function StudentsPage() {
         />
       </Panel>
 
-      <StudentModal
-        isOpen={isModalOpen}
-        editingStudent={editingStudent}
-        classSections={classSections}
-        onClose={() => setIsModalOpen(false)}
-        onSubmit={async (
-          data: CreateStudentRequest,
-          status: StudentStatus,
-          identity: UpdateStudentIdentityRequest | null,
-        ) => {
-          if (editingStudent) {
-            const {
-              admNo: _admNo,
-              admissionDate: _admissionDate,
-              ...rest
-            } = data;
-            try {
-              await studentService.update(editingStudent.id, {
-                ...rest,
-                status,
-                rowVersion: editingStudent.rowVersion,
-              });
-            } catch (err) {
-              // Someone else saved this student first: refresh the list so the next try starts fresh.
-              if (isConcurrencyConflict(err)) await loadData();
-              throw err;
-            }
-            // Identity numbers have their own endpoint and permission.
-            if (identity) {
-              await studentService.updateIdentity(editingStudent.id, identity);
-            }
-            toast.success(`${fullName(data)} was saved.`);
-          } else {
-            await studentService.create(data);
-            toast.success(`${fullName(data)} was added.`);
-          }
-          await loadData();
-        }}
-      />
-
-      <LinkedParentsViewModal
-        student={linkedParentsTarget}
-        onClose={() => setLinkedParentsTarget(null)}
-      />
-      <StudentHistoryModal
-        student={historyTarget}
-        onClose={() => setHistoryTarget(null)}
-      />
       <ConfirmDialog
         isOpen={deleteTarget !== null}
         title="Delete student"
@@ -693,74 +590,12 @@ export function StudentsPage() {
             : ""
         }
         confirmLabel="Delete"
+        danger
         onConfirm={confirmDelete}
         onCancel={() => setDeleteTarget(null)}
       />
 
       <ValidationModal errors={errors} onClose={() => setErrors(null)} />
-
-      <ViewDetailsModal
-        isOpen={detailsTarget !== null}
-        title={detailsTarget ? fullName(detailsTarget) : ""}
-        subtitle={detailsTarget?.admNo}
-        onClose={() => setDetailsTarget(null)}
-        sections={
-          detailsTarget
-            ? [
-                {
-                  heading: "Basics",
-                  rows: [
-                    { label: "Gender", value: detailsTarget.gender },
-                    {
-                      label: "Date of Birth",
-                      value: detailsTarget.dateOfBirth,
-                    },
-                    { label: "Nationality", value: detailsTarget.nationality },
-                    {
-                      label: "Blood Group",
-                      value: detailsTarget.health?.bloodGroup,
-                    },
-                  ],
-                },
-                {
-                  heading: "Academic",
-                  rows: [
-                    { label: "Class", value: detailsTarget.classSectionName },
-                    { label: "Roll Number", value: detailsTarget.rollNumber },
-                    {
-                      label: "Curriculum",
-                      value: detailsTarget.curriculumTrack,
-                    },
-                    { label: "EAL", value: detailsTarget.ealCode },
-                    { label: "House", value: detailsTarget.house },
-                    { label: "Status", value: detailsTarget.status },
-                  ],
-                },
-                {
-                  heading: "Health",
-                  rows: [
-                    {
-                      label: "Allergies",
-                      value:
-                        detailsTarget.health?.allergies ??
-                        (detailsTarget.hasAllergies
-                          ? "Yes (details need sensitive-data access)"
-                          : "None recorded"),
-                    },
-                    {
-                      label: "Dietary Requirements",
-                      value: detailsTarget.health?.dietaryRequirements,
-                    },
-                    {
-                      label: "Medical Notes",
-                      value: detailsTarget.health?.medicalNotes,
-                    },
-                  ],
-                },
-              ]
-            : []
-        }
-      />
     </div>
   );
 }

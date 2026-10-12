@@ -57,3 +57,50 @@ export function getApiErrors(error: unknown, fallback: string): string[] {
   }
   return [fallback];
 }
+
+/**
+ * U2: a failed SAVE split into errors that belong to one field (shown under that field) and
+ * errors that belong to the whole form (shown in the banner at the top).
+ *
+ * The API's validation keys are C# property paths: "FirstName", "Health.Allergies",
+ * "PickupPersons[0].Phone". They become the form's field keys: "firstName",
+ * "health.allergies", "pickupPersons.0.phone". `prefix` is for requests sent from a part of
+ * the form (e.g. "identity" for PUT /students/{id}/identity).
+ */
+export interface SaveErrors {
+  fields: Record<string, string>;
+  form: string[];
+}
+
+export function toFieldKey(apiKey: string, prefix?: string): string {
+  const key = apiKey
+    .replace(/^\$\./, "")
+    .replace(/\[(\d+)\]/g, ".$1")
+    .split(".")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toLowerCase() + part.slice(1))
+    .join(".");
+  return prefix ? `${prefix}.${key}` : key;
+}
+
+export function getSaveErrors(
+  error: unknown,
+  fallback: string,
+  prefix?: string,
+): SaveErrors {
+  const result: SaveErrors = { fields: {}, form: [] };
+  if (axios.isAxiosError(error) && error.response) {
+    const data = error.response.data as ApiErrorBody | undefined;
+    if (data?.errors) {
+      for (const [apiKey, messages] of Object.entries(data.errors)) {
+        if (messages.length === 0) continue;
+        if (!apiKey) result.form.push(...messages);
+        else result.fields[toFieldKey(apiKey, prefix)] = messages[0];
+      }
+      if (Object.keys(result.fields).length > 0 || result.form.length > 0)
+        return result;
+    }
+  }
+  result.form = getApiErrors(error, fallback);
+  return result;
+}

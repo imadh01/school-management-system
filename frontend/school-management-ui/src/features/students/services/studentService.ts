@@ -7,6 +7,7 @@ import type {
   UpdateStudentIdentityRequest,
   StudentIdentityResponse,
   StudentEnrollmentResponse,
+  StudentDetail,
 } from "../types/student.types";
 
 export const studentService = {
@@ -16,8 +17,9 @@ export const studentService = {
       .get<StudentSummaryResponse[]>("/students")
       .then((res) => res.data),
 
+  // The full record for Students.View, the reduced one for Students.ViewScoped (F1).
   getById: (id: number) =>
-    apiClient.get<StudentResponse>(`/students/${id}`).then((res) => res.data),
+    apiClient.get<StudentDetail>(`/students/${id}`).then((res) => res.data),
 
   create: (request: CreateStudentRequest) =>
     apiClient

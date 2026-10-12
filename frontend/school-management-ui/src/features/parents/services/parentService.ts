@@ -26,7 +26,7 @@ export const parentService = {
 
   delete: (id: number) => apiClient.delete(`/parents/${id}`),
 
-  // Read-only view used from the Students page (LinkedParentsViewModal).
+  // The guardians of one student (F1: a teacher gets the contact-only shape).
   getGuardiansForStudent: (studentId: number) =>
     apiClient
       .get<StudentGuardianResponse[]>(`/students/${studentId}/guardians`)

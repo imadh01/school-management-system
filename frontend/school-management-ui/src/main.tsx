@@ -9,6 +9,7 @@ import "@fontsource/plus-jakarta-sans/800.css";
 import "@/assets/theme.css";
 import "@/assets/layout.css";
 import "@/assets/components.css";
+import "@/assets/pages.css";
 import "./index.css";
 import App from "./App.tsx";
 

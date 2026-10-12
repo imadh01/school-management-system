@@ -1,17 +1,28 @@
 import type { ReactNode } from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
+import {
+  Navigate,
+  Route,
+  createBrowserRouter,
+  createRoutesFromElements,
+} from "react-router-dom";
 import { LoginPage } from "../features/authentication/pages/LoginPage";
 import { ChangePasswordRequiredPage } from "../features/authentication/pages/ChangePasswordRequiredPage";
 import { DashboardPage } from "../features/dashboard/pages/DashboardPage";
 import { AdmissionsPage } from "../features/admissions/pages/AdmissionsPage";
 import { StudentsPage } from "../features/students/pages/StudentsPage";
+import { StudentDetailPage } from "../features/students/pages/StudentDetailPage";
+import { StudentEditPage } from "../features/students/pages/StudentEditPage";
 import { ParentsPage } from "../features/parents/pages/ParentsPage";
 import { ClassSectionsPage } from "../features/class-sections/pages/ClassSectionsPage";
 import { TeachersPage } from "../features/teachers/pages/TeachersPage";
 import { SubjectsPage } from "../features/subjects/pages/SubjectsPage";
 import { CHANGE_PASSWORD_PATH, ProtectedRoute } from "./ProtectedRoute";
 import { RequirePermission } from "./RequirePermission";
-import { PAGE_PERMISSIONS, UNBUILT_MODULES_PERMISSIONS } from "./permissions";
+import {
+  PAGE_PERMISSIONS,
+  Permission,
+  UNBUILT_MODULES_PERMISSIONS,
+} from "./permissions";
 import { AttendancePage } from "../features/attendance/pages/AttendancePage";
 import { AppLayout } from "../layouts/AppLayout";
 import { ALL_NAV_ITEMS } from "../layouts/navConfig";
@@ -32,9 +43,14 @@ function guarded(
   );
 }
 
-export function AppRoutes() {
-  return (
-    <Routes>
+/*
+ * U2: a "data router" (createBrowserRouter) instead of <BrowserRouter>. It routes the same way;
+ * the difference is that it supports useBlocker, which the add/edit pages use to ask before
+ * leaving with unsaved changes. The routes are built once, when the app starts.
+ */
+export const router = createBrowserRouter(
+  createRoutesFromElements(
+    <>
       <Route path="/login" element={<LoginPage />} />
       <Route element={<ProtectedRoute />}>
         <Route
@@ -45,6 +61,14 @@ export function AppRoutes() {
           <Route path="/dashboard" element={<DashboardPage />} />
           {guarded("/admissions", <AdmissionsPage />)}
           {guarded("/students", <StudentsPage />)}
+          {guarded(
+            "/students/:id",
+            <StudentDetailPage />,
+            PAGE_PERMISSIONS["/students"],
+          )}
+          {guarded("/students/:id/edit", <StudentEditPage />, [
+            Permission.StudentsEdit,
+          ])}
           {guarded("/parents", <ParentsPage />)}
           {guarded("/classes-sections", <ClassSectionsPage />)}
           {guarded("/subjects", <SubjectsPage />)}
@@ -58,6 +82,6 @@ export function AppRoutes() {
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
-  );
-}
+    </>,
+  ),
+);
