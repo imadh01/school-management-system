@@ -21,8 +21,7 @@
 .btn:focus-visible,
 .btn--icon:focus-visible,
 .icon-btn:focus-visible,
-.pipeline__step:focus-visible,
-.export-btn:focus-visible {
+.pipeline__step:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -448,47 +447,6 @@ textarea.input {
   padding: 0 12px;
   min-width: 170px;
 }
-.filters__clear {
-  align-self: end;
-  justify-self: start;
-  width: fit-content;
-}
-
-/* ---- Table toolbar ---- */
-.table-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 14px;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-.table-toolbar__left {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-.export-btn {
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  min-height: 38px;
-  padding: 0 14px;
-  font: inherit;
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--text);
-  background: var(--surface);
-  cursor: pointer;
-}
-.export-btn:hover {
-  background: var(--surface-2);
-}
-.table-toolbar__right {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  flex-wrap: wrap;
-}
 .pagesize {
   display: flex;
   align-items: center;
@@ -799,24 +757,6 @@ tbody tr:hover td {
   max-height: 70vh;
   overflow-y: auto;
 }
-.modal__section-title {
-  font-size: 12px;
-  font-weight: 800;
-  color: var(--accent-text);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--border);
-  margin: 20px 0 14px;
-}
-.modal__section-title:first-child {
-  margin-top: 0;
-}
-.modal__grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 14px 16px;
-}
 .modal__footer {
   display: flex;
   gap: 10px;
@@ -828,7 +768,6 @@ tbody tr:hover td {
   color: var(--bad);
   margin-left: 2px;
 }
-.modal__note,
 .info-banner {
   background: var(--info-bg);
   color: var(--text);
@@ -839,16 +778,8 @@ tbody tr:hover td {
   font-size: 13px;
   line-height: 1.5;
 }
-.modal__note {
-  margin-top: 16px;
-}
 .info-banner {
   margin-bottom: 16px;
-}
-@media (max-width: 640px) {
-  .modal__grid {
-    grid-template-columns: 1fr;
-  }
 }
 
 /* ---- Tag buttons (dietary requirements, house) ---- */
@@ -873,21 +804,26 @@ tbody tr:hover td {
   border-color: var(--info-solid);
   color: #fff;
 }
-.tag-btn.selected.house-Red {
+.tag-btn.selected.tag-btn--Red {
   background: var(--bad-solid);
   border-color: var(--bad-solid);
 }
-.tag-btn.selected.house-Blue {
+.tag-btn.selected.tag-btn--Blue {
   background: var(--info-solid);
   border-color: var(--info-solid);
 }
-.tag-btn.selected.house-Green {
+.tag-btn.selected.tag-btn--Green {
   background: var(--ok-solid);
   border-color: var(--ok-solid);
 }
-.tag-btn.selected.house-Yellow {
+.tag-btn.selected.tag-btn--Yellow {
   background: var(--warn-solid);
   border-color: var(--warn-solid);
+}
+.tag-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  border-style: dashed;
 }
 .tag-btn--restrictions.selected {
   background: var(--ok-solid);
@@ -1002,21 +938,4 @@ tbody tr:hover td {
 }
 .toast__close:hover {
   background: var(--surface-2);
-}
-
-/* Label / value pairs in read-only dialogs */
-.detail-list {
-  display: grid;
-  grid-template-columns: max-content 1fr;
-  gap: 10px 18px;
-  margin: 0;
-  font-size: 14px;
-}
-.detail-list dt {
-  color: var(--text-muted);
-  font-weight: 600;
-}
-.detail-list dd {
-  margin: 0;
-  color: var(--text);
 }

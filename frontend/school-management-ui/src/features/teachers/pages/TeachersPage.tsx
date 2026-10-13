@@ -1,175 +1,196 @@
-import { useToast } from "@/components/Toast";
-import { PageHero } from "@/components/PageHero";
-import { Plus, Star, UserRound } from "lucide-react";
-import { StatCard, StatGrid } from "@/components/StatCard";
-import { useEffect, useMemo, useState } from "react";
-import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { ValidationModal } from "@/components/ValidationModal";
-import { getApiErrors } from "@/utils/apiError";
+import { useMemo } from "react";
+import { CircleCheck, Star, UserRound } from "lucide-react";
 import { teacherService } from "../services/teacherService";
-import { TeacherModal } from "../components/TeacherModal";
-import { TeacherManageModal } from "../components/TeacherManageModal";
-import type {
-  CreateTeacherRequest,
-  TeacherResponse,
-  UpdateTeacherRequest,
-} from "../types/teacher.types";
+import { TEACHER_STATUSES, type TeacherResponse } from "../types/teacher.types";
+import { PageHero } from "@/components/PageHero";
+import { StatCard, StatGrid } from "@/components/StatCard";
+import { Panel } from "@/components/Panel";
+import {
+  ClearFiltersButton,
+  FilterBar,
+  FilterSelect,
+} from "@/components/FilterBar";
+import { SearchBox } from "@/components/SearchBox";
+import { StatusPills } from "@/components/StatusPills";
+import { DataTable, type Column } from "@/components/DataTable";
+import { Badge, StatusBadge } from "@/components/Badge";
+import { Notice } from "@/components/Notice";
+import { ListEmptyState } from "@/components/ListEmptyState";
+import { PersonCell } from "@/components/PersonCell";
+import {
+  ExportCsvButton,
+  NewRecordLink,
+  PrintButton,
+  RowActions,
+} from "@/components/ListButtons";
+import { useAsyncData } from "@/hooks/useAsyncData";
+import { useCan } from "@/hooks/useCan";
+import { useConfirmAction } from "@/hooks/useConfirmAction";
+import { useFilters } from "@/hooks/useFilters";
+import { Permission } from "@/routes/permissions";
+import { countBy, uniqueSorted } from "@/utils/collections";
+import { downloadCsv } from "@/utils/csv";
 
-type StatusFilter = "" | "Active" | "Inactive" | "Suspended";
+const STATUS_FILTERS = ["All", ...TEACHER_STATUSES] as const;
 
-const STATUS_BADGE: Record<string, string> = {
-  Active: "badge--active",
-  Inactive: "badge--inactive",
-  Suspended: "badge--danger",
-};
-
-function downloadCsv(rows: TeacherResponse[]) {
-  const headers = [
-    "ID",
-    "Name",
-    "Username",
-    "Email",
-    "Phone",
-    "Specialization",
-    "Classes",
-    "Subjects",
-    "Class Teacher Of",
-    "Status",
-  ];
-  const lines = rows.map((t) =>
-    [
-      t.id,
-      t.name,
-      t.username,
-      t.email,
-      t.phone ?? "",
-      t.specialization ?? "",
-      t.classCount,
-      t.subjectCount,
-      t.classTeacherOfCount,
-      t.status,
-    ]
-      .map((v) => `"${String(v).replace(/"/g, '""')}"`)
-      .join(","),
-  );
-  const blob = new Blob([[headers.join(","), ...lines].join("\n")], {
-    type: "text/csv;charset=utf-8;",
-  });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "teachers.csv";
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
+/**
+ * U2: the teachers list. Opening a teacher goes to their page (profile and class/subject
+ * assignments); adding and editing are full pages.
+ */
 export function TeachersPage() {
-  const toast = useToast();
-  const [teachers, setTeachers] = useState<TeacherResponse[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const can = useCan();
+  const canCreate = can(Permission.TeachersCreate);
+  const canEdit = can(Permission.TeachersEdit);
+  const canDelete = can(Permission.TeachersDelete);
 
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("");
-  const [search, setSearch] = useState("");
-  const [quickSearch, setQuickSearch] = useState("");
+  const list = useAsyncData(
+    () => teacherService.getAll(),
+    [],
+    "Could not load teachers.",
+  );
+  const teachers = useMemo(() => list.data ?? [], [list.data]);
 
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const filters = useFilters({ status: "All", specialization: "", search: "" });
+  const f = filters.values;
 
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editing, setEditing] = useState<TeacherResponse | null>(null);
-  const [managingId, setManagingId] = useState<number | null>(null);
-  const [deleting, setDeleting] = useState<TeacherResponse | null>(null);
-  const [errors, setErrors] = useState<string[] | null>(null);
-
-  const loadData = async () => {
-    try {
-      setTeachers(await teacherService.getAll());
-    } catch (err) {
-      setErrors(getApiErrors(err, "Could not load teachers."));
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const counts = useMemo(
-    () => ({
-      all: teachers.length,
-      active: teachers.filter((t) => t.status === "Active").length,
-      inactive: teachers.filter((t) => t.status === "Inactive").length,
-      suspended: teachers.filter((t) => t.status === "Suspended").length,
-      classTeachers: teachers.reduce((n, t) => n + t.classTeacherOfCount, 0),
-    }),
+  const specializations = useMemo(
+    () => uniqueSorted(teachers.map((t) => t.specialization)),
     [teachers],
   );
+  const counts: Record<string, number> = useMemo(
+    () => ({ All: teachers.length, ...countBy(teachers, (t) => t.status) }),
+    [teachers],
+  );
+  const classTeachers = teachers.filter(
+    (t) => t.classTeacherOfCount > 0,
+  ).length;
 
   const filtered = useMemo(() => {
-    const q = (quickSearch || search).trim().toLowerCase();
+    const q = f.search.trim().toLowerCase();
     return teachers.filter((t) => {
-      if (statusFilter && t.status !== statusFilter) return false;
-      if (q) {
-        const haystack =
-          `${t.name} ${t.username} ${t.email} ${t.specialization ?? ""}`.toLowerCase();
-        if (!haystack.includes(q)) return false;
-      }
+      if (f.status !== "All" && t.status !== f.status) return false;
+      if (f.specialization && t.specialization !== f.specialization)
+        return false;
+      if (
+        q &&
+        !`${t.name} ${t.username} ${t.email} ${t.specialization ?? ""}`
+          .toLowerCase()
+          .includes(q)
+      )
+        return false;
       return true;
     });
-  }, [teachers, statusFilter, search, quickSearch]);
+  }, [teachers, f]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const pageRows = filtered.slice((page - 1) * pageSize, page * pageSize);
+  const remove = useConfirmAction<TeacherResponse>({
+    title: "Delete teacher",
+    message: (t) =>
+      `Delete ${t.name}? Their login is removed too. This cannot be undone.`,
+    confirmLabel: "Delete",
+    danger: true,
+    run: async (t) => {
+      await teacherService.delete(t.id);
+      await list.reload();
+    },
+    success: (t) => `${t.name} was deleted.`,
+    failure: "Could not delete this teacher.",
+  });
 
-  useEffect(() => {
-    setPage(1);
-  }, [statusFilter, search, quickSearch, pageSize]);
+  const exportCsv = () =>
+    downloadCsv(
+      "teachers.csv",
+      [
+        "Name",
+        "Username",
+        "Email",
+        "Phone",
+        "Specialization",
+        "Classes",
+        "Subjects",
+        "Class Teacher Of",
+        "Status",
+      ],
+      filtered.map((t) => [
+        t.name,
+        t.username,
+        t.email,
+        t.phone,
+        t.specialization,
+        t.classCount,
+        t.subjectCount,
+        t.classTeacherOfCount,
+        t.status,
+      ]),
+    );
 
-  const clearFilters = () => {
-    setSearch("");
-    setQuickSearch("");
-    setStatusFilter("");
-  };
+  const newLink = canCreate ? (
+    <NewRecordLink to="/teachers/new" label="Add teacher" />
+  ) : undefined;
 
-  const handleConfirmDelete = async () => {
-    if (!deleting) return;
-    const target = deleting;
-    setDeleting(null);
-    try {
-      await teacherService.delete(target.id);
-      await loadData();
-    } catch (err) {
-      setErrors(getApiErrors(err, "Could not delete this teacher."));
-    }
-  };
-
-  const managing = teachers.find((t) => t.id === managingId) ?? null;
-
-  const pipelineSteps: {
-    key: StatusFilter;
-    label: string;
-    activeClass: string;
-  }[] = [
+  const columns: Column<TeacherResponse>[] = [
     {
-      key: "",
-      label: `All (${counts.all})`,
-      activeClass: "pipeline__step--dark",
+      key: "name",
+      header: "Teacher",
+      sortValue: (t) => t.name,
+      render: (t) => (
+        <PersonCell name={t.name} to={`/teachers/${t.id}`} sub={t.username} />
+      ),
     },
     {
-      key: "Active",
-      label: `Active (${counts.active})`,
-      activeClass: "pipeline__step--green",
+      key: "contact",
+      header: "Contact",
+      hideBelow: "md",
+      sortValue: (t) => t.email,
+      render: (t) => (
+        <div>
+          <div>{t.email}</div>
+          {t.phone && <div className="person__sub">{t.phone}</div>}
+        </div>
+      ),
     },
     {
-      key: "Inactive",
-      label: `Inactive (${counts.inactive})`,
-      activeClass: "",
+      key: "specialization",
+      header: "Specialization",
+      sortValue: (t) => t.specialization,
+      render: (t) => t.specialization ?? <span className="cell-muted">—</span>,
     },
     {
-      key: "Suspended",
-      label: `Suspended (${counts.suspended})`,
-      activeClass: "pipeline__step--red",
+      key: "classes",
+      header: "Classes",
+      sortValue: (t) => t.classCount,
+      render: (t) => (
+        <>
+          {t.classCount}{" "}
+          {t.classTeacherOfCount > 0 && (
+            <Badge tone="warn">Class teacher of {t.classTeacherOfCount}</Badge>
+          )}
+        </>
+      ),
+    },
+    {
+      key: "subjects",
+      header: "Subjects",
+      hideBelow: "md",
+      sortValue: (t) => t.subjectCount,
+      render: (t) => t.subjectCount,
+    },
+    {
+      key: "status",
+      header: "Status",
+      sortValue: (t) => t.status,
+      render: (t) => <StatusBadge status={t.status} />,
+    },
+    {
+      key: "actions",
+      header: "Actions",
+      render: (t) => (
+        <RowActions
+          name={t.name}
+          viewTo={`/teachers/${t.id}`}
+          editTo={canEdit ? `/teachers/${t.id}/edit` : undefined}
+          onDelete={canDelete ? () => remove.ask(t) : undefined}
+        />
+      ),
     },
   ];
 
@@ -180,29 +201,27 @@ export function TeachersPage() {
         subtitle="Teaching staff, the subjects they teach and their class-teacher duties."
         actions={
           <>
-            <button
-              className="btn btn--primary"
-              onClick={() => {
-                setEditing(null);
-                setIsModalOpen(true);
-              }}
-            >
-              <Plus size={16} aria-hidden="true" />
-              Add teacher
-            </button>
+            <PrintButton />
+            {newLink}
           </>
         }
         stats={
           <StatGrid>
             <StatCard
               label="Teachers"
-              value={counts.all}
+              value={teachers.length}
               icon={UserRound}
               tone="info"
             />
             <StatCard
+              label="Active"
+              value={counts.Active ?? 0}
+              icon={CircleCheck}
+              tone="ok"
+            />
+            <StatCard
               label="Class teachers"
-              value={counts.classTeachers}
+              value={classTeachers}
               icon={Star}
               tone="accent"
             />
@@ -210,238 +229,69 @@ export function TeachersPage() {
         }
       />
 
-      <div className="card">
-        <div className="pipeline">
-          {pipelineSteps.map((s) => (
-            <button
-              key={s.key}
-              type="button"
-              className={`pipeline__step ${statusFilter === s.key ? "pipeline__step--active" : s.activeClass}`}
-              onClick={() => setStatusFilter(s.key)}
-            >
-              {s.label}
-            </button>
-          ))}
-        </div>
+      <Panel
+        title="All teachers"
+        subtitle={`${teachers.length} teachers · ${filtered.length} shown`}
+        icon={UserRound}
+        actions={
+          <ExportCsvButton
+            onClick={exportCsv}
+            disabled={filtered.length === 0}
+          />
+        }
+      >
+        <StatusPills
+          label="Filter by status"
+          options={STATUS_FILTERS}
+          value={f.status as (typeof STATUS_FILTERS)[number]}
+          onChange={(v) => filters.set("status", v)}
+          counts={counts}
+        />
+        <FilterBar>
+          <FilterSelect
+            label="Specialization"
+            allLabel="All specializations"
+            options={specializations}
+            value={f.specialization}
+            onChange={(v) => filters.set("specialization", v)}
+          />
+          <SearchBox
+            label="Search teachers"
+            placeholder="Name, username, email"
+            value={f.search}
+            onChange={(v) => filters.set("search", v)}
+          />
+          <ClearFiltersButton
+            visible={filters.isActive}
+            onClear={filters.clear}
+          />
+        </FilterBar>
 
-        <div className="filters">
-          <div className="field" style={{ gridColumn: "span 2" }}>
-            <label>Search</label>
-            <input
-              placeholder="Name / username / email..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
+        {list.error && (
+          <Notice tone="warn" style={{ margin: 16 }}>
+            {list.error}
+          </Notice>
+        )}
+        <DataTable
+          caption="Teachers"
+          columns={columns}
+          rows={filtered}
+          rowKey={(t) => t.id}
+          loading={list.isLoading && !list.data}
+          resetPageKey={filters.key}
+          empty={
+            <ListEmptyState
+              icon={UserRound}
+              noun="teachers"
+              hasRecords={teachers.length > 0}
+              onClearFilters={filters.clear}
+              createAction={newLink}
             />
-          </div>
-          <button
-            className="btn btn--secondary filters__clear"
-            onClick={clearFilters}
-          >
-            Clear
-          </button>
-        </div>
+          }
+        />
+      </Panel>
 
-        <div className="table-toolbar">
-          <div className="table-toolbar__left">
-            <button
-              className="export-btn export-btn--csv"
-              onClick={() => downloadCsv(filtered)}
-            >
-              CSV
-            </button>
-            <button
-              className="export-btn export-btn--pdf"
-              onClick={() =>
-                toast.info("PDF export is coming in a later release.")
-              }
-            >
-              PDF
-            </button>
-            <button
-              className="export-btn export-btn--print"
-              onClick={() => window.print()}
-            >
-              PRINT
-            </button>
-          </div>
-          <div className="table-toolbar__right">
-            <div className="pagesize">
-              Show{" "}
-              <select
-                value={pageSize}
-                onChange={(e) => setPageSize(Number(e.target.value))}
-              >
-                <option value={10}>10</option>
-                <option value={25}>25</option>
-              </select>{" "}
-              entries
-            </div>
-            <input
-              className="search-box"
-              type="search"
-              placeholder="Search..."
-              value={quickSearch}
-              onChange={(e) => setQuickSearch(e.target.value)}
-            />
-          </div>
-        </div>
-
-        <div style={{ overflowX: "auto" }}>
-          {isLoading ? (
-            <div className="empty-state">Loading…</div>
-          ) : pageRows.length === 0 ? (
-            <div className="empty-state">No teachers match these filters.</div>
-          ) : (
-            <table>
-              <thead>
-                <tr>
-                  <th>Teacher</th>
-                  <th>Contact</th>
-                  <th>Specialization</th>
-                  <th>Classes</th>
-                  <th>Status</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pageRows.map((t) => (
-                  <tr key={t.id}>
-                    <td>
-                      <span className="avatar-circle">
-                        {t.name.charAt(0).toUpperCase()}
-                      </span>
-                      <strong>{t.name}</strong>
-                      <br />
-                      <span style={{ fontSize: 11, color: "var(--muted)" }}>
-                        {t.username}
-                      </span>
-                    </td>
-                    <td>
-                      {t.email}
-                      {t.phone && (
-                        <>
-                          <br />
-                          <span style={{ fontSize: 11, color: "var(--muted)" }}>
-                            {t.phone}
-                          </span>
-                        </>
-                      )}
-                    </td>
-                    <td>
-                      <span className="badge badge--info">
-                        {t.specialization ?? "—"}
-                      </span>
-                    </td>
-                    <td>
-                      {t.classCount}
-                      {t.classTeacherOfCount > 0 && (
-                        <span
-                          className="badge badge--warn"
-                          style={{ marginLeft: 6 }}
-                          title={`Class teacher of ${t.classTeacherOfCount}`}
-                        >
-                          ★ {t.classTeacherOfCount}
-                        </span>
-                      )}
-                    </td>
-                    <td>
-                      <span
-                        className={`badge ${STATUS_BADGE[t.status] ?? "badge--inactive"}`}
-                      >
-                        {t.status}
-                      </span>
-                    </td>
-                    <td style={{ whiteSpace: "nowrap" }}>
-                      <button
-                        className="btn btn--secondary btn--sm"
-                        onClick={() => setManagingId(t.id)}
-                      >
-                        Manage
-                      </button>{" "}
-                      <button
-                        className="btn--icon"
-                        title="Edit"
-                        onClick={() => {
-                          setEditing(t);
-                          setIsModalOpen(true);
-                        }}
-                      >
-                        ✎
-                      </button>
-                      <button
-                        className="btn--icon danger"
-                        title="Delete"
-                        onClick={() => setDeleting(t)}
-                      >
-                        🗑
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-
-        <div className="table-footer">
-          <span>
-            Showing {filtered.length === 0 ? 0 : (page - 1) * pageSize + 1} to{" "}
-            {Math.min(page * pageSize, filtered.length)} of {filtered.length}{" "}
-            entries
-          </span>
-          <div className="table-footer__pages">
-            <button
-              className="btn btn--secondary btn--sm"
-              disabled={page <= 1}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-            >
-              Previous
-            </button>
-            <span>
-              Page {page} of {totalPages}
-            </span>
-            <button
-              className="btn btn--secondary btn--sm"
-              disabled={page >= totalPages}
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            >
-              Next
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <TeacherModal
-        isOpen={isModalOpen}
-        editing={editing}
-        onClose={() => setIsModalOpen(false)}
-        onCreate={async (data: CreateTeacherRequest) => {
-          await teacherService.create(data);
-          setStatusFilter("");
-          await loadData();
-        }}
-        onUpdate={async (id: number, data: UpdateTeacherRequest) => {
-          await teacherService.update(id, data);
-          await loadData();
-        }}
-      />
-
-      <TeacherManageModal
-        teacher={managing}
-        onClose={() => setManagingId(null)}
-        onChanged={loadData}
-      />
-
-      <ConfirmDialog
-        isOpen={!!deleting}
-        title="Delete Teacher"
-        message={`Delete ${deleting?.name ?? "this teacher"} (${deleting?.username ?? ""})? Their login is removed too. Teachers who still have subjects or a class-teacher role cannot be deleted — remove those first.`}
-        confirmLabel="Delete"
-        onConfirm={handleConfirmDelete}
-        onCancel={() => setDeleting(null)}
-      />
-
-      <ValidationModal errors={errors} onClose={() => setErrors(null)} />
+      {remove.dialog}
     </div>
   );
 }

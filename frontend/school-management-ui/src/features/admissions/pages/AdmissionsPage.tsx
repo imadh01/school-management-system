@@ -1,22 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useMemo } from "react";
 import {
   CircleCheck,
+  CircleX,
   ClipboardList,
-  Download,
-  Eye,
   FileText,
   GraduationCap,
-  Pencil,
-  Plus,
-  Printer,
-  Search,
-  Trash,
-  CircleX,
 } from "lucide-react";
 import { admissionService } from "../services/admissionService";
 import {
   ADMISSION_STATUS_TONE,
+  isAdmissionDeletable,
   isAdmissionEditable,
   type AdmissionResponse,
   type AdmissionStatus,
@@ -24,18 +17,35 @@ import {
 import { PageHero } from "@/components/PageHero";
 import { StatCard, StatGrid } from "@/components/StatCard";
 import { Panel } from "@/components/Panel";
-import { FilterBar } from "@/components/FilterBar";
+import {
+  ClearFiltersButton,
+  FilterBar,
+  FilterDate,
+  FilterSelect,
+} from "@/components/FilterBar";
+import { SearchBox } from "@/components/SearchBox";
+import { StatusPills } from "@/components/StatusPills";
 import { DataTable, type Column } from "@/components/DataTable";
 import { Badge } from "@/components/Badge";
-import { IconButton } from "@/components/IconButton";
-import { EmptyState } from "@/components/EmptyState";
-import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { useToast } from "@/components/Toast";
-import { getApiErrors, getReadErrors } from "@/utils/apiError";
-import { useAuth } from "@/store/AuthContext";
+import { Notice } from "@/components/Notice";
+import { ListEmptyState } from "@/components/ListEmptyState";
+import { PersonCell } from "@/components/PersonCell";
+import {
+  ExportCsvButton,
+  NewRecordLink,
+  PrintButton,
+  RowActions,
+} from "@/components/ListButtons";
+import { useAsyncData } from "@/hooks/useAsyncData";
+import { useCan } from "@/hooks/useCan";
+import { useConfirmAction } from "@/hooks/useConfirmAction";
+import { useFilters } from "@/hooks/useFilters";
 import { Permission } from "@/routes/permissions";
+import { countBy, uniqueSorted } from "@/utils/collections";
+import { downloadCsv } from "@/utils/csv";
+import { formatDate } from "@/utils/format";
 
-const STATUS_FILTERS: (AdmissionStatus | "All")[] = [
+const STATUS_FILTERS: readonly (AdmissionStatus | "All")[] = [
   "All",
   "Registered",
   "Admitted",
@@ -43,198 +53,121 @@ const STATUS_FILTERS: (AdmissionStatus | "All")[] = [
   "Rejected",
 ];
 
-function unique(values: (string | null)[]): string[] {
-  return [...new Set(values.filter((v): v is string => !!v))].sort();
-}
-
-function formatDate(iso: string): string {
-  const d = new Date(`${iso}T00:00:00`);
-  return Number.isNaN(d.getTime())
-    ? iso
-    : d.toLocaleDateString("en-GB", {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-      });
-}
-
-function toCsv(rows: AdmissionResponse[]): string {
-  const headers = [
-    "Reg No",
-    "Applicant",
-    "Gender",
-    "DOB",
-    "Applied For",
-    "Type",
-    "Previous School",
-    "Phone",
-    "Email",
-    "Reg Date",
-    "Admission Fee",
-    "Status",
-  ];
-  const lines = rows.map((a) =>
-    [
-      a.regNo,
-      `${a.firstName} ${a.lastName}`,
-      a.gender,
-      a.dateOfBirth,
-      a.appliedForClassSectionName,
-      a.admissionType,
-      a.previousSchool ?? "",
-      a.phone,
-      a.email ?? "",
-      a.registrationDate,
-      a.admissionFee ?? "",
-      a.status,
-    ]
-      .map((v) => `"${String(v).replace(/"/g, '""')}"`)
-      .join(","),
-  );
-  return [headers.join(","), ...lines].join("\n");
-}
+const fullName = (a: AdmissionResponse) => `${a.firstName} ${a.lastName}`;
 
 /**
  * U2: the admissions list. Opening a row goes to the application's own page, where the decisions
  * (confirm, reject, enrol) are made. Registering opens the full-page form.
  */
 export function AdmissionsPage() {
-  const toast = useToast();
-  const navigate = useNavigate();
-  const { hasAnyPermission } = useAuth();
-  const canCreate = hasAnyPermission([Permission.AdmissionsCreate]);
-  const canEdit = hasAnyPermission([Permission.AdmissionsEdit]);
-  const canDelete = hasAnyPermission([Permission.AdmissionsDelete]);
+  const can = useCan();
+  const canCreate = can(Permission.AdmissionsCreate);
+  const canEdit = can(Permission.AdmissionsEdit);
+  const canDelete = can(Permission.AdmissionsDelete);
 
-  const [admissions, setAdmissions] = useState<AdmissionResponse[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState<AdmissionStatus | "All">(
-    "All",
+  const list = useAsyncData(
+    () => admissionService.getAll(),
+    [],
+    "Could not load applications.",
   );
-  const [search, setSearch] = useState("");
-  const [yearFilter, setYearFilter] = useState("");
-  const [typeFilter, setTypeFilter] = useState("");
-  const [classFilter, setClassFilter] = useState("");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
-  const [deleteTarget, setDeleteTarget] = useState<AdmissionResponse | null>(
-    null,
-  );
+  const admissions = useMemo(() => list.data ?? [], [list.data]);
 
-  const loadData = async () => {
-    try {
-      setAdmissions(await admissionService.getAll());
-    } catch (err) {
-      toast.error(getReadErrors(err, "Could not load applications.")[0]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    void loadData();
-    // Load once. (loadData uses toast, whose object changes on every message: listing it would reload in a loop.)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const filters = useFilters({
+    status: "All",
+    search: "",
+    year: "",
+    type: "",
+    classSection: "",
+    dateFrom: "",
+    dateTo: "",
+  });
+  const f = filters.values;
 
   const years = useMemo(
-    () => unique(admissions.map((a) => a.academicYearName)),
+    () => uniqueSorted(admissions.map((a) => a.academicYearName)),
     [admissions],
   );
   const classNames = useMemo(
-    () => unique(admissions.map((a) => a.appliedForClassSectionName)),
+    () => uniqueSorted(admissions.map((a) => a.appliedForClassSectionName)),
+    [admissions],
+  );
+  const counts = useMemo(
+    (): Record<string, number> => ({
+      All: admissions.length,
+      ...countBy(admissions, (a) => a.status),
+    }),
     [admissions],
   );
 
-  const counts = useMemo(() => {
-    const c: Record<AdmissionStatus | "All", number> = {
-      All: admissions.length,
-      Registered: 0,
-      Admitted: 0,
-      Enrolled: 0,
-      Rejected: 0,
-    };
-    admissions.forEach((a) => (c[a.status] += 1));
-    return c;
-  }, [admissions]);
-
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = f.search.trim().toLowerCase();
     return admissions.filter((a) => {
-      if (statusFilter !== "All" && a.status !== statusFilter) return false;
-      if (yearFilter && a.academicYearName !== yearFilter) return false;
-      if (typeFilter && a.admissionType !== typeFilter) return false;
-      if (classFilter && a.appliedForClassSectionName !== classFilter)
+      if (f.status !== "All" && a.status !== f.status) return false;
+      if (f.year && a.academicYearName !== f.year) return false;
+      if (f.type && a.admissionType !== f.type) return false;
+      if (f.classSection && a.appliedForClassSectionName !== f.classSection)
         return false;
-      if (dateFrom && a.registrationDate < dateFrom) return false;
-      if (dateTo && a.registrationDate > dateTo) return false;
+      if (f.dateFrom && a.registrationDate < f.dateFrom) return false;
+      if (f.dateTo && a.registrationDate > f.dateTo) return false;
       if (q) {
         const haystack =
-          `${a.firstName} ${a.lastName} ${a.regNo} ${a.phone} ${a.email ?? ""}`.toLowerCase();
+          `${fullName(a)} ${a.regNo} ${a.phone} ${a.email ?? ""}`.toLowerCase();
         if (!haystack.includes(q)) return false;
       }
       return true;
     });
-  }, [
-    admissions,
-    statusFilter,
-    search,
-    yearFilter,
-    typeFilter,
-    classFilter,
-    dateFrom,
-    dateTo,
-  ]);
+  }, [admissions, f]);
 
-  const filterKey = [
-    statusFilter,
-    search,
-    yearFilter,
-    typeFilter,
-    classFilter,
-    dateFrom,
-    dateTo,
-  ].join("|");
-  const anyFilter =
-    statusFilter !== "All" ||
-    !!(search || yearFilter || typeFilter || classFilter || dateFrom || dateTo);
+  const remove = useConfirmAction<AdmissionResponse>({
+    title: "Delete application",
+    message: (a) =>
+      `Delete the application for ${fullName(a)} (${a.regNo})? This cannot be undone.`,
+    confirmLabel: "Delete",
+    danger: true,
+    run: async (a) => {
+      await admissionService.delete(a.id);
+      await list.reload();
+    },
+    success: (a) => `Application ${a.regNo} was deleted.`,
+    failure: "Could not delete this application.",
+  });
 
-  const clearFilters = () => {
-    setStatusFilter("All");
-    setSearch("");
-    setYearFilter("");
-    setTypeFilter("");
-    setClassFilter("");
-    setDateFrom("");
-    setDateTo("");
-  };
+  const exportCsv = () =>
+    downloadCsv(
+      "admissions.csv",
+      [
+        "Reg No",
+        "Applicant",
+        "Gender",
+        "DOB",
+        "Applied For",
+        "Type",
+        "Previous School",
+        "Phone",
+        "Email",
+        "Reg Date",
+        "Admission Fee",
+        "Status",
+      ],
+      filtered.map((a) => [
+        a.regNo,
+        fullName(a),
+        a.gender,
+        a.dateOfBirth,
+        a.appliedForClassSectionName,
+        a.admissionType,
+        a.previousSchool,
+        a.phone,
+        a.email,
+        a.registrationDate,
+        a.admissionFee,
+        a.status,
+      ]),
+    );
 
-  const confirmDelete = async () => {
-    const target = deleteTarget;
-    setDeleteTarget(null);
-    if (!target) return;
-    try {
-      await admissionService.delete(target.id);
-      toast.success(`Application ${target.regNo} was deleted.`);
-      await loadData();
-    } catch (err) {
-      toast.error(getApiErrors(err, "Could not delete this application.")[0]);
-    }
-  };
-
-  const handleExportCsv = () => {
-    const blob = new Blob([toCsv(filtered)], {
-      type: "text/csv;charset=utf-8;",
-    });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "admissions.csv";
-    link.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const fullName = (a: AdmissionResponse) => `${a.firstName} ${a.lastName}`;
+  const newLink = canCreate ? (
+    <NewRecordLink to="/admissions/new" label="New registration" />
+  ) : undefined;
 
   const columns: Column<AdmissionResponse>[] = [
     {
@@ -248,17 +181,11 @@ export function AdmissionsPage() {
       header: "Applicant",
       sortValue: (a) => fullName(a),
       render: (a) => (
-        <div>
-          <Link
-            className="person__name person__link"
-            to={`/admissions/${a.id}`}
-          >
-            {fullName(a)}
-          </Link>
-          <div className="person__sub">
-            {a.gender} · born {formatDate(a.dateOfBirth)}
-          </div>
-        </div>
+        <PersonCell
+          name={fullName(a)}
+          to={`/admissions/${a.id}`}
+          sub={`${a.gender} · born ${formatDate(a.dateOfBirth)}`}
+        />
       ),
     },
     {
@@ -297,29 +224,20 @@ export function AdmissionsPage() {
       key: "actions",
       header: "Actions",
       render: (a) => (
-        <div className="row-actions">
-          <IconButton
-            icon={Eye}
-            label={`Open the application of ${fullName(a)}`}
-            onClick={() => navigate(`/admissions/${a.id}`)}
-          />
-          {canEdit && isAdmissionEditable(a.status) && (
-            <IconButton
-              icon={Pencil}
-              tone="info"
-              label={`Edit the application of ${fullName(a)}`}
-              onClick={() => navigate(`/admissions/${a.id}/edit`)}
-            />
-          )}
-          {canDelete && (
-            <IconButton
-              icon={Trash}
-              tone="bad"
-              label={`Delete the application of ${fullName(a)}`}
-              onClick={() => setDeleteTarget(a)}
-            />
-          )}
-        </div>
+        <RowActions
+          name={`the application of ${fullName(a)}`}
+          viewTo={`/admissions/${a.id}`}
+          editTo={
+            canEdit && isAdmissionEditable(a.status)
+              ? `/admissions/${a.id}/edit`
+              : undefined
+          }
+          onDelete={
+            canDelete && isAdmissionDeletable(a.status)
+              ? () => remove.ask(a)
+              : undefined
+          }
+        />
       ),
     },
   ];
@@ -331,45 +249,33 @@ export function AdmissionsPage() {
         subtitle="Applications from registration to confirmation and enrolment."
         actions={
           <>
-            <button
-              type="button"
-              className="btn btn--secondary"
-              onClick={() => window.print()}
-            >
-              <Printer size={16} aria-hidden="true" />
-              Print
-            </button>
-            {canCreate && (
-              <Link className="btn btn--primary" to="/admissions/new">
-                <Plus size={16} aria-hidden="true" />
-                New registration
-              </Link>
-            )}
+            <PrintButton />
+            {newLink}
           </>
         }
         stats={
           <StatGrid>
             <StatCard
               label="Registered"
-              value={counts.Registered}
+              value={counts.Registered ?? 0}
               icon={ClipboardList}
               tone="info"
             />
             <StatCard
               label="Admitted"
-              value={counts.Admitted}
+              value={counts.Admitted ?? 0}
               icon={CircleCheck}
               tone="warn"
             />
             <StatCard
               label="Enrolled"
-              value={counts.Enrolled}
+              value={counts.Enrolled ?? 0}
               icon={GraduationCap}
               tone="ok"
             />
             <StatCard
               label="Rejected"
-              value={counts.Rejected}
+              value={counts.Rejected ?? 0}
               icon={CircleX}
               tone="bad"
             />
@@ -382,174 +288,89 @@ export function AdmissionsPage() {
         subtitle={`${admissions.length} applications · ${filtered.length} shown`}
         icon={FileText}
         actions={
-          <button
-            type="button"
-            className="btn btn--secondary"
-            onClick={handleExportCsv}
+          <ExportCsvButton
+            onClick={exportCsv}
             disabled={filtered.length === 0}
-          >
-            <Download size={16} aria-hidden="true" />
-            Export CSV
-          </button>
+          />
         }
       >
-        <div className="pipeline" role="group" aria-label="Filter by status">
-          {STATUS_FILTERS.map((s) => (
-            <button
-              key={s}
-              type="button"
-              aria-pressed={statusFilter === s}
-              className={`pipeline__step ${statusFilter === s ? "pipeline__step--active" : ""}`}
-              onClick={() => setStatusFilter(s)}
-            >
-              {s} ({counts[s]})
-            </button>
-          ))}
-        </div>
+        <StatusPills
+          label="Filter by status"
+          options={STATUS_FILTERS}
+          value={f.status as AdmissionStatus | "All"}
+          onChange={(v) => filters.set("status", v)}
+          counts={counts}
+        />
 
         <FilterBar>
-          <label>
-            <span className="visually-hidden">Academic year</span>
-            <select
-              className="select"
-              value={yearFilter}
-              onChange={(e) => setYearFilter(e.target.value)}
-            >
-              <option value="">All years</option>
-              {years.map((y) => (
-                <option key={y}>{y}</option>
-              ))}
-            </select>
-          </label>
-          <label>
-            <span className="visually-hidden">Admission type</span>
-            <select
-              className="select"
-              value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value)}
-            >
-              <option value="">All types</option>
-              <option>New</option>
-              <option>Transfer</option>
-            </select>
-          </label>
-          <label>
-            <span className="visually-hidden">Applied-for class</span>
-            <select
-              className="select"
-              value={classFilter}
-              onChange={(e) => setClassFilter(e.target.value)}
-            >
-              <option value="">All classes</option>
-              {classNames.map((c) => (
-                <option key={c}>{c}</option>
-              ))}
-            </select>
-          </label>
-          <label className="filter-date">
-            <span>From</span>
-            <input
-              className="select"
-              type="date"
-              value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
-            />
-          </label>
-          <label className="filter-date">
-            <span>To</span>
-            <input
-              className="select"
-              type="date"
-              value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
-            />
-          </label>
-          <label
-            className="search-box"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              marginLeft: "auto",
-            }}
-          >
-            <Search size={16} aria-hidden="true" />
-            <span className="visually-hidden">Search applications</span>
-            <input
-              type="search"
-              placeholder="Name, reg no., phone"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              style={{
-                border: 0,
-                outline: "none",
-                background: "transparent",
-                color: "inherit",
-                font: "inherit",
-                width: "100%",
-              }}
-            />
-          </label>
-          {anyFilter && (
-            <button
-              type="button"
-              className="btn btn--secondary btn--sm"
-              onClick={clearFilters}
-            >
-              Clear
-            </button>
-          )}
+          <FilterSelect
+            label="Academic year"
+            allLabel="All years"
+            options={years}
+            value={f.year}
+            onChange={(v) => filters.set("year", v)}
+          />
+          <FilterSelect
+            label="Admission type"
+            allLabel="All types"
+            options={["New", "Transfer"]}
+            value={f.type}
+            onChange={(v) => filters.set("type", v)}
+          />
+          <FilterSelect
+            label="Applied-for class"
+            allLabel="All classes"
+            options={classNames}
+            value={f.classSection}
+            onChange={(v) => filters.set("classSection", v)}
+          />
+          <FilterDate
+            label="From"
+            value={f.dateFrom}
+            onChange={(v) => filters.set("dateFrom", v)}
+          />
+          <FilterDate
+            label="To"
+            value={f.dateTo}
+            onChange={(v) => filters.set("dateTo", v)}
+          />
+          <SearchBox
+            label="Search applications"
+            placeholder="Name, reg no., phone"
+            value={f.search}
+            onChange={(v) => filters.set("search", v)}
+          />
+          <ClearFiltersButton
+            visible={filters.isActive}
+            onClear={filters.clear}
+          />
         </FilterBar>
 
+        {list.error && (
+          <Notice tone="warn" style={{ margin: 16 }}>
+            {list.error}
+          </Notice>
+        )}
         <DataTable
           caption="Admission applications"
           columns={columns}
           rows={filtered}
           rowKey={(a) => a.id}
-          loading={isLoading}
-          resetPageKey={filterKey}
+          loading={list.isLoading && !list.data}
+          resetPageKey={filters.key}
           empty={
-            <EmptyState
+            <ListEmptyState
               icon={FileText}
-              title={
-                admissions.length === 0
-                  ? "No applications yet"
-                  : "No applications match these filters"
-              }
-              action={
-                admissions.length === 0 && canCreate ? (
-                  <Link className="btn btn--primary" to="/admissions/new">
-                    <Plus size={16} aria-hidden="true" />
-                    New registration
-                  </Link>
-                ) : admissions.length > 0 ? (
-                  <button
-                    type="button"
-                    className="btn btn--secondary"
-                    onClick={clearFilters}
-                  >
-                    Clear filters
-                  </button>
-                ) : undefined
-              }
+              noun="applications"
+              hasRecords={admissions.length > 0}
+              onClearFilters={filters.clear}
+              createAction={newLink}
             />
           }
         />
       </Panel>
 
-      <ConfirmDialog
-        isOpen={deleteTarget !== null}
-        title="Delete application"
-        message={
-          deleteTarget
-            ? `Delete the application for ${fullName(deleteTarget)} (${deleteTarget.regNo})? This cannot be undone.`
-            : ""
-        }
-        confirmLabel="Delete"
-        danger
-        onConfirm={confirmDelete}
-        onCancel={() => setDeleteTarget(null)}
-      />
+      {remove.dialog}
     </div>
   );
 }

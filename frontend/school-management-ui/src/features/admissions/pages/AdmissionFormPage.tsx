@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { FileUp, Info, Lock, Plus, Trash, UserX } from "lucide-react";
+import { FileUp, Lock } from "lucide-react";
 import { admissionService } from "../services/admissionService";
 import { classSectionService } from "@/features/class-sections/services/classSectionService";
 import {
@@ -10,23 +10,31 @@ import {
   type CreateAdmissionRequest,
   type GuardianRelation,
 } from "../types/admission.types";
-import type { ClassSectionResponse } from "@/features/class-sections/types/classSection.types";
 import { FormPage } from "@/components/form/FormPage";
 import { FormSection } from "@/components/form/FormSection";
-import { Field } from "@/components/form/Field";
-import { UnsavedChangesGuard } from "@/components/form/UnsavedChangesGuard";
-import { EmptyState } from "@/components/EmptyState";
-import { useToast } from "@/components/Toast";
 import {
-  getReadErrors,
-  getSaveErrors,
-  isConcurrencyConflict,
-} from "@/utils/apiError";
+  SelectField,
+  TextAreaField,
+  TextField,
+} from "@/components/form/Inputs";
+import { AddRowButton, RepeatRow } from "@/components/form/RepeatRow";
+import { EmptyState } from "@/components/EmptyState";
+import { Notice } from "@/components/Notice";
+import { PageLoadError, PageLoading } from "@/components/PageState";
+import { useAsyncData } from "@/hooks/useAsyncData";
+import { useRecordForm } from "@/hooks/useRecordForm";
+import { GENDERS, GUARDIAN_RELATIONS } from "@/types/lookups";
+import {
+  blankToNull,
+  fieldBinder,
+  remapRowErrors,
+  type FormSectionDef,
+} from "@/utils/form";
 
 const MAX_GUARDIANS = 5;
 
 /** The sections in the same order as the old registration dialog, plus Documents (off until G1). */
-const SECTIONS = [
+const SECTIONS: readonly FormSectionDef[] = [
   {
     id: "applicant",
     title: "Applicant",
@@ -44,21 +52,10 @@ const SECTIONS = [
     fields: ["phone", "email", "addressLine", "city", "state", "pincode"],
   },
   { id: "remarks", title: "Remarks", fields: ["remarks"] },
-  { id: "documents", title: "Documents", fields: [] as string[] },
+  { id: "documents", title: "Documents", fields: [] },
 ];
 
-function sectionOf(key: string): string | undefined {
-  return SECTIONS.find((s) =>
-    s.fields.some((f) => key === f || key.startsWith(f + ".")),
-  )?.id;
-}
-
-type TextKey = Exclude<
-  keyof CreateAdmissionRequest,
-  "guardians" | "appliedForClassSectionId"
->;
-
-const emptyForm = (): CreateAdmissionRequest => ({
+const EMPTY_FORM: CreateAdmissionRequest = {
   firstName: "",
   middleName: null,
   lastName: "",
@@ -75,7 +72,7 @@ const emptyForm = (): CreateAdmissionRequest => ({
   pincode: null,
   remarks: null,
   guardians: [],
-});
+};
 
 function formFrom(a: AdmissionResponse): CreateAdmissionRequest {
   return {
@@ -107,169 +104,118 @@ function formFrom(a: AdmissionResponse): CreateAdmissionRequest {
 const isBlankGuardian = (g: AdmissionGuardianRequest) =>
   !g.name.trim() && !g.mobile?.trim() && !g.email?.trim();
 
+/** Shown instead of the form for an application that is already enrolled or rejected (the API refuses edits too). */
+function LockedApplication({ admission }: { admission: AdmissionResponse }) {
+  const enrolled = admission.status === "Enrolled";
+  return (
+    <div className="card" style={{ maxWidth: 620, margin: "32px auto" }}>
+      <EmptyState
+        icon={Lock}
+        title={`This application is ${admission.status.toLowerCase()}`}
+        message={
+          enrolled
+            ? "Enrolled applications can no longer be edited: the details now live on the student record. Edit the student instead."
+            : "Rejected applications are closed and can no longer be edited."
+        }
+        action={
+          <div
+            style={{
+              display: "flex",
+              gap: 10,
+              flexWrap: "wrap",
+              justifyContent: "center",
+            }}
+          >
+            <Link
+              className="btn btn--secondary"
+              to={`/admissions/${admission.id}`}
+            >
+              Open the application
+            </Link>
+            {enrolled && admission.studentId && (
+              <Link
+                className="btn btn--primary"
+                to={`/students/${admission.studentId}`}
+              >
+                Open the student record
+              </Link>
+            )}
+          </div>
+        }
+      />
+    </div>
+  );
+}
+
 /**
  * U2: registering an application (/admissions/new) and editing it (/admissions/:id/edit) on a full
- * page, replacing the registration dialog. Same fields, same section order. Applications that are
- * already enrolled or rejected cannot be edited (the API refuses it as well).
+ * page. Applications that are already enrolled or rejected cannot be edited (the API refuses it too).
  */
 export function AdmissionFormPage() {
   const { id } = useParams();
   const isNew = id === undefined;
   const admissionId = Number(id);
   const navigate = useNavigate();
-  const toast = useToast();
 
-  const [admission, setAdmission] = useState<AdmissionResponse | null>(null);
-  const [classSections, setClassSections] = useState<ClassSectionResponse[]>(
-    [],
-  );
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [isLoaded, setIsLoaded] = useState(false);
-
-  const [form, setForm] = useState<CreateAdmissionRequest>(emptyForm);
-  const [initial, setInitial] = useState(JSON.stringify(emptyForm()));
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  const [formErrors, setFormErrors] = useState<string[]>([]);
-  const [conflict, setConflict] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [leaveTo, setLeaveTo] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    try {
-      const [sections, existing] = await Promise.all([
+  const loaded = useAsyncData(
+    async () => {
+      const [classSections, admission] = await Promise.all([
         classSectionService.getAll(),
         isNew ? Promise.resolve(null) : admissionService.getById(admissionId),
       ]);
-      setClassSections(sections);
-      if (existing) {
-        const next = formFrom(existing);
-        setAdmission(existing);
-        setForm(next);
-        setInitial(JSON.stringify(next));
-      }
-      setFieldErrors({});
-      setFormErrors([]);
-      setConflict(false);
-      setIsLoaded(true);
-    } catch (err) {
-      setLoadError(getReadErrors(err, "Could not load this application.")[0]);
-    }
-  }, [isNew, admissionId]);
+      return { classSections, admission };
+    },
+    [isNew, admissionId],
+    "Could not load this application.",
+  );
+  const record = useRecordForm<CreateAdmissionRequest>({
+    sections: SECTIONS,
+    initial: EMPTY_FORM,
+    noun: "application",
+    onReload: () => void loaded.reload(),
+  });
+  const { reset } = record;
 
+  const admission = loaded.data?.admission ?? null;
   useEffect(() => {
-    void load();
-  }, [load]);
+    if (admission) reset(formFrom(admission));
+  }, [admission, reset]);
 
-  useEffect(() => {
-    if (leaveTo) navigate(leaveTo);
-  }, [leaveTo, navigate]);
-
-  const isDirty = JSON.stringify(form) !== initial;
-
-  const sectionLinks = useMemo(() => {
-    const counts: Record<string, number> = {};
-    for (const key of Object.keys(fieldErrors)) {
-      const s = sectionOf(key);
-      if (s) counts[s] = (counts[s] ?? 0) + 1;
-    }
-    return SECTIONS.map((s) => ({
-      id: s.id,
-      title: s.title,
-      errorCount: counts[s.id] ?? 0,
-    }));
-  }, [fieldErrors]);
-
-  if (loadError) {
+  if (loaded.error) {
     return (
-      <div className="card">
-        <EmptyState
-          icon={UserX}
-          title="This application could not be opened"
-          message={loadError}
-          action={
-            <Link className="btn btn--secondary" to="/admissions">
-              Back to admissions
-            </Link>
-          }
-        />
-      </div>
+      <PageLoadError
+        title="This application could not be opened"
+        message={loaded.error}
+        backTo="/admissions"
+        backLabel="Back to admissions"
+      />
     );
   }
-  if (!isLoaded) {
-    return (
-      <div className="card">
-        <div className="empty-state" role="status">
-          Loading…
-        </div>
-      </div>
-    );
-  }
+  if (!loaded.data || (admission && record.form === EMPTY_FORM))
+    return <PageLoading />;
+  if (admission && !isAdmissionEditable(admission.status))
+    return <LockedApplication admission={admission} />;
 
-  if (admission && !isAdmissionEditable(admission.status)) {
-    const enrolled = admission.status === "Enrolled";
-    return (
-      <div className="card" style={{ maxWidth: 620, margin: "32px auto" }}>
-        <EmptyState
-          icon={Lock}
-          title={`This application is ${admission.status.toLowerCase()}`}
-          message={
-            enrolled
-              ? "Enrolled applications can no longer be edited: the details now live on the student record. Edit the student instead."
-              : "Rejected applications are closed and can no longer be edited."
-          }
-          action={
-            <div
-              style={{
-                display: "flex",
-                gap: 10,
-                flexWrap: "wrap",
-                justifyContent: "center",
-              }}
-            >
-              <Link
-                className="btn btn--secondary"
-                to={`/admissions/${admission.id}`}
-              >
-                Open the application
-              </Link>
-              {enrolled && admission.studentId && (
-                <Link
-                  className="btn btn--primary"
-                  to={`/students/${admission.studentId}`}
-                >
-                  Open the student record
-                </Link>
-              )}
-            </div>
-          }
-        />
-      </div>
-    );
-  }
+  const classSections = loaded.data.classSections;
+  const form = record.form;
+  const errors = record.fieldErrors;
+  const bind = fieldBinder(form, record.patch, errors, "admission");
+  const selectedSection = classSections.find(
+    (c) => c.id === form.appliedForClassSectionId,
+  );
 
-  // ---------------------------------------------------------------- setters
-  const set = (patch: Partial<CreateAdmissionRequest>) =>
-    setForm((f) => ({ ...f, ...patch }));
+  // ---------------------------------------------------------------- guardians
+  const setGuardians = (
+    change: (list: AdmissionGuardianRequest[]) => AdmissionGuardianRequest[],
+  ) => record.setForm((f) => ({ ...f, guardians: change(f.guardians) }));
   const setGuardian = (
     index: number,
-    patch: Partial<AdmissionGuardianRequest>,
+    changes: Partial<AdmissionGuardianRequest>,
   ) =>
-    setForm((f) => ({
-      ...f,
-      guardians: f.guardians.map((g, i) =>
-        i === index ? { ...g, ...patch } : g,
-      ),
-    }));
-  const setPrimary = (index: number) =>
-    setForm((f) => ({
-      ...f,
-      guardians: f.guardians.map((g, i) => ({
-        ...g,
-        isPrimaryContact: i === index,
-      })),
-    }));
+    setGuardians((list) =>
+      list.map((g, i) => (i === index ? { ...g, ...changes } : g)),
+    );
   const addGuardian = () => {
-    if (form.guardians.length >= MAX_GUARDIANS) return;
     // Suggest the next missing relation so the common case is one click.
     const has = (r: GuardianRelation) =>
       form.guardians.some((g) => g.relationType === r);
@@ -278,50 +224,17 @@ export function AdmissionFormPage() {
       : !has("Mother")
         ? "Mother"
         : "Guardian";
-    set({
-      guardians: [
-        ...form.guardians,
-        {
-          relationType,
-          name: "",
-          mobile: "",
-          email: "",
-          isPrimaryContact: false,
-        },
-      ],
-    });
+    setGuardians((list) => [
+      ...list,
+      {
+        relationType,
+        name: "",
+        mobile: "",
+        email: "",
+        isPrimaryContact: false,
+      },
+    ]);
   };
-  const removeGuardian = (index: number) =>
-    set({ guardians: form.guardians.filter((_, i) => i !== index) });
-
-  const textField = (
-    key: TextKey,
-    label: string,
-    opts: { required?: boolean; type?: string; span?: 1 | 2 | "full" } = {},
-  ) => (
-    <Field
-      id={`admission-${key}`}
-      label={label}
-      required={opts.required}
-      error={fieldErrors[key]}
-      span={opts.span}
-    >
-      {(c) => (
-        <input
-          {...c}
-          type={opts.type ?? "text"}
-          value={form[key] ?? ""}
-          onChange={(e) =>
-            set({ [key]: e.target.value } as Partial<CreateAdmissionRequest>)
-          }
-        />
-      )}
-    </Field>
-  );
-
-  const selectedSection = classSections.find(
-    (c) => c.id === form.appliedForClassSectionId,
-  );
 
   // ---------------------------------------------------------------- saving
   const validate = (): Record<string, string> => {
@@ -346,112 +259,64 @@ export function AdmissionFormPage() {
     return e;
   };
 
-  const showServerErrors = (
-    fields: Record<string, string>,
-    messages: string[],
-  ) => {
-    const known: Record<string, string> = {};
-    const rest = [...messages];
-    for (const [key, message] of Object.entries(fields)) {
-      if (sectionOf(key)) known[key] = message;
-      else rest.push(message);
-    }
-    setFieldErrors(known);
-    setFormErrors(rest);
-  };
-
-  const handleSave = async () => {
-    const problems = validate();
-    setConflict(false);
-    if (Object.keys(problems).length > 0) {
-      setFieldErrors(problems);
-      setFormErrors([]);
-      return;
-    }
-    setFieldErrors({});
-    setFormErrors([]);
-
+  const handleSave = () => {
     // Blank guardian rows are dropped; remember where each sent row came from, so an API error on
     // "Guardians[1].Mobile" lands under the right row on screen.
-    const sentRows = form.guardians
+    const sent = form.guardians
       .map((g, index) => ({ g, index }))
       .filter(({ g }) => !isBlankGuardian(g));
-    const anyPrimary = sentRows.some(({ g }) => g.isPrimaryContact);
-    const guardians = sentRows.map(({ g }, i) => ({
-      relationType: g.relationType,
-      name: g.name.trim(),
-      mobile: g.mobile?.trim() || null,
-      email: g.email?.trim() || null,
-      // If nobody was marked as primary contact, the first guardian is.
-      isPrimaryContact: anyPrimary ? g.isPrimaryContact : i === 0,
-    }));
-    const remap = (fields: Record<string, string>) =>
-      Object.fromEntries(
-        Object.entries(fields).map(([key, message]) => {
-          const m = /^guardians\.(\d+)(.*)$/.exec(key);
-          if (!m) return [key, message];
-          return [
-            `guardians.${sentRows[Number(m[1])]?.index ?? m[1]}${m[2]}`,
-            message,
-          ];
-        }),
-      );
-
+    const anyPrimary = sent.some(({ g }) => g.isPrimaryContact);
     const request: CreateAdmissionRequest = {
-      ...(Object.fromEntries(
-        Object.entries(form).map(([k, v]) => [
-          k,
-          typeof v === "string" && v.trim() === "" ? null : v,
-        ]),
-      ) as CreateAdmissionRequest),
+      ...blankToNull(form),
       firstName: form.firstName.trim(),
       lastName: form.lastName.trim(),
       phone: form.phone.trim(),
-      guardians,
+      guardians: sent.map(({ g }, i) => ({
+        relationType: g.relationType,
+        name: g.name.trim(),
+        mobile: g.mobile?.trim() || null,
+        email: g.email?.trim() || null,
+        // If nobody was marked as primary contact, the first guardian is.
+        isPrimaryContact: anyPrimary ? g.isPrimaryContact : i === 0,
+      })),
     };
 
-    setIsSaving(true);
-    try {
-      const saved = admission
-        ? await admissionService.update(admission.id, {
-            ...request,
-            rowVersion: admission.rowVersion,
-          })
-        : await admissionService.create(request);
-      const savedForm = formFrom(saved);
-      setForm(savedForm);
-      setInitial(JSON.stringify(savedForm));
-      toast.success(
+    void record.save({
+      validate,
+      submit: () =>
         admission
+          ? admissionService.update(admission.id, {
+              ...request,
+              rowVersion: admission.rowVersion,
+            })
+          : admissionService.create(request),
+      fallback: "Could not save this application.",
+      remap: (f) =>
+        remapRowErrors(
+          f,
+          "guardians",
+          sent.map((r) => r.index),
+        ),
+      onSaved: (saved) => ({
+        form: formFrom(saved),
+        message: admission
           ? `${saved.firstName} ${saved.lastName}'s application was saved.`
           : `Application ${saved.regNo} was registered.`,
-      );
-      setLeaveTo(`/admissions/${saved.id}`);
-    } catch (err) {
-      if (isConcurrencyConflict(err)) {
-        setConflict(true);
-        setFormErrors([
-          "Someone else saved this application while you were editing. Reload to see their changes; your edits on this page will be lost.",
-        ]);
-      } else {
-        const errors = getSaveErrors(err, "Could not save this application.");
-        showServerErrors(remap(errors.fields), errors.form);
-      }
-    } finally {
-      setIsSaving(false);
-    }
+        goTo: `/admissions/${saved.id}`,
+      }),
+    });
   };
 
-  const title = admission
-    ? `Edit application ${admission.regNo}`
-    : "New registration";
   const backTo = admission ? `/admissions/${admission.id}` : "/admissions";
 
   return (
     <>
-      <UnsavedChangesGuard when={isDirty && !isSaving && !leaveTo} />
+      {record.guard}
       <FormPage
-        title={title}
+        {...record.pageProps}
+        title={
+          admission ? `Edit application ${admission.regNo}` : "New registration"
+        }
         subtitle={
           admission
             ? `${admission.firstName} ${admission.lastName} · ${admission.status}`
@@ -461,128 +326,78 @@ export function AdmissionFormPage() {
           to: backTo,
           label: admission ? "Back to application" : "Back to admissions",
         }}
-        sections={sectionLinks}
-        formErrors={formErrors}
-        formErrorAction={
-          conflict ? (
-            <button
-              type="button"
-              className="btn btn--secondary btn--sm"
-              style={{ marginTop: 10 }}
-              onClick={() => void load()}
-            >
-              Reload latest version
-            </button>
-          ) : undefined
-        }
         onSubmit={handleSave}
-        isSaving={isSaving}
-        isDirty={isDirty}
         saveLabel={admission ? "Save changes" : "Save registration"}
         onCancel={() => navigate(backTo)}
       >
         {/* 1. Applicant */}
         <FormSection id="applicant" title="Applicant">
-          {textField("firstName", "First name", { required: true })}
-          {textField("middleName", "Middle name")}
-          {textField("lastName", "Last name", { required: true })}
-          <Field
-            id="admission-gender"
+          <TextField {...bind("firstName")} label="First name" required />
+          <TextField {...bind("middleName")} label="Middle name" />
+          <TextField {...bind("lastName")} label="Last name" required />
+          <SelectField
+            {...bind("gender")}
             label="Gender"
             required
-            error={fieldErrors.gender}
-          >
-            {(c) => (
-              <select
-                {...c}
-                value={form.gender}
-                onChange={(e) => set({ gender: e.target.value })}
-              >
-                <option value="Male">Male</option>
-                <option value="Female">Female</option>
-                <option value="Other">Other</option>
-              </select>
-            )}
-          </Field>
-          {textField("dateOfBirth", "Date of birth", {
-            required: true,
-            type: "date",
-          })}
+            options={GENDERS}
+          />
+          <TextField
+            {...bind("dateOfBirth")}
+            label="Date of birth"
+            type="date"
+            required
+          />
         </FormSection>
 
         {/* 2. Applying for */}
         <FormSection id="applying" title="Applying for">
-          <Field
-            id="admission-appliedForClassSectionId"
+          <SelectField
+            {...bind("appliedForClassSectionId")}
             label="Class"
             required
-            error={fieldErrors.appliedForClassSectionId}
-          >
-            {(c) => (
-              <select
-                {...c}
-                value={form.appliedForClassSectionId || ""}
-                onChange={(e) =>
-                  set({ appliedForClassSectionId: Number(e.target.value) })
-                }
-              >
-                <option value="">Select a class…</option>
-                {classSections
-                  .filter(
-                    (s) =>
-                      s.status === "Active" ||
-                      s.id === form.appliedForClassSectionId,
-                  )
-                  .map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.displayName}
-                    </option>
-                  ))}
-              </select>
-            )}
-          </Field>
-          <Field
-            id="admission-admissionType"
+            emptyLabel="Select a class…"
+            options={classSections
+              .filter(
+                (s) =>
+                  s.status === "Active" ||
+                  s.id === form.appliedForClassSectionId,
+              )
+              .map((s) => ({ value: s.id, label: s.displayName }))}
+            value={form.appliedForClassSectionId || ""}
+            onChange={(v) =>
+              record.patch({ appliedForClassSectionId: Number(v) })
+            }
+          />
+          <SelectField
+            {...bind("admissionType")}
             label="Admission type"
-            error={fieldErrors.admissionType}
-          >
-            {(c) => (
-              <select
-                {...c}
-                value={form.admissionType}
-                onChange={(e) => set({ admissionType: e.target.value })}
-              >
-                <option value="New">New</option>
-                <option value="Transfer">Transfer</option>
-              </select>
-            )}
-          </Field>
-          <Field
+            options={["New", "Transfer"]}
+          />
+          <TextField
             id="admission-academicYear"
             label="Academic year"
             hint="Follows the selected class."
-          >
-            {(c) => (
-              <input
-                {...c}
-                value={selectedSection?.academicYearName ?? "—"}
-                disabled
-              />
-            )}
-          </Field>
-          {textField("previousSchool", "Previous school", { span: 2 })}
+            value={selectedSection?.academicYearName ?? "—"}
+            onChange={() => {}}
+            disabled
+          />
+          <TextField
+            {...bind("previousSchool")}
+            label="Previous school"
+            span={2}
+          />
         </FormSection>
 
-        {/* 3. Parents / guardians (exactly as before: typed in, matched at enrolment) */}
+        {/* 3. Parents / guardians (typed in here, matched to existing parents at enrolment) */}
         <FormSection
           id="guardians"
           title="Parents / guardians"
           grid={false}
           description="Optional while the application is a draft. Enrolment needs at least one guardian with a mobile number: the number is used to find parents already in the school."
         >
-          {fieldErrors.guardians && (
+          {errors.guardians && (
             <p className="field__error" style={{ marginBottom: 12 }}>
-              {fieldErrors.guardians}
+              {errors.guardians}
             </p>
           )}
           {form.guardians.length === 0 && (
@@ -591,77 +406,29 @@ export function AdmissionFormPage() {
             </p>
           )}
           {form.guardians.map((g, i) => {
-            const k = (f: string) => `guardians.${i}.${f}`;
+            const bindRow = fieldBinder(
+              g,
+              (c) => setGuardian(i, c),
+              errors,
+              "admission",
+              `guardians.${i}.`,
+            );
             return (
-              <div key={i} className="repeat-row">
-                <div className="repeat-row__title">Guardian {i + 1}</div>
-                <Field
-                  id={`guardian-${i}-relation`}
+              <RepeatRow
+                key={i}
+                title={`Guardian ${i + 1}`}
+                onRemove={() =>
+                  setGuardians((list) => list.filter((_, x) => x !== i))
+                }
+              >
+                <SelectField
+                  {...bindRow("relationType")}
                   label="Relation"
-                  error={fieldErrors[k("relationType")]}
-                >
-                  {(c) => (
-                    <select
-                      {...c}
-                      value={g.relationType}
-                      onChange={(e) =>
-                        setGuardian(i, {
-                          relationType: e.target.value as GuardianRelation,
-                        })
-                      }
-                    >
-                      <option value="Father">Father</option>
-                      <option value="Mother">Mother</option>
-                      <option value="Guardian">Guardian</option>
-                    </select>
-                  )}
-                </Field>
-                <Field
-                  id={`guardian-${i}-name`}
-                  label="Name"
-                  required
-                  error={fieldErrors[k("name")]}
-                >
-                  {(c) => (
-                    <input
-                      {...c}
-                      value={g.name}
-                      onChange={(e) => setGuardian(i, { name: e.target.value })}
-                    />
-                  )}
-                </Field>
-                <Field
-                  id={`guardian-${i}-mobile`}
-                  label="Mobile"
-                  error={fieldErrors[k("mobile")]}
-                >
-                  {(c) => (
-                    <input
-                      {...c}
-                      type="tel"
-                      value={g.mobile ?? ""}
-                      onChange={(e) =>
-                        setGuardian(i, { mobile: e.target.value })
-                      }
-                    />
-                  )}
-                </Field>
-                <Field
-                  id={`guardian-${i}-email`}
-                  label="Email"
-                  error={fieldErrors[k("email")]}
-                >
-                  {(c) => (
-                    <input
-                      {...c}
-                      type="email"
-                      value={g.email ?? ""}
-                      onChange={(e) =>
-                        setGuardian(i, { email: e.target.value })
-                      }
-                    />
-                  )}
-                </Field>
+                  options={GUARDIAN_RELATIONS}
+                />
+                <TextField {...bindRow("name")} label="Name" required />
+                <TextField {...bindRow("mobile")} label="Mobile" type="tel" />
+                <TextField {...bindRow("email")} label="Email" type="email" />
                 <label
                   className="checkbox-row"
                   style={{ marginTop: 0, minHeight: 44 }}
@@ -670,64 +437,47 @@ export function AdmissionFormPage() {
                     type="radio"
                     name="primaryGuardian"
                     checked={g.isPrimaryContact}
-                    onChange={() => setPrimary(i)}
+                    onChange={() =>
+                      setGuardians((list) =>
+                        list.map((x, j) => ({
+                          ...x,
+                          isPrimaryContact: j === i,
+                        })),
+                      )
+                    }
                   />
                   Primary contact
                 </label>
-                <button
-                  type="button"
-                  className="btn btn--secondary"
-                  aria-label={`Remove guardian ${i + 1}`}
-                  onClick={() => removeGuardian(i)}
-                >
-                  <Trash size={16} aria-hidden="true" />
-                  Remove
-                </button>
-              </div>
+              </RepeatRow>
             );
           })}
-          <button
-            type="button"
-            className="btn btn--secondary"
+          <AddRowButton
+            label="Add guardian"
             onClick={addGuardian}
-            disabled={form.guardians.length >= MAX_GUARDIANS}
-          >
-            <Plus size={16} aria-hidden="true" />
-            Add guardian
-          </button>
-          {form.guardians.length >= MAX_GUARDIANS && (
-            <p className="field-note">Up to {MAX_GUARDIANS} guardians.</p>
-          )}
+            count={form.guardians.length}
+            max={MAX_GUARDIANS}
+            pluralNoun="guardians"
+          />
         </FormSection>
 
         {/* 4. Contact & address */}
         <FormSection id="contact" title="Contact & address">
-          {textField("phone", "Phone", { required: true, type: "tel" })}
-          {textField("email", "Email", { type: "email" })}
-          {textField("addressLine", "Address", { span: 2 })}
-          {textField("city", "City")}
-          {textField("state", "State")}
-          {textField("pincode", "Pincode")}
+          <TextField {...bind("phone")} label="Phone" type="tel" required />
+          <TextField {...bind("email")} label="Email" type="email" />
+          <TextField {...bind("addressLine")} label="Address" span={2} />
+          <TextField {...bind("city")} label="City" />
+          <TextField {...bind("state")} label="State" />
+          <TextField {...bind("pincode")} label="Pincode" />
         </FormSection>
 
         {/* 5. Remarks */}
         <FormSection id="remarks" title="Remarks">
-          <Field
-            id="admission-remarks"
+          <TextAreaField
+            {...bind("remarks")}
             label="Remarks"
             span="full"
-            error={fieldErrors.remarks}
-          >
-            {(c) => (
-              <textarea
-                {...c}
-                rows={3}
-                value={form.remarks ?? ""}
-                placeholder="Optional notes about this application"
-                onChange={(e) => set({ remarks: e.target.value })}
-              />
-            )}
-          </Field>
+            placeholder="Optional notes about this application"
+          />
         </FormSection>
 
         {/* 6. Documents: in the layout now, switched on with G1 */}
@@ -745,10 +495,9 @@ export function AdmissionFormPage() {
               be uploaded right after the application is saved.
             </span>
           </div>
-          <div className="notice" style={{ marginTop: 12 }}>
-            <Info size={16} aria-hidden="true" />
-            <span>Until then, keep paper copies with the application.</span>
-          </div>
+          <Notice style={{ marginTop: 12 }}>
+            Until then, keep paper copies with the application.
+          </Notice>
         </FormSection>
       </FormPage>
     </>

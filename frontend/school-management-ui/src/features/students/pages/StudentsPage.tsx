@@ -1,79 +1,43 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import {
   CircleCheck,
   CircleMinus,
-  Download,
-  Eye,
   GraduationCap,
   HeartPulse,
   LogOut,
-  Pencil,
-  Printer,
-  Search,
-  Trash,
 } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
 import { studentService } from "../services/studentService";
-import type {
-  StudentSummaryResponse,
-  StudentStatus,
-} from "../types/student.types";
-import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { ValidationModal } from "@/components/ValidationModal";
+import type { StudentSummaryResponse } from "../types/student.types";
 import { PageHero } from "@/components/PageHero";
 import { StatCard, StatGrid } from "@/components/StatCard";
 import { Panel } from "@/components/Panel";
-import { FilterBar } from "@/components/FilterBar";
+import {
+  ClearFiltersButton,
+  FilterBar,
+  FilterCheckbox,
+  FilterSelect,
+} from "@/components/FilterBar";
+import { SearchBox } from "@/components/SearchBox";
 import { DataTable, type Column } from "@/components/DataTable";
 import { StatusBadge } from "@/components/Badge";
-import { IconButton } from "@/components/IconButton";
-import { EmptyState } from "@/components/EmptyState";
-import { useToast } from "@/components/Toast";
-import { getApiErrors, getReadErrors } from "@/utils/apiError";
-import { useAuth } from "@/store/AuthContext";
+import { ListEmptyState } from "@/components/ListEmptyState";
+import { Notice } from "@/components/Notice";
+import { PersonCell } from "@/components/PersonCell";
+import {
+  ExportCsvButton,
+  PrintButton,
+  RowActions,
+} from "@/components/ListButtons";
+import { useAsyncData } from "@/hooks/useAsyncData";
+import { useCan } from "@/hooks/useCan";
+import { useConfirmAction } from "@/hooks/useConfirmAction";
+import { useFilters } from "@/hooks/useFilters";
 import { Permission } from "@/routes/permissions";
-import { initialsOf } from "@/utils/initials";
+import { countBy, uniqueSorted } from "@/utils/collections";
+import { downloadCsv } from "@/utils/csv";
 
-function unique(values: (string | null | undefined)[]): string[] {
-  return [...new Set(values.filter((v): v is string => !!v))].sort();
-}
-
-function fullName(s: { firstName: string; lastName: string }) {
-  return `${s.firstName} ${s.lastName}`;
-}
-
-function toCsv(rows: StudentSummaryResponse[]): string {
-  const headers = [
-    "Adm #",
-    "Student",
-    "Class",
-    "Gender",
-    "House",
-    "Nationality",
-    "Curriculum",
-    "EAL",
-    "Status",
-    "Allergies",
-  ];
-  const lines = rows.map((s) =>
-    [
-      s.admNo,
-      fullName(s),
-      s.classSectionName,
-      s.gender,
-      s.house ?? "",
-      s.nationality ?? "",
-      s.curriculumTrack ?? "",
-      s.ealCode ?? "",
-      s.status,
-      // The text only for Students.ViewSensitive holders; everyone else exports the flag.
-      s.allergies ?? (s.hasAllergies ? "Yes" : ""),
-    ]
-      .map((v) => `"${String(v).replace(/"/g, '""')}"`)
-      .join(","),
-  );
-  return [headers.join(","), ...lines].join("\n");
-}
+const fullName = (s: { firstName: string; lastName: string }) =>
+  `${s.firstName} ${s.lastName}`;
 
 /** The allergy flag (U1): an icon for everyone; the text, as a tooltip, only for ViewSensitive holders. */
 function AllergyFlag({ student }: { student: StudentSummaryResponse }) {
@@ -96,157 +60,107 @@ function AllergyFlag({ student }: { student: StudentSummaryResponse }) {
   );
 }
 
+/**
+ * The students list. A teacher holding only Students.ViewScoped gets their own students from the
+ * API (F1) and no edit or delete buttons.
+ */
 export function StudentsPage() {
-  // F1: hide what this role cannot do (the API refuses it anyway). A teacher
-  // holding only Students.ViewScoped sees their own students, read-only.
-  const { hasAnyPermission } = useAuth();
-  const canEdit = hasAnyPermission([Permission.StudentsEdit]);
-  const canDelete = hasAnyPermission([Permission.StudentsDelete]);
-  const toast = useToast();
-  const navigate = useNavigate();
+  const can = useCan();
+  const canEdit = can(Permission.StudentsEdit);
+  const canDelete = can(Permission.StudentsDelete);
 
-  const [students, setStudents] = useState<StudentSummaryResponse[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const list = useAsyncData(
+    () => studentService.getAll(),
+    [],
+    "Could not load students.",
+  );
+  const students = useMemo(() => list.data ?? [], [list.data]);
 
-  const [statusFilter, setStatusFilter] = useState<StudentStatus | "">("");
-  const [search, setSearch] = useState("");
-  const [classFilter, setClassFilter] = useState("");
-  const [genderFilter, setGenderFilter] = useState("");
-  const [curriculumFilter, setCurriculumFilter] = useState("");
-  const [ealFilter, setEalFilter] = useState("");
-  const [houseFilter, setHouseFilter] = useState("");
-  const [allergiesOnly, setAllergiesOnly] = useState(false);
+  const filters = useFilters({
+    status: "",
+    search: "",
+    classSection: "",
+    gender: "",
+    curriculum: "",
+    eal: "",
+    house: "",
+    allergiesOnly: false,
+  });
+  const f = filters.values;
 
-  const [deleteTarget, setDeleteTarget] =
-    useState<StudentSummaryResponse | null>(null);
-  const [errors, setErrors] = useState<string[] | null>(null);
-
-  const loadData = async () => {
-    setIsLoading(true);
-    try {
-      setStudents(await studentService.getAll());
-    } catch (err) {
-      setErrors(getReadErrors(err, "Could not load students."));
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    void loadData();
-  }, []);
-
-  const classNames = useMemo(
-    () => unique(students.map((s) => s.classSectionName)),
+  const options = useMemo(
+    () => ({
+      classes: uniqueSorted(students.map((s) => s.classSectionName)),
+      curricula: uniqueSorted(students.map((s) => s.curriculumTrack)),
+      ealLevels: uniqueSorted(students.map((s) => s.ealCode)),
+      houses: uniqueSorted(students.map((s) => s.house)),
+    }),
     [students],
   );
-  const curricula = useMemo(
-    () => unique(students.map((s) => s.curriculumTrack)),
-    [students],
-  );
-  const ealLevels = useMemo(
-    () => unique(students.map((s) => s.ealCode)),
-    [students],
-  );
-  const houses = useMemo(
-    () => unique(students.map((s) => s.house)),
-    [students],
-  );
-
-  const counts = useMemo(() => {
-    const c = { Active: 0, Inactive: 0, Left: 0 };
-    students.forEach((s) => {
-      if (s.status in c) c[s.status as keyof typeof c] += 1;
-    });
-    return c;
-  }, [students]);
+  const counts = useMemo(() => countBy(students, (s) => s.status), [students]);
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = f.search.trim().toLowerCase();
     return students.filter((s) => {
-      if (statusFilter && s.status !== statusFilter) return false;
-      if (classFilter && s.classSectionName !== classFilter) return false;
-      if (genderFilter && s.gender !== genderFilter) return false;
-      if (curriculumFilter && s.curriculumTrack !== curriculumFilter)
-        return false;
-      if (ealFilter && s.ealCode !== ealFilter) return false;
-      if (houseFilter && s.house !== houseFilter) return false;
-      if (allergiesOnly && !s.hasAllergies) return false;
+      if (f.status && s.status !== f.status) return false;
+      if (f.classSection && s.classSectionName !== f.classSection) return false;
+      if (f.gender && s.gender !== f.gender) return false;
+      if (f.curriculum && s.curriculumTrack !== f.curriculum) return false;
+      if (f.eal && s.ealCode !== f.eal) return false;
+      if (f.house && s.house !== f.house) return false;
+      if (f.allergiesOnly && !s.hasAllergies) return false;
       if (q) {
         const haystack =
-          `${s.firstName} ${s.lastName} ${s.admNo} ${s.rollNumber} ${s.classSectionName}`.toLowerCase();
+          `${fullName(s)} ${s.admNo} ${s.rollNumber} ${s.classSectionName}`.toLowerCase();
         if (!haystack.includes(q)) return false;
       }
       return true;
     });
-  }, [
-    students,
-    statusFilter,
-    search,
-    classFilter,
-    genderFilter,
-    curriculumFilter,
-    ealFilter,
-    houseFilter,
-    allergiesOnly,
-  ]);
+  }, [students, f]);
 
-  const filterKey = [
-    statusFilter,
-    search,
-    classFilter,
-    genderFilter,
-    curriculumFilter,
-    ealFilter,
-    houseFilter,
-    allergiesOnly,
-  ].join("|");
-  const anyFilter =
-    !!(
-      statusFilter ||
-      search ||
-      classFilter ||
-      genderFilter ||
-      curriculumFilter ||
-      ealFilter ||
-      houseFilter
-    ) || allergiesOnly;
+  const remove = useConfirmAction<StudentSummaryResponse>({
+    title: "Delete student",
+    message: (s) =>
+      `Delete ${fullName(s)} (${s.admNo})? This cannot be undone.`,
+    confirmLabel: "Delete",
+    danger: true,
+    run: async (s) => {
+      await studentService.delete(s.id);
+      await list.reload();
+    },
+    success: (s) => `${fullName(s)} was deleted.`,
+    failure: "Could not delete this student.",
+  });
 
-  const clearFilters = () => {
-    setSearch("");
-    setClassFilter("");
-    setGenderFilter("");
-    setCurriculumFilter("");
-    setEalFilter("");
-    setHouseFilter("");
-    setAllergiesOnly(false);
-    setStatusFilter("");
-  };
-
-  const confirmDelete = async () => {
-    if (!deleteTarget) return;
-    const target = deleteTarget;
-    setDeleteTarget(null);
-    try {
-      await studentService.delete(target.id);
-      toast.success(`${fullName(target)} was deleted.`);
-      await loadData();
-    } catch (err) {
-      setErrors(getApiErrors(err, "Could not delete this student."));
-    }
-  };
-
-  const handleExportCsv = () => {
-    const blob = new Blob([toCsv(filtered)], {
-      type: "text/csv;charset=utf-8;",
-    });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "students.csv";
-    link.click();
-    URL.revokeObjectURL(url);
-  };
+  const exportCsv = () =>
+    downloadCsv(
+      "students.csv",
+      [
+        "Adm #",
+        "Student",
+        "Class",
+        "Gender",
+        "House",
+        "Nationality",
+        "Curriculum",
+        "EAL",
+        "Status",
+        "Allergies",
+      ],
+      filtered.map((s) => [
+        s.admNo,
+        fullName(s),
+        s.classSectionName,
+        s.gender,
+        s.house,
+        s.nationality,
+        s.curriculumTrack,
+        s.ealCode,
+        s.status,
+        // The text only for Students.ViewSensitive holders; everyone else exports the flag.
+        s.allergies ?? (s.hasAllergies ? "Yes" : ""),
+      ]),
+    );
 
   const columns: Column<StudentSummaryResponse>[] = [
     {
@@ -269,20 +183,11 @@ export function StudentsPage() {
       header: "Student",
       sortValue: (s) => fullName(s),
       render: (s) => (
-        <div className="person">
-          <span className="avatar" aria-hidden="true">
-            {initialsOf(fullName(s))}
-          </span>
-          <div>
-            <Link
-              className="person__name person__link"
-              to={`/students/${s.id}`}
-            >
-              {fullName(s)}
-            </Link>
-            <div className="person__sub">Roll {s.rollNumber}</div>
-          </div>
-        </div>
+        <PersonCell
+          name={fullName(s)}
+          to={`/students/${s.id}`}
+          sub={`Roll ${s.rollNumber}`}
+        />
       ),
     },
     {
@@ -320,29 +225,12 @@ export function StudentsPage() {
       key: "actions",
       header: "Actions",
       render: (s) => (
-        <div className="row-actions">
-          <IconButton
-            icon={Eye}
-            label={`View ${fullName(s)}`}
-            onClick={() => navigate(`/students/${s.id}`)}
-          />
-          {canEdit && (
-            <IconButton
-              icon={Pencil}
-              tone="info"
-              label={`Edit ${fullName(s)}`}
-              onClick={() => navigate(`/students/${s.id}/edit`)}
-            />
-          )}
-          {canDelete && (
-            <IconButton
-              icon={Trash}
-              tone="bad"
-              label={`Delete ${fullName(s)}`}
-              onClick={() => setDeleteTarget(s)}
-            />
-          )}
-        </div>
+        <RowActions
+          name={fullName(s)}
+          viewTo={`/students/${s.id}`}
+          editTo={canEdit ? `/students/${s.id}/edit` : undefined}
+          onDelete={canDelete ? () => remove.ask(s) : undefined}
+        />
       ),
     },
   ];
@@ -352,16 +240,7 @@ export function StudentsPage() {
       <PageHero
         title="Students"
         subtitle="Enrolled students, their classes, guardians and academic history."
-        actions={
-          <button
-            type="button"
-            className="btn btn--secondary"
-            onClick={() => window.print()}
-          >
-            <Printer size={16} aria-hidden="true" />
-            Print
-          </button>
-        }
+        actions={<PrintButton />}
         stats={
           <StatGrid>
             <StatCard
@@ -372,19 +251,19 @@ export function StudentsPage() {
             />
             <StatCard
               label="Active"
-              value={counts.Active}
+              value={counts.Active ?? 0}
               icon={CircleCheck}
               tone="ok"
             />
             <StatCard
               label="Inactive"
-              value={counts.Inactive}
+              value={counts.Inactive ?? 0}
               icon={CircleMinus}
               tone="neutral"
             />
             <StatCard
               label="Left"
-              value={counts.Left}
+              value={counts.Left ?? 0}
               icon={LogOut}
               tone="purple"
             />
@@ -397,205 +276,101 @@ export function StudentsPage() {
         subtitle={`${students.length} students · ${filtered.length} shown`}
         icon={GraduationCap}
         actions={
-          <button
-            type="button"
-            className="btn btn--secondary"
-            onClick={handleExportCsv}
+          <ExportCsvButton
+            onClick={exportCsv}
             disabled={filtered.length === 0}
-          >
-            <Download size={16} aria-hidden="true" />
-            Export CSV
-          </button>
+          />
         }
       >
         <FilterBar>
-          <label>
-            <span className="visually-hidden">Class</span>
-            <select
-              className="select"
-              value={classFilter}
-              onChange={(e) => setClassFilter(e.target.value)}
-            >
-              <option value="">All classes</option>
-              {classNames.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            <span className="visually-hidden">Gender</span>
-            <select
-              className="select"
-              value={genderFilter}
-              onChange={(e) => setGenderFilter(e.target.value)}
-            >
-              <option value="">All genders</option>
-              <option>Male</option>
-              <option>Female</option>
-            </select>
-          </label>
-          <label>
-            <span className="visually-hidden">House</span>
-            <select
-              className="select"
-              value={houseFilter}
-              onChange={(e) => setHouseFilter(e.target.value)}
-            >
-              <option value="">All houses</option>
-              {houses.map((h) => (
-                <option key={h} value={h}>
-                  {h}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            <span className="visually-hidden">Status</span>
-            <select
-              className="select"
-              value={statusFilter}
-              onChange={(e) =>
-                setStatusFilter(e.target.value as StudentStatus | "")
-              }
-            >
-              <option value="">All statuses</option>
-              <option>Active</option>
-              <option>Inactive</option>
-              <option>Left</option>
-            </select>
-          </label>
-          {curricula.length > 0 && (
-            <label>
-              <span className="visually-hidden">Curriculum</span>
-              <select
-                className="select"
-                value={curriculumFilter}
-                onChange={(e) => setCurriculumFilter(e.target.value)}
-              >
-                <option value="">All curricula</option>
-                {curricula.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
-          {ealLevels.length > 0 && (
-            <label>
-              <span className="visually-hidden">English level</span>
-              <select
-                className="select"
-                value={ealFilter}
-                onChange={(e) => setEalFilter(e.target.value)}
-              >
-                <option value="">All English levels</option>
-                {ealLevels.map((l) => (
-                  <option key={l} value={l}>
-                    {l}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
-          <label className="checkbox-row" style={{ marginTop: 0 }}>
-            <input
-              type="checkbox"
-              checked={allergiesOnly}
-              onChange={(e) => setAllergiesOnly(e.target.checked)}
+          <FilterSelect
+            label="Class"
+            allLabel="All classes"
+            options={options.classes}
+            value={f.classSection}
+            onChange={(v) => filters.set("classSection", v)}
+          />
+          <FilterSelect
+            label="Gender"
+            allLabel="All genders"
+            options={["Male", "Female"]}
+            value={f.gender}
+            onChange={(v) => filters.set("gender", v)}
+          />
+          <FilterSelect
+            label="House"
+            allLabel="All houses"
+            options={options.houses}
+            value={f.house}
+            onChange={(v) => filters.set("house", v)}
+          />
+          <FilterSelect
+            label="Status"
+            allLabel="All statuses"
+            options={["Active", "Inactive", "Left"]}
+            value={f.status}
+            onChange={(v) => filters.set("status", v)}
+          />
+          {options.curricula.length > 0 && (
+            <FilterSelect
+              label="Curriculum"
+              allLabel="All curricula"
+              options={options.curricula}
+              value={f.curriculum}
+              onChange={(v) => filters.set("curriculum", v)}
             />
-            Has allergies
-          </label>
-          <label
-            className="search-box"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              marginLeft: "auto",
-            }}
-          >
-            <Search size={16} aria-hidden="true" />
-            <span className="visually-hidden">Search students</span>
-            <input
-              type="search"
-              placeholder="Name, admission no., roll"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              style={{
-                border: 0,
-                outline: "none",
-                background: "transparent",
-                color: "inherit",
-                font: "inherit",
-                width: "100%",
-              }}
-            />
-          </label>
-          {anyFilter && (
-            <button
-              type="button"
-              className="btn btn--secondary btn--sm"
-              onClick={clearFilters}
-            >
-              Clear
-            </button>
           )}
+          {options.ealLevels.length > 0 && (
+            <FilterSelect
+              label="English level"
+              allLabel="All English levels"
+              options={options.ealLevels}
+              value={f.eal}
+              onChange={(v) => filters.set("eal", v)}
+            />
+          )}
+          <FilterCheckbox
+            label="Has allergies"
+            checked={f.allergiesOnly}
+            onChange={(v) => filters.set("allergiesOnly", v)}
+          />
+          <SearchBox
+            label="Search students"
+            placeholder="Name, admission no., roll"
+            value={f.search}
+            onChange={(v) => filters.set("search", v)}
+          />
+          <ClearFiltersButton
+            visible={filters.isActive}
+            onClear={filters.clear}
+          />
         </FilterBar>
 
+        {list.error && (
+          <Notice tone="warn" style={{ margin: 16 }}>
+            {list.error}
+          </Notice>
+        )}
         <DataTable
           caption="Students"
           columns={columns}
           rows={filtered}
           rowKey={(s) => s.id}
-          loading={isLoading}
-          resetPageKey={filterKey}
+          loading={list.isLoading && !list.data}
+          resetPageKey={filters.key}
           empty={
-            <EmptyState
+            <ListEmptyState
               icon={GraduationCap}
-              title={
-                students.length === 0
-                  ? "No students yet"
-                  : "No students match these filters"
-              }
-              message={
-                students.length === 0
-                  ? "Students appear here once they are enrolled from Admissions."
-                  : undefined
-              }
-              action={
-                students.length > 0 ? (
-                  <button
-                    type="button"
-                    className="btn btn--secondary"
-                    onClick={clearFilters}
-                  >
-                    Clear filters
-                  </button>
-                ) : undefined
-              }
+              noun="students"
+              hasRecords={students.length > 0}
+              onClearFilters={filters.clear}
+              emptyMessage="Students appear here once they are enrolled from Admissions."
             />
           }
         />
       </Panel>
 
-      <ConfirmDialog
-        isOpen={deleteTarget !== null}
-        title="Delete student"
-        message={
-          deleteTarget
-            ? `Delete ${fullName(deleteTarget)} (${deleteTarget.admNo})? This cannot be undone.`
-            : ""
-        }
-        confirmLabel="Delete"
-        danger
-        onConfirm={confirmDelete}
-        onCancel={() => setDeleteTarget(null)}
-      />
-
-      <ValidationModal errors={errors} onClose={() => setErrors(null)} />
+      {remove.dialog}
     </div>
   );
 }

@@ -1,237 +1,225 @@
-import { useToast } from "@/components/Toast";
-import { PageHero } from "@/components/PageHero";
-import { Plus } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { ValidationModal } from "@/components/ValidationModal";
-import { classSectionService } from "@/features/class-sections/services/classSectionService";
-import type { ClassSectionResponse } from "@/features/class-sections/types/classSection.types";
-import { getApiErrors } from "@/utils/apiError";
+import { useMemo } from "react";
+import { BookOpen, CircleCheck, UserX } from "lucide-react";
 import { subjectService } from "../services/subjectService";
-import { SubjectModal } from "../components/SubjectModal";
 import {
   SUBJECT_TYPES,
-  type SubjectRequest,
+  subjectMarks,
   type SubjectResponse,
 } from "../types/subject.types";
+import { classSectionService } from "@/features/class-sections/services/classSectionService";
+import { PageHero } from "@/components/PageHero";
+import { StatCard, StatGrid } from "@/components/StatCard";
+import { Panel } from "@/components/Panel";
+import {
+  ClearFiltersButton,
+  FilterBar,
+  FilterSelect,
+} from "@/components/FilterBar";
+import { SearchBox } from "@/components/SearchBox";
+import { StatusPills } from "@/components/StatusPills";
+import { DataTable, type Column } from "@/components/DataTable";
+import { Badge, StatusBadge } from "@/components/Badge";
+import { Notice } from "@/components/Notice";
+import { ListEmptyState } from "@/components/ListEmptyState";
+import {
+  ExportCsvButton,
+  NewRecordLink,
+  PrintButton,
+  RowActions,
+} from "@/components/ListButtons";
+import { useAsyncData } from "@/hooks/useAsyncData";
+import { useCan } from "@/hooks/useCan";
+import { useConfirmAction } from "@/hooks/useConfirmAction";
+import { useFilters } from "@/hooks/useFilters";
+import { Permission } from "@/routes/permissions";
+import { countBy, uniqueSorted } from "@/utils/collections";
+import { downloadCsv } from "@/utils/csv";
 
-type StatusFilter = "" | "Active" | "Inactive";
+const STATUS_FILTERS = ["All", "Active", "Inactive"] as const;
 
-const unique = (values: string[]) => [...new Set(values)].sort();
-
+/** Max or pass marks; for theory + practical subjects the total, with the split underneath. */
 function MarksCell({ s, kind }: { s: SubjectResponse; kind: "max" | "pass" }) {
-  if (s.type === "Both") {
-    const top =
-      kind === "max"
-        ? (s.theoryMax ?? 0) + (s.practicalMax ?? 0)
-        : (s.theoryPass ?? 0) + (s.practicalPass ?? 0);
-    const sub =
-      kind === "max"
-        ? `T:${s.theoryMax} · P:${s.practicalMax}`
-        : `T:${s.theoryPass} · P:${s.practicalPass}`;
-    return (
-      <>
-        {top}
-        <br />
-        <span style={{ fontSize: 11, color: "var(--muted)" }}>{sub}</span>
-      </>
-    );
-  }
-  return <>{kind === "max" ? s.maxMarks : s.passMarks}</>;
-}
-
-function downloadCsv(rows: SubjectResponse[]) {
-  const headers = [
-    "ID",
-    "Subject",
-    "Code",
-    "Class",
-    "Type",
-    "Max",
-    "Pass",
-    "Teacher",
-    "Status",
-  ];
-  const lines = rows.map((s) => {
-    const both = s.type === "Both";
-    const max = both
-      ? (s.theoryMax ?? 0) + (s.practicalMax ?? 0)
-      : (s.maxMarks ?? "");
-    const pass = both
-      ? (s.theoryPass ?? 0) + (s.practicalPass ?? 0)
-      : (s.passMarks ?? "");
-    return [
-      s.id,
-      s.name,
-      s.code,
-      s.classSectionName,
-      s.type,
-      max,
-      pass,
-      s.teacherName ?? "",
-      s.status,
-    ]
-      .map((v) => `"${String(v).replace(/"/g, '""')}"`)
-      .join(",");
-  });
-  const blob = new Blob([[headers.join(","), ...lines].join("\n")], {
-    type: "text/csv;charset=utf-8;",
-  });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "subjects.csv";
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-export function SubjectsPage() {
-  const toast = useToast();
-  const [subjects, setSubjects] = useState<SubjectResponse[]>([]);
-  const [classSections, setClassSections] = useState<ClassSectionResponse[]>(
-    [],
+  const total = subjectMarks(s, kind);
+  if (s.type !== "Both") return <>{total ?? "—"}</>;
+  const split =
+    kind === "max"
+      ? `T ${s.theoryMax} · P ${s.practicalMax}`
+      : `T ${s.theoryPass} · P ${s.practicalPass}`;
+  return (
+    <div>
+      <div>{total}</div>
+      <div className="person__sub">{split}</div>
+    </div>
   );
-  const [isLoading, setIsLoading] = useState(true);
+}
 
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("");
-  const [search, setSearch] = useState("");
-  const [quickSearch, setQuickSearch] = useState("");
-  const [classFilter, setClassFilter] = useState("");
-  const [yearFilter, setYearFilter] = useState("");
-  const [typeFilter, setTypeFilter] = useState("");
+/**
+ * U2: the subjects list. Adding and editing are full pages. Subjects have no page of their own:
+ * everything about a subject fits in its row, and teachers are assigned from the teacher's page.
+ */
+export function SubjectsPage() {
+  const can = useCan();
+  const canCreate = can(Permission.SubjectsCreate);
+  const canEdit = can(Permission.SubjectsEdit);
+  const canDelete = can(Permission.SubjectsDelete);
 
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
-
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editing, setEditing] = useState<SubjectResponse | null>(null);
-  const [deleting, setDeleting] = useState<SubjectResponse | null>(null);
-  const [errors, setErrors] = useState<string[] | null>(null);
-
-  const loadData = async () => {
-    try {
-      const [subjectList, sections] = await Promise.all([
+  const list = useAsyncData(
+    async () => {
+      const [subjects, classSections] = await Promise.all([
         subjectService.getAll(),
         classSectionService.getAll(),
       ]);
-      setSubjects(subjectList);
-      setClassSections(sections);
-    } catch (err) {
-      setErrors(getApiErrors(err, "Could not load subjects."));
-    } finally {
-      setIsLoading(false);
-    }
-  };
+      return { subjects, classSections };
+    },
+    [],
+    "Could not load subjects.",
+  );
+  const subjects = useMemo(() => list.data?.subjects ?? [], [list.data]);
+  const yearOfClass = useMemo(
+    () =>
+      new Map(
+        (list.data?.classSections ?? []).map((c) => [c.id, c.academicYearName]),
+      ),
+    [list.data],
+  );
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  const filters = useFilters({
+    status: "All",
+    year: "",
+    classSection: "",
+    type: "",
+    search: "",
+  });
+  const f = filters.values;
 
   const years = useMemo(
-    () => unique(classSections.map((c) => c.academicYearName)),
-    [classSections],
+    () => uniqueSorted([...yearOfClass.values()]),
+    [yearOfClass],
   );
   const classNames = useMemo(
-    () => unique(subjects.map((s) => s.classSectionName)),
+    () => uniqueSorted(subjects.map((s) => s.classSectionName)),
     [subjects],
   );
-
-  const counts = useMemo(
-    () => ({
-      all: subjects.length,
-      active: subjects.filter((s) => s.status === "Active").length,
-      inactive: subjects.filter((s) => s.status === "Inactive").length,
-    }),
+  const counts: Record<string, number> = useMemo(
+    () => ({ All: subjects.length, ...countBy(subjects, (s) => s.status) }),
     [subjects],
   );
+  const withoutTeacher = subjects.filter((s) => s.teacherId === null).length;
 
   const filtered = useMemo(() => {
-    const q = (quickSearch || search).trim().toLowerCase();
+    const q = f.search.trim().toLowerCase();
     return subjects.filter((s) => {
-      if (statusFilter && s.status !== statusFilter) return false;
-      if (classFilter && s.classSectionName !== classFilter) return false;
-      if (yearFilter && !s.classSectionName.includes(`(${yearFilter})`))
+      if (f.status !== "All" && s.status !== f.status) return false;
+      if (f.year && yearOfClass.get(s.classSectionId) !== f.year) return false;
+      if (f.classSection && s.classSectionName !== f.classSection) return false;
+      if (f.type && s.type !== f.type) return false;
+      if (
+        q &&
+        !`${s.name} ${s.code} ${s.teacherName ?? ""}`.toLowerCase().includes(q)
+      )
         return false;
-      if (typeFilter && s.type !== typeFilter) return false;
-      if (q) {
-        const haystack =
-          `${s.name} ${s.code} ${s.teacherName ?? ""}`.toLowerCase();
-        if (!haystack.includes(q)) return false;
-      }
       return true;
     });
-  }, [
-    subjects,
-    statusFilter,
-    classFilter,
-    yearFilter,
-    typeFilter,
-    search,
-    quickSearch,
-  ]);
+  }, [subjects, yearOfClass, f]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const pageRows = filtered.slice((page - 1) * pageSize, page * pageSize);
+  const remove = useConfirmAction<SubjectResponse>({
+    title: "Delete subject",
+    message: (s) =>
+      `Delete ${s.name} (${s.code}) of ${s.classSectionName}? This cannot be undone.`,
+    confirmLabel: "Delete",
+    danger: true,
+    run: async (s) => {
+      await subjectService.delete(s.id);
+      await list.reload();
+    },
+    success: (s) => `${s.name} was deleted.`,
+    failure: "Could not delete this subject.",
+  });
 
-  useEffect(() => {
-    setPage(1);
-  }, [
-    statusFilter,
-    classFilter,
-    yearFilter,
-    typeFilter,
-    search,
-    quickSearch,
-    pageSize,
-  ]);
+  const exportCsv = () =>
+    downloadCsv(
+      "subjects.csv",
+      ["Subject", "Code", "Class", "Type", "Max", "Pass", "Teacher", "Status"],
+      filtered.map((s) => [
+        s.name,
+        s.code,
+        s.classSectionName,
+        s.type,
+        subjectMarks(s, "max"),
+        subjectMarks(s, "pass"),
+        s.teacherName,
+        s.status,
+      ]),
+    );
 
-  const clearFilters = () => {
-    setSearch("");
-    setQuickSearch("");
-    setClassFilter("");
-    setYearFilter("");
-    setTypeFilter("");
-    setStatusFilter("");
-  };
+  const newLink = canCreate ? (
+    <NewRecordLink to="/subjects/new" label="Add subject" />
+  ) : undefined;
 
-  const handleSave = async (data: SubjectRequest) => {
-    if (editing) await subjectService.update(editing.id, data);
-    else await subjectService.create(data);
-    if (!editing) setStatusFilter("");
-    await loadData();
-  };
-
-  const handleConfirmDelete = async () => {
-    if (!deleting) return;
-    const target = deleting;
-    setDeleting(null);
-    try {
-      await subjectService.delete(target.id);
-      await loadData();
-    } catch (err) {
-      setErrors(getApiErrors(err, "Could not delete this subject."));
-    }
-  };
-
-  const pipelineSteps: {
-    key: StatusFilter;
-    label: string;
-    activeClass: string;
-  }[] = [
+  const columns: Column<SubjectResponse>[] = [
     {
-      key: "",
-      label: `All (${counts.all})`,
-      activeClass: "pipeline__step--dark",
+      key: "name",
+      header: "Subject",
+      sortValue: (s) => s.name,
+      render: (s) => (
+        <div>
+          <div className="person__name">{s.name}</div>
+          <div className="person__sub">{s.code}</div>
+        </div>
+      ),
     },
     {
-      key: "Active",
-      label: `Active (${counts.active})`,
-      activeClass: "pipeline__step--green",
+      key: "class",
+      header: "Class",
+      sortValue: (s) => s.classSectionName,
+      render: (s) => s.classSectionName,
     },
     {
-      key: "Inactive",
-      label: `Inactive (${counts.inactive})`,
-      activeClass: "",
+      key: "type",
+      header: "Type",
+      hideBelow: "md",
+      sortValue: (s) => s.type,
+      render: (s) => (
+        <Badge tone={s.type === "Theory" ? "neutral" : "info"}>{s.type}</Badge>
+      ),
+    },
+    {
+      key: "max",
+      header: "Max",
+      hideBelow: "md",
+      sortValue: (s) => subjectMarks(s, "max"),
+      render: (s) => <MarksCell s={s} kind="max" />,
+    },
+    {
+      key: "pass",
+      header: "Pass",
+      hideBelow: "md",
+      sortValue: (s) => subjectMarks(s, "pass"),
+      render: (s) => <MarksCell s={s} kind="pass" />,
+    },
+    {
+      key: "teacher",
+      header: "Teacher",
+      sortValue: (s) => s.teacherName,
+      render: (s) =>
+        s.teacherName ?? <span className="cell-muted">Not assigned</span>,
+    },
+    {
+      key: "status",
+      header: "Status",
+      sortValue: (s) => s.status,
+      render: (s) => <StatusBadge status={s.status} />,
+    },
+    {
+      key: "actions",
+      header: "Actions",
+      render: (s) => (
+        <RowActions
+          name={`${s.name} (${s.classSectionName})`}
+          editTo={canEdit ? `/subjects/${s.id}/edit` : undefined}
+          onDelete={canDelete ? () => remove.ask(s) : undefined}
+        />
+      ),
     },
   ];
 
@@ -242,260 +230,111 @@ export function SubjectsPage() {
         subtitle="Subjects taught in each class, their teachers and marks rules."
         actions={
           <>
-            <button
-              className="btn btn--primary"
-              onClick={() => {
-                setEditing(null);
-                setIsModalOpen(true);
-              }}
-            >
-              <Plus size={16} aria-hidden="true" />
-              Add subject
-            </button>
+            <PrintButton />
+            {newLink}
           </>
+        }
+        stats={
+          <StatGrid>
+            <StatCard
+              label="Subjects"
+              value={subjects.length}
+              icon={BookOpen}
+              tone="info"
+            />
+            <StatCard
+              label="Active"
+              value={counts.Active ?? 0}
+              icon={CircleCheck}
+              tone="ok"
+            />
+            <StatCard
+              label="Without a teacher"
+              value={withoutTeacher}
+              icon={UserX}
+              tone="warn"
+            />
+          </StatGrid>
         }
       />
 
-      <div className="card">
-        <div className="pipeline">
-          {pipelineSteps.map((s) => (
-            <button
-              key={s.key}
-              type="button"
-              className={`pipeline__step ${statusFilter === s.key ? "pipeline__step--active" : s.activeClass}`}
-              onClick={() => setStatusFilter(s.key)}
-            >
-              {s.label}
-            </button>
-          ))}
-        </div>
+      <Panel
+        title="All subjects"
+        subtitle={`${subjects.length} subjects · ${filtered.length} shown`}
+        icon={BookOpen}
+        actions={
+          <ExportCsvButton
+            onClick={exportCsv}
+            disabled={filtered.length === 0}
+          />
+        }
+      >
+        <StatusPills
+          label="Filter by status"
+          options={STATUS_FILTERS}
+          value={f.status as (typeof STATUS_FILTERS)[number]}
+          onChange={(v) => filters.set("status", v)}
+          counts={counts}
+        />
+        <FilterBar>
+          <FilterSelect
+            label="Academic year"
+            allLabel="All years"
+            options={years}
+            value={f.year}
+            onChange={(v) => filters.set("year", v)}
+          />
+          <FilterSelect
+            label="Class"
+            allLabel="All classes"
+            options={classNames}
+            value={f.classSection}
+            onChange={(v) => filters.set("classSection", v)}
+          />
+          <FilterSelect
+            label="Type"
+            allLabel="All types"
+            options={SUBJECT_TYPES}
+            value={f.type}
+            onChange={(v) => filters.set("type", v)}
+          />
+          <SearchBox
+            label="Search subjects"
+            placeholder="Name, code, teacher"
+            value={f.search}
+            onChange={(v) => filters.set("search", v)}
+          />
+          <ClearFiltersButton
+            visible={filters.isActive}
+            onClear={filters.clear}
+          />
+        </FilterBar>
 
-        <div className="filters">
-          <div className="field">
-            <label>Search</label>
-            <input
-              placeholder="Search subjects..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
+        {list.error && (
+          <Notice tone="warn" style={{ margin: 16 }}>
+            {list.error}
+          </Notice>
+        )}
+        <DataTable
+          caption="Subjects"
+          columns={columns}
+          rows={filtered}
+          rowKey={(s) => s.id}
+          loading={list.isLoading && !list.data}
+          resetPageKey={filters.key}
+          empty={
+            <ListEmptyState
+              icon={BookOpen}
+              noun="subjects"
+              hasRecords={subjects.length > 0}
+              onClearFilters={filters.clear}
+              createAction={newLink}
             />
-          </div>
-          <div className="field">
-            <label>Class</label>
-            <select
-              value={classFilter}
-              onChange={(e) => setClassFilter(e.target.value)}
-            >
-              <option value="">All Classes</option>
-              {classNames.map((c) => (
-                <option key={c}>{c}</option>
-              ))}
-            </select>
-          </div>
-          <div className="field">
-            <label>Academic Year</label>
-            <select
-              value={yearFilter}
-              onChange={(e) => setYearFilter(e.target.value)}
-            >
-              <option value="">All Years</option>
-              {years.map((y) => (
-                <option key={y}>{y}</option>
-              ))}
-            </select>
-          </div>
-          <div className="field">
-            <label>Type</label>
-            <select
-              value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value)}
-            >
-              <option value="">All Types</option>
-              {SUBJECT_TYPES.map((t) => (
-                <option key={t}>{t}</option>
-              ))}
-            </select>
-          </div>
-          <button
-            className="btn btn--secondary filters__clear"
-            onClick={clearFilters}
-          >
-            Clear
-          </button>
-        </div>
+          }
+        />
+      </Panel>
 
-        <div className="table-toolbar">
-          <div className="table-toolbar__left">
-            <button
-              className="export-btn export-btn--csv"
-              onClick={() => downloadCsv(filtered)}
-            >
-              CSV
-            </button>
-            <button
-              className="export-btn export-btn--pdf"
-              onClick={() =>
-                toast.info("PDF export is coming in a later release.")
-              }
-            >
-              PDF
-            </button>
-            <button
-              className="export-btn export-btn--print"
-              onClick={() => window.print()}
-            >
-              PRINT
-            </button>
-          </div>
-          <div className="table-toolbar__right">
-            <div className="pagesize">
-              Show{" "}
-              <select
-                value={pageSize}
-                onChange={(e) => setPageSize(Number(e.target.value))}
-              >
-                <option value={10}>10</option>
-                <option value={25}>25</option>
-                <option value={50}>50</option>
-              </select>{" "}
-              entries
-            </div>
-            <input
-              className="search-box"
-              type="search"
-              placeholder="Search..."
-              value={quickSearch}
-              onChange={(e) => setQuickSearch(e.target.value)}
-            />
-          </div>
-        </div>
-
-        <div style={{ overflowX: "auto" }}>
-          {isLoading ? (
-            <div className="empty-state">Loading…</div>
-          ) : pageRows.length === 0 ? (
-            <div className="empty-state">No subjects match these filters.</div>
-          ) : (
-            <table>
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Subject</th>
-                  <th>Code</th>
-                  <th>Class</th>
-                  <th>Type</th>
-                  <th>Max</th>
-                  <th>Pass</th>
-                  <th>Teacher</th>
-                  <th>Status</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pageRows.map((s, index) => (
-                  <tr key={s.id}>
-                    <td>{(page - 1) * pageSize + index + 1}</td>
-                    <td>{s.name}</td>
-                    <td>
-                      <span className="badge badge--warn">{s.code}</span>
-                    </td>
-                    <td>{s.classSectionName}</td>
-                    <td>
-                      <span
-                        className={`badge ${s.type === "Both" ? "badge--purple" : "badge--info"}`}
-                      >
-                        {s.type}
-                      </span>
-                    </td>
-                    <td>
-                      <MarksCell s={s} kind="max" />
-                    </td>
-                    <td>
-                      <MarksCell s={s} kind="pass" />
-                    </td>
-                    <td>
-                      {s.teacherName ?? (
-                        <span style={{ color: "var(--muted)" }}>—</span>
-                      )}
-                    </td>
-                    <td>
-                      <span
-                        className={`badge ${s.status === "Active" ? "badge--active" : "badge--inactive"}`}
-                      >
-                        {s.status}
-                      </span>
-                    </td>
-                    <td style={{ whiteSpace: "nowrap" }}>
-                      <button
-                        className="btn--icon"
-                        title="Edit"
-                        onClick={() => {
-                          setEditing(s);
-                          setIsModalOpen(true);
-                        }}
-                      >
-                        ✎
-                      </button>
-                      <button
-                        className="btn--icon danger"
-                        title="Delete"
-                        onClick={() => setDeleting(s)}
-                      >
-                        🗑
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-
-        <div className="table-footer">
-          <span>
-            Showing {filtered.length === 0 ? 0 : (page - 1) * pageSize + 1} to{" "}
-            {Math.min(page * pageSize, filtered.length)} of {filtered.length}{" "}
-            entries
-          </span>
-          <div className="table-footer__pages">
-            <button
-              className="btn btn--secondary btn--sm"
-              disabled={page <= 1}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-            >
-              Previous
-            </button>
-            <span>
-              Page {page} of {totalPages}
-            </span>
-            <button
-              className="btn btn--secondary btn--sm"
-              disabled={page >= totalPages}
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            >
-              Next
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <SubjectModal
-        isOpen={isModalOpen}
-        editing={editing}
-        classSections={classSections}
-        onClose={() => setIsModalOpen(false)}
-        onSave={handleSave}
-      />
-
-      <ConfirmDialog
-        isOpen={!!deleting}
-        title="Delete Subject"
-        message={`Delete ${deleting?.name ?? "this subject"} (${deleting?.classSectionName ?? ""})? This cannot be undone. If a teacher is assigned to it, that assignment is removed too.`}
-        confirmLabel="Delete"
-        onConfirm={handleConfirmDelete}
-        onCancel={() => setDeleting(null)}
-      />
-
-      <ValidationModal errors={errors} onClose={() => setErrors(null)} />
+      {remove.dialog}
     </div>
   );
 }

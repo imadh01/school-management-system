@@ -60,6 +60,41 @@ public class AdmissionLifecycleTests
     }
 
     [Fact]
+    public async Task Deleting_an_enrolled_application_is_refused_and_keeps_it()
+    {
+        var (admissionId, _) = await CreateApplicationAsync("Enrolled");
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var service = scope.ServiceProvider.GetRequiredService<IAdmissionService>();
+            var ex = await Assert.ThrowsAsync<ConflictException>(() => service.DeleteAsync(admissionId, CancellationToken.None));
+            Assert.Contains("cannot be deleted", ex.Message);
+        }
+
+        using var verify = _factory.Services.CreateScope();
+        var db = verify.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        Assert.False(await db.Admissions.IgnoreQueryFilters().AsNoTracking()
+            .Where(a => a.Id == admissionId).Select(a => a.IsDeleted).SingleAsync());
+    }
+
+    [Theory]
+    [InlineData("Registered")]
+    [InlineData("Admitted")]
+    [InlineData("Rejected")]
+    public async Task Deleting_an_application_that_is_not_enrolled_still_works(string status)
+    {
+        var (admissionId, _) = await CreateApplicationAsync(status);
+
+        using (var scope = _factory.Services.CreateScope())
+            await scope.ServiceProvider.GetRequiredService<IAdmissionService>().DeleteAsync(admissionId, CancellationToken.None);
+
+        using var verify = _factory.Services.CreateScope();
+        var db = verify.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        Assert.True(await db.Admissions.IgnoreQueryFilters().AsNoTracking()
+            .Where(a => a.Id == admissionId).Select(a => a.IsDeleted).SingleAsync());
+    }
+
+    [Fact]
     public async Task Enrolling_the_same_application_twice_is_refused_and_leaves_one_student()
     {
         int admissionId;

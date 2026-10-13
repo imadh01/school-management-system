@@ -157,6 +157,11 @@ export function isAdmissionEditable(status: AdmissionStatus): boolean {
   return status === "Registered" || status === "Admitted";
 }
 
+/** An enrolled application is the student's admission record and is kept (the API refuses to delete it). */
+export function isAdmissionDeletable(status: AdmissionStatus): boolean {
+  return status !== "Enrolled";
+}
+
 /** One colour per status, used by the list and the detail page. */
 export const ADMISSION_STATUS_TONE: Record<AdmissionStatus, BadgeTone> = {
   Registered: "info",

@@ -1,24 +1,16 @@
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
-import { Check, Circle } from "lucide-react";
 import { apiClient } from "@/services/apiClient";
 import { startSession } from "../services/session";
 import type { AuthResult } from "../types/auth.types";
 import { useAuth } from "@/store/AuthContext";
 import { useToast } from "@/components/Toast";
 import { getApiErrors } from "@/utils/apiError";
+import { meetsPasswordRules } from "@/utils/password";
+import { PasswordRules } from "@/components/form/PasswordRules";
 import logo from "@/assets/synergein-logo.jpg";
 import "./LoginPage.css";
-
-/** The server's rules (ChangePasswordRequestValidator), shown live so nobody has to guess. */
-const RULES: { label: string; test: (p: string) => boolean }[] = [
-  { label: "At least 8 characters", test: (p) => p.length >= 8 },
-  { label: "An uppercase letter", test: (p) => /[A-Z]/.test(p) },
-  { label: "A lowercase letter", test: (p) => /[a-z]/.test(p) },
-  { label: "A digit", test: (p) => /[0-9]/.test(p) },
-  { label: "A special character", test: (p) => /[^a-zA-Z0-9]/.test(p) },
-];
 
 type FieldErrors = Partial<
   Record<"currentPassword" | "newPassword" | "confirm", string>
@@ -49,7 +41,7 @@ export function ChangePasswordRequiredPage() {
 
     const next: FieldErrors = {};
     if (!currentPassword) next.currentPassword = "Enter your current password.";
-    if (!RULES.every((r) => r.test(newPassword)))
+    if (!meetsPasswordRules(newPassword))
       next.newPassword = "The new password does not meet all the rules below.";
     if (newPassword !== confirm)
       next.confirm = "The two new passwords do not match.";
@@ -148,28 +140,9 @@ export function ChangePasswordRequiredPage() {
               setNewPassword,
               "new-password",
             )}
-            <ul
-              className="password-rules"
-              aria-label="Password rules"
-              style={{ margin: "-8px 0 18px" }}
-            >
-              {RULES.map((r) => {
-                const met = r.test(newPassword);
-                return (
-                  <li key={r.label} className={met ? "met" : undefined}>
-                    {met ? (
-                      <Check size={14} aria-hidden="true" />
-                    ) : (
-                      <Circle size={12} aria-hidden="true" />
-                    )}
-                    {r.label}
-                    <span className="visually-hidden">
-                      {met ? " (met)" : " (not met yet)"}
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
+            <div style={{ margin: "-8px 0 18px" }}>
+              <PasswordRules password={newPassword} />
+            </div>
             {field(
               "confirm",
               "Repeat the new password",

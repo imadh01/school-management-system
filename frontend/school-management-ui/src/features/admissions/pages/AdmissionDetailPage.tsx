@@ -1,10 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
-import {
-  Link,
-  useNavigate,
-  useParams,
-  useSearchParams,
-} from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   Ban,
   Check,
@@ -12,19 +7,15 @@ import {
   FileText,
   FileUp,
   GraduationCap,
-  Mail,
-  Pencil,
-  Phone,
-  Trash,
   UserRound,
   Users,
-  UserX,
   X,
 } from "lucide-react";
 import { admissionService } from "../services/admissionService";
 import { classSectionService } from "@/features/class-sections/services/classSectionService";
 import {
   ADMISSION_STATUS_TONE,
+  isAdmissionDeletable,
   isAdmissionEditable,
   type AdmissionResponse,
   type AdmissionStatus,
@@ -34,27 +25,21 @@ import { ConfirmAdmissionModal } from "../components/ConfirmAdmissionModal";
 import { RejectAdmissionModal } from "../components/RejectAdmissionModal";
 import { EnrollModal } from "../components/EnrollModal";
 import { DetailHeader } from "@/components/detail/DetailHeader";
+import { DetailCard } from "@/components/detail/DetailCard";
+import { ContactCard, ContactList } from "@/components/detail/ContactCard";
+import { DeleteButton, EditButton } from "@/components/detail/HeaderButtons";
 import { Tabs, TabPanel, type TabItem } from "@/components/detail/Tabs";
 import { KeyValueGrid } from "@/components/detail/KeyValueGrid";
 import { Badge } from "@/components/Badge";
-import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { EmptyState } from "@/components/EmptyState";
+import { Notice } from "@/components/Notice";
+import { PageLoadError, PageLoading } from "@/components/PageState";
 import { useToast } from "@/components/Toast";
-import { getApiErrors, getReadErrors } from "@/utils/apiError";
-import { useAuth } from "@/store/AuthContext";
+import { useAsyncData } from "@/hooks/useAsyncData";
+import { useCan } from "@/hooks/useCan";
+import { useConfirmAction } from "@/hooks/useConfirmAction";
+import { useTabParam } from "@/hooks/useTabParam";
 import { PAGE_PERMISSIONS, Permission } from "@/routes/permissions";
-
-function formatDate(iso: string | null | undefined): string | null {
-  if (!iso) return null;
-  const d = new Date(`${iso}T00:00:00`);
-  return Number.isNaN(d.getTime())
-    ? iso
-    : d.toLocaleDateString("en-GB", {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-      });
-}
+import { formatDate, joinParts } from "@/utils/format";
 
 /** Registered → Admitted → Enrolled, or Rejected at any point before enrolment. */
 function StatusSteps({ status }: { status: AdmissionStatus }) {
@@ -105,43 +90,39 @@ function StatusSteps({ status }: { status: AdmissionStatus }) {
   );
 }
 
+const TAB_IDS = ["overview", "guardians", "enrolment", "documents"] as const;
+
 /**
- * U2: one application on a page of its own (/admissions/:id), replacing the details dialog and the
- * "view reason" dialog. The decisions (confirm, reject, enrol) stay pop-ups opened from here, and
- * only the ones that fit the current status and the user's permissions are offered.
+ * U2: one application on a page of its own (/admissions/:id). The decisions (confirm, reject,
+ * enrol) stay pop-ups opened from here, and only the ones that fit the current status and the
+ * user's permissions are offered.
  */
 export function AdmissionDetailPage() {
-  const { id } = useParams();
-  const admissionId = Number(id);
+  const admissionId = Number(useParams().id);
   const navigate = useNavigate();
   const toast = useToast();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const { hasAnyPermission } = useAuth();
-  const canEdit = hasAnyPermission([Permission.AdmissionsEdit]);
-  const canEnrol = hasAnyPermission([Permission.AdmissionsEnroll]);
-  const canDelete = hasAnyPermission([Permission.AdmissionsDelete]);
-  const canOpenStudents = hasAnyPermission(PAGE_PERMISSIONS["/students"]);
+  const can = useCan();
+  const canEdit = can(Permission.AdmissionsEdit);
+  const canEnrol = can(Permission.AdmissionsEnroll);
+  const canDelete = can(Permission.AdmissionsDelete);
+  const canOpenStudents = can(...PAGE_PERMISSIONS["/students"]);
 
-  const [admission, setAdmission] = useState<AdmissionResponse | null>(null);
+  const {
+    data: admission,
+    error,
+    reload,
+  } = useAsyncData(
+    () => admissionService.getById(admissionId),
+    [admissionId],
+    "Could not load this application.",
+  );
+  const [activeTab, selectTab] = useTabParam(TAB_IDS);
+  const [dialog, setDialog] = useState<"confirm" | "reject" | "enrol" | null>(
+    null,
+  );
   const [classSections, setClassSections] = useState<ClassSectionResponse[]>(
     [],
   );
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [dialog, setDialog] = useState<
-    "confirm" | "reject" | "enrol" | "delete" | null
-  >(null);
-
-  const load = useCallback(async () => {
-    try {
-      setAdmission(await admissionService.getById(admissionId));
-    } catch (err) {
-      setLoadError(getReadErrors(err, "Could not load this application.")[0]);
-    }
-  }, [admissionId]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
 
   // The class list is needed only by the enrolment pop-up.
   useEffect(() => {
@@ -152,31 +133,31 @@ export function AdmissionDetailPage() {
         .catch(() => undefined);
   }, [dialog, classSections.length]);
 
-  if (loadError) {
+  const remove = useConfirmAction<AdmissionResponse>({
+    title: "Delete application",
+    message: (a) =>
+      `Delete the application for ${a.firstName} ${a.lastName} (${a.regNo})? This cannot be undone.`,
+    confirmLabel: "Delete",
+    danger: true,
+    run: async (a) => {
+      await admissionService.delete(a.id);
+      navigate("/admissions");
+    },
+    success: (a) => `Application ${a.regNo} was deleted.`,
+    failure: "Could not delete this application.",
+  });
+
+  if (error) {
     return (
-      <div className="card">
-        <EmptyState
-          icon={UserX}
-          title="This application could not be opened"
-          message={loadError}
-          action={
-            <Link className="btn btn--secondary" to="/admissions">
-              Back to admissions
-            </Link>
-          }
-        />
-      </div>
+      <PageLoadError
+        title="This application could not be opened"
+        message={error}
+        backTo="/admissions"
+        backLabel="Back to admissions"
+      />
     );
   }
-  if (!admission) {
-    return (
-      <div className="card">
-        <div className="empty-state" role="status">
-          Loading…
-        </div>
-      </div>
-    );
-  }
+  if (!admission) return <PageLoading />;
 
   const a = admission;
   const name = `${a.firstName} ${a.lastName}`;
@@ -196,36 +177,18 @@ export function AdmissionDetailPage() {
       : []),
     { id: "documents", label: "Documents", icon: FileText },
   ];
-  const requested = searchParams.get("tab");
-  const activeTab =
-    requested && tabs.some((t) => t.id === requested) ? requested : "overview";
-  const selectTab = (tab: string) =>
-    setSearchParams(tab === "overview" ? {} : { tab }, { replace: true });
+  // "?tab=enrolment" on an application that is not enrolled falls back to the overview.
+  const shownTab =
+    activeTab === "enrolment" && !enrolled ? "overview" : activeTab;
 
   const afterAction = async (message: string) => {
     toast.success(message);
-    await load();
-  };
-
-  const handleDelete = async () => {
-    setDialog(null);
-    try {
-      await admissionService.delete(a.id);
-      toast.success(`Application ${a.regNo} was deleted.`);
-      navigate("/admissions");
-    } catch (err) {
-      toast.error(getApiErrors(err, "Could not delete this application.")[0]);
-    }
+    await reload();
   };
 
   const actions = (
     <>
-      {editable && canEdit && (
-        <Link className="btn btn--secondary" to={`/admissions/${a.id}/edit`}>
-          <Pencil size={16} aria-hidden="true" />
-          Edit
-        </Link>
-      )}
+      {editable && canEdit && <EditButton to={`/admissions/${a.id}/edit`} />}
       {a.status === "Registered" && canEdit && (
         <button
           type="button"
@@ -262,15 +225,8 @@ export function AdmissionDetailPage() {
           Reject
         </button>
       )}
-      {canDelete && (
-        <button
-          type="button"
-          className="btn btn--secondary"
-          onClick={() => setDialog("delete")}
-        >
-          <Trash size={16} aria-hidden="true" />
-          Delete
-        </button>
+      {canDelete && isAdmissionDeletable(a.status) && (
+        <DeleteButton onClick={() => remove.ask(a)} />
       )}
     </>
   );
@@ -304,23 +260,17 @@ export function AdmissionDetailPage() {
       >
         <StatusSteps status={a.status} />
         {a.status === "Rejected" && (
-          <div className="notice notice--warn" style={{ marginTop: 14 }}>
-            <Ban size={16} aria-hidden="true" />
-            <span>
-              <strong>Rejected.</strong>{" "}
-              {a.rejectionReason || "No reason recorded."} This application is
-              closed and can no longer be edited.
-            </span>
-          </div>
+          <Notice tone="warn" icon={Ban} style={{ marginTop: 14 }}>
+            <strong>Rejected.</strong>{" "}
+            {a.rejectionReason || "No reason recorded."} This application is
+            closed and can no longer be edited.
+          </Notice>
         )}
         {enrolled && (
-          <div className="notice" style={{ marginTop: 14 }}>
-            <GraduationCap size={16} aria-hidden="true" />
-            <span>
-              Enrolled into {a.allottedClassSectionName ?? "a class"}. This
-              application is closed; changes are made on the student record.
-            </span>
-          </div>
+          <Notice icon={GraduationCap} style={{ marginTop: 14 }}>
+            Enrolled into {a.allottedClassSectionName ?? "a class"}. This
+            application is closed; changes are made on the student record.
+          </Notice>
         )}
       </section>
 
@@ -328,15 +278,14 @@ export function AdmissionDetailPage() {
         idBase="admission"
         label="Application details"
         tabs={tabs}
-        active={activeTab}
+        active={shownTab}
         onChange={selectTab}
       />
 
-      {activeTab === "overview" && (
+      {shownTab === "overview" && (
         <TabPanel idBase="admission" id="overview">
           <div className="detail-cards">
-            <section className="detail-card" aria-labelledby="ad-applicant">
-              <h2 id="ad-applicant">Applicant</h2>
+            <DetailCard title="Applicant">
               <KeyValueGrid
                 items={[
                   { label: "First name", value: a.firstName },
@@ -346,9 +295,8 @@ export function AdmissionDetailPage() {
                   { label: "Date of birth", value: formatDate(a.dateOfBirth) },
                 ]}
               />
-            </section>
-            <section className="detail-card" aria-labelledby="ad-applying">
-              <h2 id="ad-applying">Applying for</h2>
+            </DetailCard>
+            <DetailCard title="Applying for">
               <KeyValueGrid
                 items={[
                   { label: "Class", value: a.appliedForClassSectionName },
@@ -357,9 +305,8 @@ export function AdmissionDetailPage() {
                   { label: "Previous school", value: a.previousSchool },
                 ]}
               />
-            </section>
-            <section className="detail-card" aria-labelledby="ad-contact">
-              <h2 id="ad-contact">Contact &amp; address</h2>
+            </DetailCard>
+            <DetailCard title="Contact & address">
               <KeyValueGrid
                 items={[
                   {
@@ -374,17 +321,18 @@ export function AdmissionDetailPage() {
                   },
                   {
                     label: "Address",
-                    value:
-                      [a.addressLine, a.city, a.state, a.pincode]
-                        .filter(Boolean)
-                        .join(", ") || null,
+                    value: joinParts([
+                      a.addressLine,
+                      a.city,
+                      a.state,
+                      a.pincode,
+                    ]),
                     wide: true,
                   },
                 ]}
               />
-            </section>
-            <section className="detail-card" aria-labelledby="ad-admission">
-              <h2 id="ad-admission">Admission</h2>
+            </DetailCard>
+            <DetailCard title="Admission">
               <KeyValueGrid
                 items={[
                   {
@@ -405,59 +353,52 @@ export function AdmissionDetailPage() {
                   { label: "Remarks", value: a.remarks, wide: true },
                 ]}
               />
-            </section>
+            </DetailCard>
           </div>
         </TabPanel>
       )}
 
-      {activeTab === "guardians" && (
+      {shownTab === "guardians" && (
         <TabPanel idBase="admission" id="guardians">
-          <section className="detail-card" aria-labelledby="ad-guardians">
-            <h2 id="ad-guardians">Parents / guardians</h2>
+          <DetailCard title="Parents / guardians">
             {a.guardians.length === 0 ? (
               <p className="cell-muted" style={{ margin: 0 }}>
                 No guardians added yet. Enrolment needs at least one, with a
                 mobile number.
               </p>
             ) : (
-              <div className="contact-list">
+              <ContactList>
                 {a.guardians.map((g) => (
-                  <div key={g.id} className="contact-card">
-                    <div className="contact-card__name">{g.name}</div>
-                    <div className="contact-card__badges">
-                      <Badge tone="info">{g.relationType}</Badge>
-                      {g.isPrimaryContact && (
-                        <Badge tone="warn">Primary contact</Badge>
-                      )}
-                    </div>
-                    {g.mobile ? (
-                      <div className="contact-card__line">
-                        <Phone size={14} aria-hidden="true" />
-                        <a href={`tel:${g.mobile}`}>{g.mobile}</a>
-                      </div>
-                    ) : (
+                  <ContactCard
+                    key={g.id}
+                    name={g.name}
+                    badges={
+                      <>
+                        <Badge tone="info">{g.relationType}</Badge>
+                        {g.isPrimaryContact && (
+                          <Badge tone="warn">Primary contact</Badge>
+                        )}
+                      </>
+                    }
+                    phone={g.mobile}
+                    email={g.email}
+                  >
+                    {!g.mobile && (
                       <p className="field__error" style={{ marginTop: 6 }}>
                         No mobile number: needed before enrolment.
                       </p>
                     )}
-                    {g.email && (
-                      <div className="contact-card__line">
-                        <Mail size={14} aria-hidden="true" />
-                        <a href={`mailto:${g.email}`}>{g.email}</a>
-                      </div>
-                    )}
-                  </div>
+                  </ContactCard>
                 ))}
-              </div>
+              </ContactList>
             )}
-          </section>
+          </DetailCard>
         </TabPanel>
       )}
 
-      {activeTab === "enrolment" && enrolled && (
+      {shownTab === "enrolment" && (
         <TabPanel idBase="admission" id="enrolment">
-          <section className="detail-card" aria-labelledby="ad-enrolment">
-            <h2 id="ad-enrolment">Enrolment</h2>
+          <DetailCard title="Enrolment">
             <KeyValueGrid
               items={[
                 { label: "Class", value: a.allottedClassSectionName },
@@ -482,14 +423,13 @@ export function AdmissionDetailPage() {
                 },
               ]}
             />
-          </section>
+          </DetailCard>
         </TabPanel>
       )}
 
-      {activeTab === "documents" && (
+      {shownTab === "documents" && (
         <TabPanel idBase="admission" id="documents">
-          <section className="detail-card" aria-labelledby="ad-documents">
-            <h2 id="ad-documents">Documents</h2>
+          <DetailCard title="Documents">
             <div className="dropzone dropzone--disabled" aria-disabled="true">
               <FileUp size={28} aria-hidden="true" />
               <strong>Documents are not switched on yet</strong>
@@ -498,7 +438,7 @@ export function AdmissionDetailPage() {
                 module (G1). They will move to the student record on enrolment.
               </span>
             </div>
-          </section>
+          </DetailCard>
         </TabPanel>
       )}
 
@@ -533,15 +473,7 @@ export function AdmissionDetailPage() {
           }}
         />
       )}
-      <ConfirmDialog
-        isOpen={dialog === "delete"}
-        title="Delete application"
-        message={`Delete the application for ${name} (${a.regNo})? This cannot be undone.`}
-        confirmLabel="Delete"
-        danger
-        onConfirm={handleDelete}
-        onCancel={() => setDialog(null)}
-      />
+      {remove.dialog}
     </div>
   );
 }

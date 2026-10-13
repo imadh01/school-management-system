@@ -12,9 +12,23 @@
 export const Permission = {
   UsersView: "Users.View",
   SettingsView: "Settings.View",
+
   ClassSectionsView: "ClassSections.View",
+  ClassSectionsCreate: "ClassSections.Create",
+  ClassSectionsEdit: "ClassSections.Edit",
+  ClassSectionsDelete: "ClassSections.Delete",
+
   SubjectsView: "Subjects.View",
+  SubjectsCreate: "Subjects.Create",
+  SubjectsEdit: "Subjects.Edit",
+  SubjectsDelete: "Subjects.Delete",
+
   TeachersView: "Teachers.View",
+  TeachersCreate: "Teachers.Create",
+  TeachersEdit: "Teachers.Edit",
+  TeachersDelete: "Teachers.Delete",
+  TeachersAssign: "Teachers.Assign",
+
   AdmissionsView: "Admissions.View",
   AdmissionsCreate: "Admissions.Create",
   AdmissionsEdit: "Admissions.Edit",

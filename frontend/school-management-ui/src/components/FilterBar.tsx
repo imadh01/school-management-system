@@ -10,3 +10,102 @@ export function FilterBar({ children }: { children: ReactNode }) {
     </div>
   );
 }
+
+/** One drop-down filter in a FilterBar. The first option ("All classes") means "no filter" (""). */
+export function FilterSelect({
+  label,
+  value,
+  onChange,
+  allLabel,
+  options,
+}: {
+  /** Read by screen readers ("Class"). */
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  allLabel: string;
+  options: readonly string[];
+}) {
+  return (
+    <label>
+      <span className="visually-hidden">{label}</span>
+      <select
+        className="select"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      >
+        <option value="">{allLabel}</option>
+        {options.map((o) => (
+          <option key={o} value={o}>
+            {o}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+/** A yes/no filter ("Has allergies"). */
+export function FilterCheckbox({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <label className="checkbox-row" style={{ marginTop: 0 }}>
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+      />
+      {label}
+    </label>
+  );
+}
+
+/** "Clear" at the end of a FilterBar, shown only while a filter is set. */
+export function ClearFiltersButton({
+  visible,
+  onClear,
+}: {
+  visible: boolean;
+  onClear: () => void;
+}) {
+  if (!visible) return null;
+  return (
+    <button
+      type="button"
+      className="btn btn--secondary btn--sm"
+      onClick={onClear}
+    >
+      Clear
+    </button>
+  );
+}
+
+/** A "From" / "To" date filter (yyyy-mm-dd, "" = no limit). */
+export function FilterDate({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="filter-date">
+      <span>{label}</span>
+      <input
+        className="select"
+        type="date"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    </label>
+  );
+}

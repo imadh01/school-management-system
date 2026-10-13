@@ -341,6 +341,12 @@ public class AdmissionService : IAdmissionService
     public async Task DeleteAsync(int id, CancellationToken cancellationToken)
     {
         var admission = await GetOrThrowAsync(id, cancellationToken);
+        // An enrolled application is the record of how the student joined: it is kept for good.
+        // (Registered, Admitted and Rejected applications can still be deleted.)
+        if (admission.Status == "Enrolled")
+            throw new ConflictException(
+                $"Application '{admission.RegNo}' is enrolled and cannot be deleted: it is the admission record of the student.");
+
         admission.IsDeleted = true;
         admission.DeletedAt = DateTime.UtcNow;
         await _admissionRepository.SaveChangesAsync(cancellationToken);

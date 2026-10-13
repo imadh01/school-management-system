@@ -1,6 +1,7 @@
 import { apiClient } from "@/services/apiClient";
 import type {
   ParentResponse,
+  ParentDetail,
   CreateParentRequest,
   UpdateParentRequest,
   StudentGuardianResponse,
@@ -10,11 +11,12 @@ import type {
 } from "../types/parent.types";
 
 export const parentService = {
+  // The full record for Parents.View, name and mobile only for Parents.ViewScoped (F1).
   getAll: () =>
-    apiClient.get<ParentResponse[]>("/parents").then((res) => res.data),
+    apiClient.get<ParentDetail[]>("/parents").then((res) => res.data),
 
   getById: (id: number) =>
-    apiClient.get<ParentResponse>(`/parents/${id}`).then((res) => res.data),
+    apiClient.get<ParentDetail>(`/parents/${id}`).then((res) => res.data),
 
   create: (request: CreateParentRequest) =>
     apiClient.post<ParentResponse>("/parents", request).then((res) => res.data),

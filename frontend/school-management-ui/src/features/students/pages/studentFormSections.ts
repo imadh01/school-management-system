@@ -1,11 +1,13 @@
 /**
  * U2: the sections of the student edit page, in the same order as the old dialog, and which
- * form fields live in each. The section list uses this to put an error count next to a section.
+ * form fields live in each. useRecordForm uses this to count errors per section.
  *
  * Field keys follow the API's property paths in camelCase: "firstName", "health.allergies",
  * "pickupPersons.0.phone", "identity.passportNumber".
  */
-export const STUDENT_FORM_SECTIONS = [
+import type { FormSectionDef } from "@/utils/form";
+
+export const STUDENT_FORM_SECTIONS: readonly FormSectionDef[] = [
   {
     id: "academic",
     title: "Identity & academic",
@@ -88,14 +90,4 @@ export const STUDENT_FORM_SECTIONS = [
     fields: ["feeConcessionPercent", "health.specialEducationalNeeds"],
   },
   { id: "identity", title: "Identity documents", fields: ["identity"] },
-] as const;
-
-/** The section a field key belongs to, or undefined (then its message goes to the top banner). */
-export function sectionOfField(key: string): string | undefined {
-  for (const section of STUDENT_FORM_SECTIONS) {
-    for (const field of section.fields as readonly string[]) {
-      if (key === field || key.startsWith(field + ".")) return section.id;
-    }
-  }
-  return undefined;
-}
+];

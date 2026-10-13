@@ -30,6 +30,20 @@ export interface ParentResponse {
   rowVersion: string;
 }
 
+/** A parent as a Parents.ViewScoped caller (a teacher) sees them: who to call (F1). */
+export interface ParentContactResponse {
+  id: number;
+  name: string;
+  mobile: string;
+}
+
+/** GET /parents and GET /parents/{id} return the full record or, for a teacher, the contact only. */
+export type ParentDetail = ParentResponse | ParentContactResponse;
+
+export function isFullParent(p: ParentDetail): p is ParentResponse {
+  return "status" in p;
+}
+
 export interface CreateParentRequest {
   name: string;
   email: string | null;

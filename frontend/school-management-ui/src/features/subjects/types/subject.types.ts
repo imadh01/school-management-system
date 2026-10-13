@@ -33,3 +33,15 @@ export interface SubjectRequest {
   practicalPass: number | null;
   isActive: boolean;
 }
+
+/** Total max / pass marks of a subject: theory + practical for "Both", otherwise the single pair. */
+export function subjectMarks(
+  s: SubjectResponse,
+  kind: "max" | "pass",
+): number | null {
+  if (s.type === "Both")
+    return kind === "max"
+      ? (s.theoryMax ?? 0) + (s.practicalMax ?? 0)
+      : (s.theoryPass ?? 0) + (s.practicalPass ?? 0);
+  return kind === "max" ? s.maxMarks : s.passMarks;
+}

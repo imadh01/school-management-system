@@ -1,241 +1,248 @@
-import { useToast } from "@/components/Toast";
-import { PageHero } from "@/components/PageHero";
-import { Plus } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { ValidationModal } from "@/components/ValidationModal";
-import { ViewDetailsModal } from "@/components/ViewDetailsModal";
-import { getApiErrors, isConcurrencyConflict } from "@/utils/apiError";
+import { useMemo } from "react";
+import { Link } from "react-router-dom";
+import { CircleCheck, Power, School, Users } from "lucide-react";
 import { classSectionService } from "../services/classSectionService";
-import { ClassSectionModal } from "../components/ClassSectionModal";
 import {
   CLASS_MEDIUMS,
   CLASS_STAGES,
   type ClassSectionResponse,
-  type ClassSectionFields,
 } from "../types/classSection.types";
+import { classLocation } from "../types/classSectionFormat";
+import { PageHero } from "@/components/PageHero";
+import { StatCard, StatGrid } from "@/components/StatCard";
+import { Panel } from "@/components/Panel";
+import {
+  ClearFiltersButton,
+  FilterBar,
+  FilterSelect,
+} from "@/components/FilterBar";
+import { SearchBox } from "@/components/SearchBox";
+import { StatusPills } from "@/components/StatusPills";
+import { DataTable, type Column } from "@/components/DataTable";
+import { StatusBadge } from "@/components/Badge";
+import { IconButton } from "@/components/IconButton";
+import { Notice } from "@/components/Notice";
+import { ListEmptyState } from "@/components/ListEmptyState";
+import {
+  ExportCsvButton,
+  NewRecordLink,
+  PrintButton,
+  RowActions,
+} from "@/components/ListButtons";
+import { useAsyncData } from "@/hooks/useAsyncData";
+import { useCan } from "@/hooks/useCan";
+import { useConfirmAction } from "@/hooks/useConfirmAction";
+import { useFilters } from "@/hooks/useFilters";
+import { Permission } from "@/routes/permissions";
+import { countBy, uniqueSorted } from "@/utils/collections";
+import { downloadCsv } from "@/utils/csv";
 
-type StatusFilter = "" | "Active" | "Inactive";
+const STATUS_FILTERS = ["All", "Active", "Inactive"] as const;
 
-const unique = (values: string[]) => [...new Set(values)].sort();
-
-function locationText(c: ClassSectionResponse) {
-  const parts = [
-    c.building,
-    c.floor !== null ? `Floor ${c.floor}` : null,
-    c.room ? `Room ${c.room}` : null,
-  ].filter(Boolean);
-  return parts.length ? parts.join(" · ") : "—";
-}
-
-function downloadCsv(rows: ClassSectionResponse[]) {
-  const headers = [
-    "Code",
-    "Class",
-    "Section",
-    "Academic Year",
-    "Stage",
-    "Medium",
-    "Stream",
-    "Capacity",
-    "Enrolled",
-    "Building",
-    "Floor",
-    "Room",
-    "Status",
-  ];
-  const lines = rows.map((c) =>
-    [
-      c.code,
-      c.name,
-      c.section,
-      c.academicYearName,
-      c.stage,
-      c.medium,
-      c.stream,
-      c.capacity ?? "",
-      c.enrolled,
-      c.building ?? "",
-      c.floor ?? "",
-      c.room ?? "",
-      c.status,
-    ]
-      .map((v) => `"${String(v).replace(/"/g, '""')}"`)
-      .join(","),
-  );
-  const blob = new Blob([[headers.join(","), ...lines].join("\n")], {
-    type: "text/csv;charset=utf-8;",
-  });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "classes-sections.csv";
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
+/**
+ * U2: the classes and sections list. Opening a class goes to its page (details, students,
+ * subjects); adding and editing are full pages. Activating / deactivating stays a one-click action
+ * with a confirmation.
+ */
 export function ClassSectionsPage() {
-  const toast = useToast();
-  const [rows, setRows] = useState<ClassSectionResponse[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const can = useCan();
+  const canCreate = can(Permission.ClassSectionsCreate);
+  const canEdit = can(Permission.ClassSectionsEdit);
+  const canDelete = can(Permission.ClassSectionsDelete);
 
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("");
-  const [search, setSearch] = useState("");
-  const [quickSearch, setQuickSearch] = useState("");
-  const [yearFilter, setYearFilter] = useState("");
-  const [sectionFilter, setSectionFilter] = useState("");
-  const [stageFilter, setStageFilter] = useState("");
-  const [mediumFilter, setMediumFilter] = useState("");
+  const list = useAsyncData(
+    () => classSectionService.getAll(),
+    [],
+    "Could not load classes.",
+  );
+  const rows = useMemo(() => list.data ?? [], [list.data]);
 
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
-
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editing, setEditing] = useState<ClassSectionResponse | null>(null);
-  const [viewing, setViewing] = useState<ClassSectionResponse | null>(null);
-  const [deleting, setDeleting] = useState<ClassSectionResponse | null>(null);
-  const [errors, setErrors] = useState<string[] | null>(null);
-
-  const loadData = async () => {
-    setIsLoading(true);
-    try {
-      setRows(await classSectionService.getAll());
-    } catch (err) {
-      setErrors(getApiErrors(err, "Could not load classes."));
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadData();
-  }, []);
+  const filters = useFilters({
+    status: "All",
+    year: "",
+    section: "",
+    stage: "",
+    medium: "",
+    search: "",
+  });
+  const f = filters.values;
 
   const years = useMemo(
-    () => unique(rows.map((c) => c.academicYearName)),
+    () => uniqueSorted(rows.map((c) => c.academicYearName)),
     [rows],
   );
-  const sections = useMemo(() => unique(rows.map((c) => c.section)), [rows]);
-
-  const counts = useMemo(
-    () => ({
-      all: rows.length,
-      active: rows.filter((c) => c.status === "Active").length,
-      inactive: rows.filter((c) => c.status === "Inactive").length,
-    }),
+  const sections = useMemo(
+    () => uniqueSorted(rows.map((c) => c.section)),
     [rows],
   );
+  const counts: Record<string, number> = useMemo(
+    () => ({ All: rows.length, ...countBy(rows, (c) => c.status) }),
+    [rows],
+  );
+  const enrolled = rows.reduce((n, c) => n + c.enrolled, 0);
 
   const filtered = useMemo(() => {
-    const q = (quickSearch || search).trim().toLowerCase();
+    const q = f.search.trim().toLowerCase();
     return rows.filter((c) => {
-      if (statusFilter && c.status !== statusFilter) return false;
-      if (yearFilter && c.academicYearName !== yearFilter) return false;
-      if (sectionFilter && c.section !== sectionFilter) return false;
-      if (stageFilter && c.stage !== stageFilter) return false;
-      if (mediumFilter && c.medium !== mediumFilter) return false;
-      if (q) {
-        const haystack =
-          `${c.code} ${c.displayName} ${c.room ?? ""} ${c.building ?? ""}`.toLowerCase();
-        if (!haystack.includes(q)) return false;
-      }
+      if (f.status !== "All" && c.status !== f.status) return false;
+      if (f.year && c.academicYearName !== f.year) return false;
+      if (f.section && c.section !== f.section) return false;
+      if (f.stage && c.stage !== f.stage) return false;
+      if (f.medium && c.medium !== f.medium) return false;
+      if (
+        q &&
+        !`${c.code} ${c.displayName} ${c.room ?? ""} ${c.building ?? ""}`
+          .toLowerCase()
+          .includes(q)
+      )
+        return false;
       return true;
     });
-  }, [
-    rows,
-    statusFilter,
-    yearFilter,
-    sectionFilter,
-    stageFilter,
-    mediumFilter,
-    search,
-    quickSearch,
-  ]);
+  }, [rows, f]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const pageRows = filtered.slice((page - 1) * pageSize, page * pageSize);
-
-  useEffect(() => {
-    setPage(1);
-  }, [
-    statusFilter,
-    yearFilter,
-    sectionFilter,
-    stageFilter,
-    mediumFilter,
-    search,
-    quickSearch,
-    pageSize,
-  ]);
-
-  const clearFilters = () => {
-    setSearch("");
-    setQuickSearch("");
-    setYearFilter("");
-    setSectionFilter("");
-    setStageFilter("");
-    setMediumFilter("");
-    setStatusFilter("");
-  };
-
-  const handleSave = async (data: ClassSectionFields) => {
-    if (editing) {
-      try {
-        await classSectionService.update(editing.id, {
-          ...data,
-          rowVersion: editing.rowVersion,
-        });
-      } catch (err) {
-        // Someone else saved this class first: refresh the list so the next try starts fresh.
-        if (isConcurrencyConflict(err)) await loadData();
-        throw err;
-      }
-    } else {
-      await classSectionService.create(data);
-    }
-    await loadData();
-  };
-
-  const handleToggleStatus = async (c: ClassSectionResponse) => {
-    try {
+  const remove = useConfirmAction<ClassSectionResponse>({
+    title: "Delete class",
+    message: (c) => `Delete ${c.displayName}? This cannot be undone.`,
+    confirmLabel: "Delete",
+    danger: true,
+    run: async (c) => {
+      await classSectionService.delete(c.id);
+      await list.reload();
+    },
+    success: (c) => `${c.displayName} was deleted.`,
+    failure:
+      "Could not delete this class. It may still have students or subjects.",
+  });
+  const toggleStatus = useConfirmAction<ClassSectionResponse>({
+    title: "Change status",
+    message: (c) =>
+      c.status === "Active"
+        ? `Deactivate ${c.displayName}? It will no longer be offered for admissions and enrolment.`
+        : `Activate ${c.displayName}?`,
+    confirmLabel: "Confirm",
+    run: async (c) => {
       await classSectionService.changeStatus(c.id, c.status !== "Active");
-      await loadData();
-    } catch (err) {
-      setErrors(getApiErrors(err, "Could not change the status."));
-    }
-  };
+      await list.reload();
+    },
+    success: (c) =>
+      `${c.displayName} was ${c.status === "Active" ? "deactivated" : "activated"}.`,
+    failure: "Could not change the status of this class.",
+  });
 
-  const handleConfirmDelete = async () => {
-    if (!deleting) return;
-    const target = deleting;
-    setDeleting(null);
-    try {
-      await classSectionService.delete(target.id);
-      await loadData();
-    } catch (err) {
-      setErrors(getApiErrors(err, "Could not delete this class."));
-    }
-  };
+  const exportCsv = () =>
+    downloadCsv(
+      "classes-sections.csv",
+      [
+        "Code",
+        "Class",
+        "Section",
+        "Academic Year",
+        "Stage",
+        "Medium",
+        "Stream",
+        "Capacity",
+        "Enrolled",
+        "Class Teacher",
+        "Building",
+        "Floor",
+        "Room",
+        "Status",
+      ],
+      filtered.map((c) => [
+        c.code,
+        c.name,
+        c.section,
+        c.academicYearName,
+        c.stage,
+        c.medium,
+        c.stream,
+        c.capacity,
+        c.enrolled,
+        c.classTeacherName,
+        c.building,
+        c.floor,
+        c.room,
+        c.status,
+      ]),
+    );
 
-  const pipelineSteps: {
-    key: StatusFilter;
-    label: string;
-    activeClass: string;
-  }[] = [
+  const newLink = canCreate ? (
+    <NewRecordLink to="/classes-sections/new" label="Add class" />
+  ) : undefined;
+  const muted = <span className="cell-muted">—</span>;
+
+  const columns: Column<ClassSectionResponse>[] = [
     {
-      key: "",
-      label: `All (${counts.all})`,
-      activeClass: "pipeline__step--dark",
+      key: "code",
+      header: "Code",
+      sortValue: (c) => c.code,
+      render: (c) => <span className="cell-strong">{c.code}</span>,
     },
     {
-      key: "Active",
-      label: `Active (${counts.active})`,
-      activeClass: "pipeline__step--green",
+      key: "class",
+      header: "Class",
+      sortValue: (c) => c.displayName,
+      render: (c) => (
+        <div>
+          <Link
+            className="person__name person__link"
+            to={`/classes-sections/${c.id}`}
+          >
+            {c.displayName}
+          </Link>
+          <div className="person__sub">
+            {[c.academicYearName, classLocation(c)].filter(Boolean).join(" · ")}
+          </div>
+        </div>
+      ),
     },
     {
-      key: "Inactive",
-      label: `Inactive (${counts.inactive})`,
-      activeClass: "",
+      key: "stage",
+      header: "Stage",
+      hideBelow: "md",
+      sortValue: (c) => c.stage,
+      render: (c) => c.stage,
+    },
+    {
+      key: "strength",
+      header: "Strength",
+      sortValue: (c) => c.enrolled,
+      render: (c) =>
+        c.capacity ? `${c.enrolled} / ${c.capacity}` : c.enrolled,
+    },
+    {
+      key: "teacher",
+      header: "Class teacher",
+      hideBelow: "md",
+      sortValue: (c) => c.classTeacherName,
+      render: (c) => c.classTeacherName ?? muted,
+    },
+    {
+      key: "status",
+      header: "Status",
+      sortValue: (c) => c.status,
+      render: (c) => <StatusBadge status={c.status} />,
+    },
+    {
+      key: "actions",
+      header: "Actions",
+      render: (c) => (
+        <RowActions
+          name={c.displayName}
+          viewTo={`/classes-sections/${c.id}`}
+          editTo={canEdit ? `/classes-sections/${c.id}/edit` : undefined}
+          onDelete={canDelete ? () => remove.ask(c) : undefined}
+        >
+          {canEdit && (
+            <IconButton
+              icon={Power}
+              tone={c.status === "Active" ? "neutral" : "ok"}
+              label={`${c.status === "Active" ? "Deactivate" : "Activate"} ${c.displayName}`}
+              onClick={() => toggleStatus.ask(c)}
+            />
+          )}
+        </RowActions>
+      ),
     },
   ];
 
@@ -246,330 +253,119 @@ export function ClassSectionsPage() {
         subtitle="Classes and sections of each academic year, their capacity and class teachers."
         actions={
           <>
-            <button
-              className="btn btn--primary"
-              onClick={() => {
-                setEditing(null);
-                setIsModalOpen(true);
-              }}
-            >
-              <Plus size={16} aria-hidden="true" />
-              Add class
-            </button>
+            <PrintButton />
+            {newLink}
           </>
         }
-      />
-
-      <div className="card">
-        <div className="pipeline">
-          {pipelineSteps.map((s) => (
-            <button
-              key={s.key}
-              type="button"
-              className={`pipeline__step ${statusFilter === s.key ? "pipeline__step--active" : s.activeClass}`}
-              onClick={() => setStatusFilter(s.key)}
-            >
-              {s.label}
-            </button>
-          ))}
-        </div>
-
-        <div className="filters">
-          <div className="field">
-            <label>Search</label>
-            <input
-              placeholder="Search by code, class, room..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
+        stats={
+          <StatGrid>
+            <StatCard
+              label="Classes"
+              value={rows.length}
+              icon={School}
+              tone="info"
             />
-          </div>
-          <div className="field">
-            <label>Academic Year</label>
-            <select
-              value={yearFilter}
-              onChange={(e) => setYearFilter(e.target.value)}
-            >
-              <option value="">All Years</option>
-              {years.map((y) => (
-                <option key={y}>{y}</option>
-              ))}
-            </select>
-          </div>
-          <div className="field">
-            <label>Section</label>
-            <select
-              value={sectionFilter}
-              onChange={(e) => setSectionFilter(e.target.value)}
-            >
-              <option value="">All Sections</option>
-              {sections.map((s) => (
-                <option key={s}>{s}</option>
-              ))}
-            </select>
-          </div>
-          <div className="field">
-            <label>Stage</label>
-            <select
-              value={stageFilter}
-              onChange={(e) => setStageFilter(e.target.value)}
-            >
-              <option value="">All Stages</option>
-              {CLASS_STAGES.map((s) => (
-                <option key={s}>{s}</option>
-              ))}
-            </select>
-          </div>
-          <div className="field">
-            <label>Medium</label>
-            <select
-              value={mediumFilter}
-              onChange={(e) => setMediumFilter(e.target.value)}
-            >
-              <option value="">All Mediums</option>
-              {CLASS_MEDIUMS.map((m) => (
-                <option key={m}>{m}</option>
-              ))}
-            </select>
-          </div>
-          <button
-            className="btn btn--secondary filters__clear"
-            onClick={clearFilters}
-          >
-            Clear
-          </button>
-        </div>
-
-        <div className="table-toolbar">
-          <div className="table-toolbar__left">
-            <button
-              className="export-btn export-btn--csv"
-              onClick={() => downloadCsv(filtered)}
-            >
-              CSV
-            </button>
-            <button
-              className="export-btn export-btn--pdf"
-              onClick={() =>
-                toast.info("PDF export is coming in a later release.")
-              }
-            >
-              PDF
-            </button>
-            <button
-              className="export-btn export-btn--print"
-              onClick={() => window.print()}
-            >
-              PRINT
-            </button>
-          </div>
-          <div className="table-toolbar__right">
-            <div className="pagesize">
-              Show{" "}
-              <select
-                value={pageSize}
-                onChange={(e) => setPageSize(Number(e.target.value))}
-              >
-                <option value={10}>10</option>
-                <option value={25}>25</option>
-                <option value={50}>50</option>
-              </select>{" "}
-              entries
-            </div>
-            <input
-              className="search-box"
-              type="search"
-              placeholder="Search..."
-              value={quickSearch}
-              onChange={(e) => setQuickSearch(e.target.value)}
+            <StatCard
+              label="Active"
+              value={counts.Active ?? 0}
+              icon={CircleCheck}
+              tone="ok"
             />
-          </div>
-        </div>
-
-        <div style={{ overflowX: "auto" }}>
-          {isLoading ? (
-            <div className="empty-state">Loading…</div>
-          ) : pageRows.length === 0 ? (
-            <div className="empty-state">No classes match these filters.</div>
-          ) : (
-            <table>
-              <thead>
-                <tr>
-                  <th>Code</th>
-                  <th>Class</th>
-                  <th>Section</th>
-                  <th>Stage</th>
-                  <th>Medium</th>
-                  <th>Strength</th>
-                  <th>Location</th>
-                  <th>Status</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pageRows.map((c) => (
-                  <tr key={c.id}>
-                    <td>
-                      <strong>{c.code}</strong>
-                    </td>
-                    <td>
-                      {c.name}
-                      <br />
-                      <span style={{ fontSize: 11, color: "var(--muted)" }}>
-                        {c.academicYearName}
-                      </span>
-                    </td>
-                    <td>{c.section}</td>
-                    <td>{c.stage}</td>
-                    <td>{c.medium}</td>
-                    <td>
-                      {c.enrolled} / {c.capacity ?? "—"}
-                    </td>
-                    <td>{locationText(c)}</td>
-                    <td>
-                      <span
-                        className={`badge ${c.status === "Active" ? "badge--active" : "badge--inactive"}`}
-                      >
-                        {c.status}
-                      </span>
-                    </td>
-                    <td style={{ whiteSpace: "nowrap" }}>
-                      <button
-                        className="btn--icon"
-                        title="View"
-                        onClick={() => setViewing(c)}
-                      >
-                        👁
-                      </button>
-                      <button
-                        className="btn--icon"
-                        title="Edit"
-                        onClick={() => {
-                          setEditing(c);
-                          setIsModalOpen(true);
-                        }}
-                      >
-                        ✎
-                      </button>
-                      <button
-                        className="btn--icon"
-                        title={
-                          c.status === "Active" ? "Deactivate" : "Activate"
-                        }
-                        onClick={() => handleToggleStatus(c)}
-                      >
-                        {c.status === "Active" ? "⏸" : "▶"}
-                      </button>
-                      <button
-                        className="btn--icon danger"
-                        title="Delete"
-                        onClick={() => setDeleting(c)}
-                      >
-                        🗑
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-
-        <div className="table-footer">
-          <span>
-            Showing {filtered.length === 0 ? 0 : (page - 1) * pageSize + 1} to{" "}
-            {Math.min(page * pageSize, filtered.length)} of {filtered.length}{" "}
-            entries
-          </span>
-          <div className="table-footer__pages">
-            <button
-              className="btn btn--secondary btn--sm"
-              disabled={page <= 1}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-            >
-              Previous
-            </button>
-            <span>
-              Page {page} of {totalPages}
-            </span>
-            <button
-              className="btn btn--secondary btn--sm"
-              disabled={page >= totalPages}
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            >
-              Next
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <ClassSectionModal
-        isOpen={isModalOpen}
-        editing={editing}
-        onClose={() => setIsModalOpen(false)}
-        onSave={handleSave}
-      />
-
-      <ViewDetailsModal
-        isOpen={!!viewing}
-        title={viewing?.displayName ?? ""}
-        subtitle={
-          viewing ? `${viewing.code} · ${viewing.academicYearName}` : ""
-        }
-        onClose={() => setViewing(null)}
-        sections={
-          viewing
-            ? [
-                {
-                  heading: "Class",
-                  rows: [
-                    { label: "Code", value: viewing.code },
-                    { label: "Class", value: viewing.name },
-                    { label: "Section", value: viewing.section },
-                    { label: "Grade", value: viewing.grade },
-                    { label: "Status", value: viewing.status },
-                    { label: "Academic Year", value: viewing.academicYearName },
-                  ],
-                },
-                {
-                  heading: "Academic",
-                  rows: [
-                    { label: "Stage", value: viewing.stage },
-                    { label: "Medium", value: viewing.medium },
-                    { label: "Stream", value: viewing.stream },
-                    { label: "Capacity", value: viewing.capacity },
-                    { label: "Enrolled", value: viewing.enrolled },
-                    {
-                      label: "Seats Left",
-                      value:
-                        viewing.capacity !== null
-                          ? Math.max(0, viewing.capacity - viewing.enrolled)
-                          : null,
-                    },
-                  ],
-                },
-                {
-                  heading: "Location",
-                  rows: [
-                    { label: "Building", value: viewing.building },
-                    { label: "Floor", value: viewing.floor },
-                    { label: "Room", value: viewing.room },
-                  ],
-                },
-              ]
-            : []
+            <StatCard
+              label="Students enrolled"
+              value={enrolled}
+              icon={Users}
+              tone="purple"
+            />
+          </StatGrid>
         }
       />
 
-      <ConfirmDialog
-        isOpen={!!deleting}
-        title="Delete Class"
-        message={`Delete ${deleting?.displayName ?? "this class"}? This cannot be undone. Classes that have students, admissions or subjects cannot be deleted — deactivate them instead.`}
-        confirmLabel="Delete"
-        onConfirm={handleConfirmDelete}
-        onCancel={() => setDeleting(null)}
-      />
+      <Panel
+        title="All classes"
+        subtitle={`${rows.length} classes · ${filtered.length} shown`}
+        icon={School}
+        actions={
+          <ExportCsvButton
+            onClick={exportCsv}
+            disabled={filtered.length === 0}
+          />
+        }
+      >
+        <StatusPills
+          label="Filter by status"
+          options={STATUS_FILTERS}
+          value={f.status as (typeof STATUS_FILTERS)[number]}
+          onChange={(v) => filters.set("status", v)}
+          counts={counts}
+        />
+        <FilterBar>
+          <FilterSelect
+            label="Academic year"
+            allLabel="All years"
+            options={years}
+            value={f.year}
+            onChange={(v) => filters.set("year", v)}
+          />
+          <FilterSelect
+            label="Section"
+            allLabel="All sections"
+            options={sections}
+            value={f.section}
+            onChange={(v) => filters.set("section", v)}
+          />
+          <FilterSelect
+            label="Stage"
+            allLabel="All stages"
+            options={CLASS_STAGES}
+            value={f.stage}
+            onChange={(v) => filters.set("stage", v)}
+          />
+          <FilterSelect
+            label="Medium"
+            allLabel="All media"
+            options={CLASS_MEDIUMS}
+            value={f.medium}
+            onChange={(v) => filters.set("medium", v)}
+          />
+          <SearchBox
+            label="Search classes"
+            placeholder="Code, class, room"
+            value={f.search}
+            onChange={(v) => filters.set("search", v)}
+          />
+          <ClearFiltersButton
+            visible={filters.isActive}
+            onClear={filters.clear}
+          />
+        </FilterBar>
 
-      <ValidationModal errors={errors} onClose={() => setErrors(null)} />
+        {list.error && (
+          <Notice tone="warn" style={{ margin: 16 }}>
+            {list.error}
+          </Notice>
+        )}
+        <DataTable
+          caption="Classes and sections"
+          columns={columns}
+          rows={filtered}
+          rowKey={(c) => c.id}
+          loading={list.isLoading && !list.data}
+          resetPageKey={filters.key}
+          empty={
+            <ListEmptyState
+              icon={School}
+              noun="classes"
+              hasRecords={rows.length > 0}
+              onClearFilters={filters.clear}
+              createAction={newLink}
+            />
+          }
+        />
+      </Panel>
+
+      {remove.dialog}
+      {toggleStatus.dialog}
     </div>
   );
 }

@@ -1,162 +1,98 @@
-import { useEffect, useState } from "react";
-import {
-  Link,
-  useNavigate,
-  useParams,
-  useSearchParams,
-} from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   BookOpen,
   HeartPulse,
   History,
-  Info,
   Lock,
-  Mail,
-  Pencil,
-  Phone,
   ShieldCheck,
-  Trash,
   UserRound,
   Users,
-  UserX,
 } from "lucide-react";
 import { studentService } from "../services/studentService";
 import {
   isFullStudent,
   type StudentDetail,
-  type StudentEnrollmentResponse,
   type StudentResponse,
 } from "../types/student.types";
 import { DetailHeader } from "@/components/detail/DetailHeader";
+import { DetailCard } from "@/components/detail/DetailCard";
+import { DeleteButton, EditButton } from "@/components/detail/HeaderButtons";
+import { ContactCard, ContactList } from "@/components/detail/ContactCard";
 import { Tabs, TabPanel, type TabItem } from "@/components/detail/Tabs";
 import { KeyValueGrid } from "@/components/detail/KeyValueGrid";
 import { Badge, StatusBadge, statusTone } from "@/components/Badge";
-import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { EmptyState } from "@/components/EmptyState";
-import { useToast } from "@/components/Toast";
-import { getApiErrors, getReadErrors } from "@/utils/apiError";
-import { useAuth } from "@/store/AuthContext";
+import { Notice } from "@/components/Notice";
+import { PageLoadError, PageLoading } from "@/components/PageState";
+import { useAsyncData } from "@/hooks/useAsyncData";
+import { useCan } from "@/hooks/useCan";
+import { useConfirmAction } from "@/hooks/useConfirmAction";
+import { useTabParam } from "@/hooks/useTabParam";
 import { Permission } from "@/routes/permissions";
-
-/** "2015-03-09" → "9 Mar 2015". Dates from the API are calendar dates, not instants. */
-function formatDate(iso: string | null | undefined): string | null {
-  if (!iso) return null;
-  const d = new Date(`${iso}T00:00:00`);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-}
-
-function ageOn(iso: string, today = new Date()): number | null {
-  const d = new Date(`${iso}T00:00:00`);
-  if (Number.isNaN(d.getTime())) return null;
-  let age = today.getFullYear() - d.getFullYear();
-  const beforeBirthday =
-    today.getMonth() < d.getMonth() ||
-    (today.getMonth() === d.getMonth() && today.getDate() < d.getDate());
-  if (beforeBirthday) age -= 1;
-  return age;
-}
-
-function joinParts(parts: (string | null | undefined)[]): string | null {
-  const text = parts.filter((p) => p && p.trim()).join(", ");
-  return text || null;
-}
-
-const TAB_IDS = [
-  "overview",
-  "guardians",
-  "history",
-  "health",
-  "safeguarding",
-] as const;
-type TabId = (typeof TAB_IDS)[number];
+import { ageOn, formatDate, joinParts } from "@/utils/format";
 
 /**
- * U2: one student on a page of its own (/students/:id), replacing the old details dialog and
- * the "Parents" and "History" dialogs (now tabs). The tab is kept in the address (?tab=health),
- * so a link or a reload opens the same tab.
+ * U2: one student on a page of its own (/students/:id). Tabs: Overview, Parents / guardians,
+ * Academic history, Health, and Safeguarding (office staff only).
  *
- * A teacher (Students.ViewScoped) gets the reduced record from the API (F1): only the fields
- * that record has are shown, read-only, with a note that the rest is for office staff.
+ * A teacher (Students.ViewScoped) gets the reduced record from the API (F1): only the fields that
+ * record has are shown, read-only, with a note that the rest is for office staff.
  */
 export function StudentDetailPage() {
-  const { id } = useParams();
-  const studentId = Number(id);
+  const studentId = Number(useParams().id);
   const navigate = useNavigate();
-  const toast = useToast();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const { hasAnyPermission } = useAuth();
-  const canEdit = hasAnyPermission([Permission.StudentsEdit]);
-  const canDelete = hasAnyPermission([Permission.StudentsDelete]);
+  const can = useCan();
 
-  const [student, setStudent] = useState<StudentDetail | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [history, setHistory] = useState<StudentEnrollmentResponse[] | null>(
-    null,
+  const { data: student, error } = useAsyncData(
+    () => studentService.getById(studentId),
+    [studentId],
+    "Could not load this student.",
   );
-  const [historyError, setHistoryError] = useState<string | null>(null);
-  const [confirmDelete, setConfirmDelete] = useState(false);
+  const history = useAsyncData(
+    () => studentService.getEnrollments(studentId),
+    [studentId],
+    "Could not load the history.",
+  );
 
-  useEffect(() => {
-    let cancelled = false;
-    studentService
-      .getById(studentId)
-      .then((s) => {
-        if (!cancelled) setStudent(s);
-      })
-      .catch((err) => {
-        if (!cancelled)
-          setLoadError(getReadErrors(err, "Could not load this student.")[0]);
-      });
-    studentService
-      .getEnrollments(studentId)
-      .then((rows) => {
-        if (!cancelled) setHistory(rows);
-      })
-      .catch((err) => {
-        if (!cancelled)
-          setHistoryError(getReadErrors(err, "Could not load the history.")[0]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [studentId]);
+  const remove = useConfirmAction<StudentDetail>({
+    title: "Delete student",
+    message: (s) =>
+      `Delete ${s.firstName} ${s.lastName} (${s.admNo})? This cannot be undone.`,
+    confirmLabel: "Delete",
+    danger: true,
+    run: async (s) => {
+      await studentService.delete(s.id);
+      navigate("/students");
+    },
+    success: (s) => `${s.firstName} ${s.lastName} was deleted.`,
+    failure: "Could not delete this student.",
+  });
 
-  if (loadError) {
+  const full = student && isFullStudent(student) ? student : null;
+  const [activeTab, selectTab] = useTabParam(
+    full
+      ? ["overview", "guardians", "history", "health", "safeguarding"]
+      : ["overview", "guardians", "history", "health"],
+  );
+
+  if (error) {
     return (
-      <div className="card">
-        <EmptyState
-          icon={UserX}
-          title="This student could not be opened"
-          message={loadError}
-          action={
-            <Link className="btn btn--secondary" to="/students">
-              Back to students
-            </Link>
-          }
-        />
-      </div>
+      <PageLoadError
+        title="This student could not be opened"
+        message={error}
+        backTo="/students"
+        backLabel="Back to students"
+      />
     );
   }
-  if (!student) {
-    return (
-      <div className="card">
-        <div className="empty-state" role="status">
-          Loading…
-        </div>
-      </div>
-    );
-  }
+  if (!student) return <PageLoading />;
 
-  const full = isFullStudent(student) ? student : null;
   const name = `${student.firstName} ${student.lastName}`;
-  const hasAllergies = isFullStudent(student)
-    ? student.hasAllergies
-    : student.health.hasAllergies;
+  const hasAllergies = full
+    ? full.hasAllergies
+    : !isFullStudent(student) && student.health.hasAllergies;
+  const age = ageOn(student.dateOfBirth);
+  const canEdit = can(Permission.StudentsEdit);
+  const canDelete = can(Permission.StudentsDelete);
 
   const tabs: TabItem[] = [
     { id: "overview", label: "Overview", icon: UserRound },
@@ -172,24 +108,6 @@ export function StudentDetailPage() {
       ? [{ id: "safeguarding", label: "Safeguarding", icon: ShieldCheck }]
       : []),
   ];
-  const requested = searchParams.get("tab") as TabId | null;
-  const activeTab =
-    requested && tabs.some((t) => t.id === requested) ? requested : "overview";
-  const selectTab = (tab: string) =>
-    setSearchParams(tab === "overview" ? {} : { tab }, { replace: true });
-
-  const handleDelete = async () => {
-    setConfirmDelete(false);
-    try {
-      await studentService.delete(student.id);
-      toast.success(`${name} was deleted.`);
-      navigate("/students");
-    } catch (err) {
-      toast.error(getApiErrors(err, "Could not delete this student.")[0]);
-    }
-  };
-
-  const age = ageOn(student.dateOfBirth);
 
   return (
     <div>
@@ -215,23 +133,10 @@ export function StudentDetailPage() {
           full && (canEdit || canDelete) ? (
             <>
               {canEdit && (
-                <Link
-                  className="btn btn--primary"
-                  to={`/students/${student.id}/edit`}
-                >
-                  <Pencil size={16} aria-hidden="true" />
-                  Edit
-                </Link>
+                <EditButton primary to={`/students/${student.id}/edit`} />
               )}
               {canDelete && (
-                <button
-                  type="button"
-                  className="btn btn--secondary"
-                  onClick={() => setConfirmDelete(true)}
-                >
-                  <Trash size={16} aria-hidden="true" />
-                  Delete
-                </button>
+                <DeleteButton onClick={() => remove.ask(student)} />
               )}
             </>
           ) : undefined
@@ -250,8 +155,7 @@ export function StudentDetailPage() {
         <TabPanel idBase="student" id="overview">
           {!full && <ScopedNotice />}
           <div className="detail-cards">
-            <section className="detail-card" aria-labelledby="ov-personal">
-              <h2 id="ov-personal">Personal</h2>
+            <DetailCard title="Personal">
               <KeyValueGrid
                 items={[
                   { label: "First name", value: student.firstName },
@@ -279,10 +183,9 @@ export function StudentDetailPage() {
                     : []),
                 ]}
               />
-            </section>
+            </DetailCard>
 
-            <section className="detail-card" aria-labelledby="ov-academic">
-              <h2 id="ov-academic">Academic</h2>
+            <DetailCard title="Academic">
               <KeyValueGrid
                 items={[
                   { label: "Class", value: student.classSectionName },
@@ -299,7 +202,16 @@ export function StudentDetailPage() {
                           value: formatDate(full.admissionDate),
                         },
                         { label: "Admission type", value: full.admissionType },
-                        { label: "From admission", value: full.admissionRegNo },
+                        {
+                          label: "From admission",
+                          value: full.admissionId ? (
+                            <Link to={`/admissions/${full.admissionId}`}>
+                              {full.admissionRegNo}
+                            </Link>
+                          ) : (
+                            full.admissionRegNo
+                          ),
+                        },
                         { label: "Curriculum", value: full.curriculumTrack },
                         {
                           label: "English proficiency",
@@ -310,11 +222,10 @@ export function StudentDetailPage() {
                     : []),
                 ]}
               />
-            </section>
+            </DetailCard>
 
             {full && (
-              <section className="detail-card" aria-labelledby="ov-contact">
-                <h2 id="ov-contact">Contact &amp; address</h2>
+              <DetailCard title="Contact & address">
                 <KeyValueGrid
                   items={[
                     {
@@ -341,12 +252,11 @@ export function StudentDetailPage() {
                     },
                   ]}
                 />
-              </section>
+              </DetailCard>
             )}
 
             {full && (
-              <section className="detail-card" aria-labelledby="ov-background">
-                <h2 id="ov-background">Background</h2>
+              <DetailCard title="Background">
                 <KeyValueGrid
                   items={[
                     { label: "Category", value: full.category },
@@ -369,7 +279,7 @@ export function StudentDetailPage() {
                     },
                   ]}
                 />
-              </section>
+              </DetailCard>
             )}
 
             {full && <IdentityCard student={full} />}
@@ -379,62 +289,63 @@ export function StudentDetailPage() {
 
       {activeTab === "guardians" && (
         <TabPanel idBase="student" id="guardians">
-          <section className="detail-card" aria-labelledby="gd-title">
-            <h2 id="gd-title">Parents / guardians</h2>
+          <DetailCard title="Parents / guardians">
             {student.guardians.length === 0 ? (
               <p className="cell-muted" style={{ margin: 0 }}>
                 No parents linked to this student yet.
               </p>
             ) : (
-              <div className="contact-list">
+              <ContactList>
                 {student.guardians.map((g) => (
-                  <div key={g.parentId} className="contact-card">
-                    <div className="contact-card__name">{g.parentName}</div>
-                    <div className="contact-card__badges">
-                      <Badge tone="info">{g.relationType}</Badge>
-                      {g.isPrimaryContact && (
-                        <Badge tone="warn">Primary contact</Badge>
-                      )}
-                    </div>
-                    <div className="contact-card__line">
-                      <Phone size={14} aria-hidden="true" />
-                      <a href={`tel:${g.parentMobile}`}>{g.parentMobile}</a>
-                    </div>
-                    {"parentEmail" in g && g.parentEmail && (
-                      <div className="contact-card__line">
-                        <Mail size={14} aria-hidden="true" />
-                        <a href={`mailto:${g.parentEmail}`}>{g.parentEmail}</a>
-                      </div>
-                    )}
-                  </div>
+                  <ContactCard
+                    key={g.parentId}
+                    name={
+                      can(
+                        Permission.ParentsView,
+                        Permission.ParentsViewScoped,
+                      ) ? (
+                        <Link to={`/parents/${g.parentId}`}>
+                          {g.parentName}
+                        </Link>
+                      ) : (
+                        g.parentName
+                      )
+                    }
+                    phone={g.parentMobile}
+                    email={"parentEmail" in g ? g.parentEmail : null}
+                    badges={
+                      <>
+                        <Badge tone="info">{g.relationType}</Badge>
+                        {g.isPrimaryContact && (
+                          <Badge tone="warn">Primary contact</Badge>
+                        )}
+                      </>
+                    }
+                  />
                 ))}
-              </div>
+              </ContactList>
             )}
-          </section>
+          </DetailCard>
           {full && (
-            <div className="notice">
-              <Info size={16} aria-hidden="true" />
-              <span>
-                Parent details and links are managed in the{" "}
-                <Link to="/parents">Parents</Link> module.
-              </span>
-            </div>
+            <Notice>
+              Parent details and links are managed in the{" "}
+              <Link to="/parents">Parents</Link> module.
+            </Notice>
           )}
         </TabPanel>
       )}
 
       {activeTab === "history" && (
         <TabPanel idBase="student" id="history">
-          <section className="detail-card" aria-labelledby="hi-title">
-            <h2 id="hi-title">Academic history</h2>
+          <DetailCard title="Academic history">
             <p className="field-note" style={{ margin: "-6px 0 14px" }}>
               A new row appears when the student changes class or is promoted.
             </p>
-            {historyError ? (
-              <p className="cell-muted">{historyError}</p>
-            ) : history === null ? (
+            {history.error ? (
+              <p className="cell-muted">{history.error}</p>
+            ) : !history.data ? (
               <p role="status">Loading…</p>
-            ) : history.length === 0 ? (
+            ) : history.data.length === 0 ? (
               <p className="cell-muted">No academic history yet.</p>
             ) : (
               <div className="table-box">
@@ -456,7 +367,7 @@ export function StudentDetailPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {history.map((r) => (
+                    {history.data.map((r) => (
                       <tr key={r.id}>
                         <td className="cell-strong">{r.academicYearName}</td>
                         <td>{r.classSectionName}</td>
@@ -481,34 +392,24 @@ export function StudentDetailPage() {
                 </table>
               </div>
             )}
-          </section>
+          </DetailCard>
         </TabPanel>
       )}
 
       {activeTab === "health" && (
         <TabPanel idBase="student" id="health">
-          <section className="detail-card" aria-labelledby="he-allergies">
-            <h2 id="he-allergies">Allergies</h2>
+          <DetailCard title="Allergies">
             {!hasAllergies ? (
               <p style={{ margin: 0 }}>No allergies recorded.</p>
-            ) : full?.health.allergies ? (
-              <div className="notice notice--warn">
-                <HeartPulse size={16} aria-hidden="true" />
-                <span>{full.health.allergies}</span>
-              </div>
             ) : (
-              <div className="notice notice--warn">
-                <HeartPulse size={16} aria-hidden="true" />
-                <span>
-                  This student has allergies. The details are visible to staff
-                  with sensitive-data access; ask the office if you need them.
-                </span>
-              </div>
+              <Notice tone="warn" icon={HeartPulse}>
+                {full?.health.allergies ??
+                  "This student has allergies. The details are visible to staff with sensitive-data access; ask the office if you need them."}
+              </Notice>
             )}
-          </section>
+          </DetailCard>
           {full ? (
-            <section className="detail-card" aria-labelledby="he-more">
-              <h2 id="he-more">Health and support</h2>
+            <DetailCard title="Health and support">
               <KeyValueGrid
                 items={[
                   { label: "Blood group", value: full.health.bloodGroup },
@@ -536,7 +437,7 @@ export function StudentDetailPage() {
                   },
                 ]}
               />
-            </section>
+            </DetailCard>
           ) : (
             <ScopedNotice />
           )}
@@ -545,8 +446,7 @@ export function StudentDetailPage() {
 
       {activeTab === "safeguarding" && full && (
         <TabPanel idBase="student" id="safeguarding">
-          <section className="detail-card" aria-labelledby="sg-title">
-            <h2 id="sg-title">Safeguarding</h2>
+          <DetailCard title="Safeguarding">
             <KeyValueGrid
               items={[
                 {
@@ -561,45 +461,33 @@ export function StudentDetailPage() {
                 },
               ]}
             />
-          </section>
-          <section className="detail-card" aria-labelledby="sg-pickup">
-            <h2 id="sg-pickup">Authorised pickup persons</h2>
+          </DetailCard>
+          <DetailCard title="Authorised pickup persons">
             {full.pickupPersons.length === 0 ? (
               <p className="cell-muted" style={{ margin: 0 }}>
                 No pickup persons added.
               </p>
             ) : (
-              <div className="contact-list">
+              <ContactList>
                 {full.pickupPersons.map((p) => (
-                  <div key={p.id} className="contact-card">
-                    <div className="contact-card__name">{p.name}</div>
-                    <div className="contact-card__badges">
-                      <Badge tone="neutral">{p.relation}</Badge>
-                    </div>
-                    <div className="contact-card__line">
-                      <Phone size={14} aria-hidden="true" />
-                      <a href={`tel:${p.phone}`}>{p.phone}</a>
-                    </div>
+                  <ContactCard
+                    key={p.id}
+                    name={p.name}
+                    phone={p.phone}
+                    badges={<Badge tone="neutral">{p.relation}</Badge>}
+                  >
                     {p.idNote && (
                       <div className="contact-card__line">ID: {p.idNote}</div>
                     )}
-                  </div>
+                  </ContactCard>
                 ))}
-              </div>
+              </ContactList>
             )}
-          </section>
+          </DetailCard>
         </TabPanel>
       )}
 
-      <ConfirmDialog
-        isOpen={confirmDelete}
-        title="Delete student"
-        message={`Delete ${name} (${student.admNo})? This cannot be undone.`}
-        confirmLabel="Delete"
-        danger
-        onConfirm={handleDelete}
-        onCancel={() => setConfirmDelete(false)}
-      />
+      {remove.dialog}
     </div>
   );
 }
@@ -607,29 +495,22 @@ export function StudentDetailPage() {
 /** Teachers see the reduced record (F1); say so, so missing fields are not mistaken for empty ones. */
 function ScopedNotice() {
   return (
-    <div className="notice">
-      <BookOpen size={16} aria-hidden="true" />
-      <span>
-        You are seeing the class view of this student. Contact details, identity
-        documents and health notes are visible to office staff only.
-      </span>
-    </div>
+    <Notice icon={BookOpen}>
+      You are seeing the class view of this student. Contact details, identity
+      documents and health notes are visible to office staff only.
+    </Notice>
   );
 }
 
 function IdentityCard({ student }: { student: StudentResponse }) {
   const idn = student.identity;
   return (
-    <section className="detail-card" aria-labelledby="ov-identity">
-      <h2 id="ov-identity">Identity documents</h2>
+    <DetailCard title="Identity documents">
       {idn.isMasked ? (
-        <div className="notice notice--warn">
-          <Lock size={16} aria-hidden="true" />
-          <span>
-            Identity numbers are hidden for your role. Only staff with
-            sensitive-data access can see them.
-          </span>
-        </div>
+        <Notice tone="warn" icon={Lock}>
+          Identity numbers are hidden for your role. Only staff with
+          sensitive-data access can see them.
+        </Notice>
       ) : (
         <KeyValueGrid
           items={[
@@ -641,6 +522,6 @@ function IdentityCard({ student }: { student: StudentResponse }) {
           ]}
         />
       )}
-    </section>
+    </DetailCard>
   );
 }
