@@ -27,6 +27,38 @@ public static class AddressTypes
     public static bool IsValid(string? value) => value is not null && All.Contains(value);
 }
 
+/// <summary>G1b: review state of an uploaded document. Unverify sends a Verified document back to Pending.</summary>
+public static class DocumentStatuses
+{
+    public const string Pending = "Pending";
+    public const string Verified = "Verified";
+    public const string Rejected = "Rejected";
+
+    public static readonly string[] All = { Pending, Verified, Rejected };
+
+    public static bool IsValid(string? value) => value is not null && All.Contains(value);
+}
+
+/// <summary>
+/// G1b: the only file types accepted for documents, as detected from the file's own bytes.
+/// <see cref="Extensions"/> gives the extension the stored and downloaded file gets.
+/// </summary>
+public static class DocumentContentTypes
+{
+    public const string Pdf = "application/pdf";
+    public const string Jpeg = "image/jpeg";
+    public const string Png = "image/png";
+
+    public static readonly string[] All = { Pdf, Jpeg, Png };
+
+    public static readonly IReadOnlyDictionary<string, string> Extensions = new Dictionary<string, string>
+    {
+        [Pdf] = ".pdf",
+        [Jpeg] = ".jpg",
+        [Png] = ".png",
+    };
+}
+
 /// <summary>Admission pipeline: Registered -> Admitted -> Enrolled, or Rejected.</summary>
 public static class AdmissionStatuses
 {

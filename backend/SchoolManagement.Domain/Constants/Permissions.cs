@@ -99,6 +99,16 @@ public static class Permissions
     /// </summary>
     public const string AttendanceViewScoped = "Attendance.ViewScoped";
 
+    // ── Documents (G1b) ────────────────────────────────────────────────
+    /// <summary>See the list of documents and their details, and download non-sensitive files.
+    /// Identity and medical files also need Students.ViewSensitive.</summary>
+    public const string DocumentsView = "Documents.View";
+    public const string DocumentsUpload = "Documents.Upload";
+    /// <summary>Verify, reject and unverify. Never your own upload (checked in the service and the database).</summary>
+    public const string DocumentsVerify = "Documents.Verify";
+    /// <summary>Delete (soft) a document that is not verified. The file is kept for the retention period.</summary>
+    public const string DocumentsDelete = "Documents.Delete";
+
     /// <summary>The catalog, in display order (grouped by module).</summary>
     public static readonly IReadOnlyList<PermissionDefinition> Definitions = new PermissionDefinition[]
     {
@@ -158,6 +168,12 @@ public static class Permissions
         new(AttendanceManage, "Attendance", "Mark and edit attendance for any class."),
         new(AttendanceViewScoped, "Attendance",
             "See attendance of your own classes and subjects this year, and all attendance of your own children or yourself."),
+
+        new(DocumentsView, "Documents",
+            "See documents of students and applicants and download them (identity and medical files also need Students.ViewSensitive)."),
+        new(DocumentsUpload, "Documents", "Upload documents for students and applicants."),
+        new(DocumentsVerify, "Documents", "Verify, reject and unverify documents uploaded by someone else."),
+        new(DocumentsDelete, "Documents", "Delete documents that are not verified."),
     };
 
     /// <summary>Every permission name in the catalog. Admin holds all of these in code.</summary>

@@ -26,3 +26,19 @@ export function ageOn(iso: string, today = new Date()): number | null {
   if (beforeBirthday) age -= 1;
   return age;
 }
+
+/**
+ * A moment from the API ("2026-10-13T09:00:00", UTC without a "Z") as a local calendar date:
+ * "13 Oct 2026". Unlike formatDate, this IS a point in time, so it is converted to local time.
+ */
+export function formatUtcDate(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const hasZone = /Z$|[+-]\d{2}:\d{2}$/.test(iso);
+  const d = new Date(hasZone ? iso : `${iso}Z`);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}

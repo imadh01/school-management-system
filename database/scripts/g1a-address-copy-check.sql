@@ -3,29 +3,33 @@
 --
 -- 1. Counts per owner table. "Copied" + "NotCopied" = "HadOldAddress". Expect NotCopied = 0 before G1c,
 --    or a short list you have re-entered by hand (the forms show the old address as a hint).
-SELECT N'Students' AS [Owner],
+--    (SQL Server cannot SUM over an EXISTS, so each row gets its 0/1 flag first, then the counts.)
+WITH [OldAddresses] AS (
+    SELECT N'Students' AS [Owner],
+           CASE WHEN EXISTS (SELECT 1 FROM [Addresses] a WHERE a.[StudentId] = o.[Id]) THEN 1 ELSE 0 END AS [IsCopied]
+    FROM [Students] o
+    WHERE NULLIF(LTRIM(RTRIM(o.[AddressLine])), '') IS NOT NULL OR NULLIF(LTRIM(RTRIM(o.[City])), '') IS NOT NULL
+       OR NULLIF(LTRIM(RTRIM(o.[State])), '') IS NOT NULL OR NULLIF(LTRIM(RTRIM(o.[Pincode])), '') IS NOT NULL
+    UNION ALL
+    SELECT N'Parents' AS [Owner],
+           CASE WHEN EXISTS (SELECT 1 FROM [Addresses] a WHERE a.[ParentId] = o.[Id]) THEN 1 ELSE 0 END AS [IsCopied]
+    FROM [Parents] o
+    WHERE NULLIF(LTRIM(RTRIM(o.[AddressLine])), '') IS NOT NULL OR NULLIF(LTRIM(RTRIM(o.[City])), '') IS NOT NULL
+       OR NULLIF(LTRIM(RTRIM(o.[State])), '') IS NOT NULL OR NULLIF(LTRIM(RTRIM(o.[Pincode])), '') IS NOT NULL
+    UNION ALL
+    SELECT N'Admissions' AS [Owner],
+           CASE WHEN EXISTS (SELECT 1 FROM [Addresses] a WHERE a.[AdmissionId] = o.[Id]) THEN 1 ELSE 0 END AS [IsCopied]
+    FROM [Admissions] o
+    WHERE NULLIF(LTRIM(RTRIM(o.[AddressLine])), '') IS NOT NULL OR NULLIF(LTRIM(RTRIM(o.[City])), '') IS NOT NULL
+       OR NULLIF(LTRIM(RTRIM(o.[State])), '') IS NOT NULL OR NULLIF(LTRIM(RTRIM(o.[Pincode])), '') IS NOT NULL
+)
+SELECT [Owner],
        COUNT(*) AS [HadOldAddress],
-       SUM(CASE WHEN EXISTS (SELECT 1 FROM [Addresses] a WHERE a.[StudentId] = o.[Id]) THEN 1 ELSE 0 END) AS [Copied],
-       SUM(CASE WHEN NOT EXISTS (SELECT 1 FROM [Addresses] a WHERE a.[StudentId] = o.[Id]) THEN 1 ELSE 0 END) AS [NotCopied]
-FROM [Students] o
-WHERE NULLIF(LTRIM(RTRIM(o.[AddressLine])), '') IS NOT NULL OR NULLIF(LTRIM(RTRIM(o.[City])), '') IS NOT NULL
-   OR NULLIF(LTRIM(RTRIM(o.[State])), '') IS NOT NULL OR NULLIF(LTRIM(RTRIM(o.[Pincode])), '') IS NOT NULL
-UNION ALL
-SELECT N'Parents' AS [Owner],
-       COUNT(*) AS [HadOldAddress],
-       SUM(CASE WHEN EXISTS (SELECT 1 FROM [Addresses] a WHERE a.[ParentId] = o.[Id]) THEN 1 ELSE 0 END) AS [Copied],
-       SUM(CASE WHEN NOT EXISTS (SELECT 1 FROM [Addresses] a WHERE a.[ParentId] = o.[Id]) THEN 1 ELSE 0 END) AS [NotCopied]
-FROM [Parents] o
-WHERE NULLIF(LTRIM(RTRIM(o.[AddressLine])), '') IS NOT NULL OR NULLIF(LTRIM(RTRIM(o.[City])), '') IS NOT NULL
-   OR NULLIF(LTRIM(RTRIM(o.[State])), '') IS NOT NULL OR NULLIF(LTRIM(RTRIM(o.[Pincode])), '') IS NOT NULL
-UNION ALL
-SELECT N'Admissions' AS [Owner],
-       COUNT(*) AS [HadOldAddress],
-       SUM(CASE WHEN EXISTS (SELECT 1 FROM [Addresses] a WHERE a.[AdmissionId] = o.[Id]) THEN 1 ELSE 0 END) AS [Copied],
-       SUM(CASE WHEN NOT EXISTS (SELECT 1 FROM [Addresses] a WHERE a.[AdmissionId] = o.[Id]) THEN 1 ELSE 0 END) AS [NotCopied]
-FROM [Admissions] o
-WHERE NULLIF(LTRIM(RTRIM(o.[AddressLine])), '') IS NOT NULL OR NULLIF(LTRIM(RTRIM(o.[City])), '') IS NOT NULL
-   OR NULLIF(LTRIM(RTRIM(o.[State])), '') IS NOT NULL OR NULLIF(LTRIM(RTRIM(o.[Pincode])), '') IS NOT NULL;
+       SUM([IsCopied]) AS [Copied],
+       COUNT(*) - SUM([IsCopied]) AS [NotCopied]
+FROM [OldAddresses]
+GROUP BY [Owner]
+ORDER BY [Owner];
 
 -- 2. The rows that were NOT copied, and why. Enter these addresses again on the student / parent /
 --    application page (the old text is shown there until G1c), then run this script again.

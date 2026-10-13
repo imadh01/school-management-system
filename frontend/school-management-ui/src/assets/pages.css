@@ -550,6 +550,31 @@
 .dropzone--disabled {
   cursor: not-allowed;
 }
+/* G1b: the file picker of the upload dialog (a label around a visually hidden file input). */
+.field .dropzone--input {
+  font-size: 14px;
+  font-weight: 400;
+  cursor: pointer;
+}
+.dropzone--input:hover,
+.dropzone--active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.dropzone--input:focus-within {
+  box-shadow: var(--focus-ring);
+}
+.field--invalid .dropzone--input {
+  border-color: var(--bad);
+}
+.dropzone__file {
+  overflow-wrap: anywhere;
+}
+.field__label {
+  font-size: 13px;
+  color: var(--text);
+  font-weight: 700;
+}
 
 /* Admission progress: Registered → Admitted → Enrolled (or Rejected) */
 .steps {

@@ -14,6 +14,7 @@ public class AdmissionService : IAdmissionService
     private readonly IStudentGuardianRepository _studentGuardianRepository;
     private readonly IConcurrencyGuard _concurrency;
     private readonly IAddressService _addressService;
+    private readonly IDocumentRepository _documentRepository;
 
     public AdmissionService(
         IAdmissionRepository admissionRepository,
@@ -22,7 +23,8 @@ public class AdmissionService : IAdmissionService
         IParentRepository parentRepository,
         IStudentGuardianRepository studentGuardianRepository,
         IConcurrencyGuard concurrency,
-        IAddressService addressService)
+        IAddressService addressService,
+        IDocumentRepository documentRepository)
     {
         _admissionRepository = admissionRepository;
         _classSectionRepository = classSectionRepository;
@@ -31,6 +33,7 @@ public class AdmissionService : IAdmissionService
         _studentGuardianRepository = studentGuardianRepository;
         _concurrency = concurrency;
         _addressService = addressService;
+        _documentRepository = documentRepository;
     }
 
     public async Task<List<AdmissionResponse>> GetAllAsync(CancellationToken cancellationToken)
@@ -217,7 +220,7 @@ public class AdmissionService : IAdmissionService
     public async Task<AdmissionResponse> EnrollAsync(int id, EnrollAdmissionRequest request, CancellationToken cancellationToken)
     {
         // Everything below runs in ONE transaction. Any exception rolls all of it back:
-        // Student, StudentHealth, new Parents, StudentGuardian links and the status change.
+        // Student, StudentHealth, new Parents, StudentGuardian links, the documents' move and the status change.
         return await _admissionRepository.ExecuteInTransactionAsync(async () =>
         {
             // U2: one enrolment per application at a time. The second request waits here, then reads
@@ -293,6 +296,14 @@ public class AdmissionService : IAdmissionService
                 },
             };
             await _studentRepository.AddAsync(student, cancellationToken);
+
+            // G1b: the application's documents MOVE to the student (unlike addresses, which are copied):
+            // there is one stored file and, once enrolled, it belongs to the student. Saved with step 4.
+            foreach (var document in await _documentRepository.GetForAdmissionAsync(admission.Id, cancellationToken))
+            {
+                document.AdmissionId = null;
+                document.StudentId = student.Id;
+            }
 
             // 2 + 3. Create or reuse each Parent, then link it to the student.
             foreach (var item in plan)

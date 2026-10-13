@@ -26,6 +26,10 @@ public class SqlServerWebApplicationFactory : WebApplicationFactory<Program>, IA
     private readonly string _connectionString =
         Environment.GetEnvironmentVariable("SCHOOLMGMT_TEST_CONNECTION") ?? DefaultConnectionString;
 
+    /// <summary>G1b: where this test run's uploaded files go. Deleted when the run ends.</summary>
+    public string DocumentStorageRoot { get; } =
+        Path.Combine(Path.GetTempPath(), "eschool-test-documents-" + Guid.NewGuid().ToString("N"));
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.ConfigureAppConfiguration((_, config) =>
@@ -37,6 +41,8 @@ public class SqlServerWebApplicationFactory : WebApplicationFactory<Program>, IA
                 ["Jwt:Audience"] = "SchoolManagementClient",
                 ["Jwt:SigningKey"] = "test-signing-key-at-least-32-characters-long!!",
                 ["Jwt:ExpiryMinutes"] = "60",
+                ["Documents:StorageRoot"] = DocumentStorageRoot,
+                ["Documents:PurgeEnabled"] = "false",
             });
         });
     }
@@ -59,6 +65,8 @@ public class SqlServerWebApplicationFactory : WebApplicationFactory<Program>, IA
             EnsureItIsATestDatabase(db);
             await db.Database.EnsureDeletedAsync();
         }
+        if (Directory.Exists(DocumentStorageRoot))
+            Directory.Delete(DocumentStorageRoot, recursive: true);
         await base.DisposeAsync();
     }
 

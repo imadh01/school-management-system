@@ -20,6 +20,7 @@ using SchoolManagement.Application.DTOs.Subjects;
 using SchoolManagement.Application.DTOs.Teachers;
 using SchoolManagement.Application.DTOs.Users;
 using SchoolManagement.Application.DTOs.Attendance;
+using SchoolManagement.Application.DTOs.Documents;
 using SchoolManagement.Application.Interfaces;
 using SchoolManagement.Application.Services;
 using SchoolManagement.Application.Settings;
@@ -29,6 +30,7 @@ using SchoolManagement.Infrastructure.Persistence;
 using SchoolManagement.Infrastructure.Persistence.Interceptors;
 using SchoolManagement.Infrastructure.Repositories;
 using SchoolManagement.Infrastructure.Security;
+using SchoolManagement.Infrastructure.Storage;
 using Serilog;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
@@ -142,6 +144,31 @@ builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<IAttendanceRepository, AttendanceRepository>();
 builder.Services.AddScoped<IAttendanceService, AttendanceService>();
 builder.Services.AddScoped<IValidator<SaveAttendanceRequest>, SaveAttendanceRequestValidator>();
+
+// ── G1b: Documents ────────────────────────────────────────────────────
+// Settings (size limit, retention, storage folder) come from the "Documents" section and are checked
+// at startup: a wrong value stops the API with a clear message instead of failing on the first upload.
+builder.Services.AddOptions<DocumentSettings>()
+    .Bind(builder.Configuration.GetSection(DocumentSettings.SectionName))
+    .ValidateOnStart();
+builder.Services.AddSingleton<IValidateOptions<DocumentSettings>, DocumentSettingsValidator>();
+builder.Services.AddSingleton(sp => sp.GetRequiredService<IOptions<DocumentSettings>>().Value);
+// Files live OUTSIDE the web root; an empty StorageRoot means "App_Data/documents" next to the API.
+builder.Services.AddSingleton<IFileStorage>(sp =>
+{
+    var settings = sp.GetRequiredService<DocumentSettings>();
+    var contentRoot = sp.GetRequiredService<IWebHostEnvironment>().ContentRootPath;
+    var root = string.IsNullOrWhiteSpace(settings.StorageRoot)
+        ? Path.Combine(contentRoot, "App_Data", "documents")
+        : Path.GetFullPath(settings.StorageRoot, contentRoot);
+    return new LocalFileStorage(root);
+});
+builder.Services.AddScoped<IDocumentRepository, DocumentRepository>();
+builder.Services.AddScoped<IDocumentService, DocumentService>();
+builder.Services.AddScoped<IValidator<UploadDocumentRequest>, UploadDocumentRequestValidator>();
+builder.Services.AddScoped<IValidator<ReviewDocumentRequest>, ReviewDocumentRequestValidator>();
+builder.Services.AddScoped<IValidator<RejectDocumentRequest>, RejectDocumentRequestValidator>();
+builder.Services.AddHostedService<DocumentPurgeJob>();
 
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("Jwt"));
 var jwtSettings = builder.Configuration.GetSection("Jwt").Get<JwtSettings>()!;
@@ -337,4 +364,4 @@ public partial class Program { }
 internal static class CorsPolicies
 {
     public const string Frontend = "Frontend";
-}
+}

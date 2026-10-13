@@ -48,6 +48,11 @@ export const Permission = {
 
   AttendanceView: "Attendance.View",
   AttendanceViewScoped: "Attendance.ViewScoped",
+
+  DocumentsView: "Documents.View",
+  DocumentsUpload: "Documents.Upload",
+  DocumentsVerify: "Documents.Verify",
+  DocumentsDelete: "Documents.Delete",
 } as const;
 
 /**
@@ -69,6 +74,7 @@ export const PAGE_PERMISSIONS: Readonly<Record<string, readonly string[]>> = {
   "/subjects": [Permission.SubjectsView],
   "/teachers": [Permission.TeachersView],
   "/attendance": [Permission.AttendanceView, Permission.AttendanceViewScoped],
+  "/documents": [Permission.DocumentsView],
   "/users-staff": [Permission.UsersView],
   "/settings": [Permission.SettingsView],
 };

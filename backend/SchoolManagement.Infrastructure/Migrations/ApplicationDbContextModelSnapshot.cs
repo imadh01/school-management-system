@@ -845,6 +845,227 @@ namespace SchoolManagement.Infrastructure.Migrations
                     b.ToTable("CountryRegions", (string)null);
                 });
 
+            modelBuilder.Entity("SchoolManagement.Domain.Entities.Document", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int?>("AdmissionId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("SYSUTCDATETIME()");
+
+                    b.Property<int?>("CreatedBy")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("DeletedBy")
+                        .HasColumnType("int");
+
+                    b.Property<int>("DocumentTypeId")
+                        .HasColumnType("int");
+
+                    b.Property<DateOnly?>("ExpiryDate")
+                        .HasColumnType("date");
+
+                    b.Property<DateTime?>("FilePurgedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<string>("OriginalFileName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<string>("RejectionReason")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<byte[]>("Sha256")
+                        .IsRequired()
+                        .HasColumnType("binary(32)");
+
+                    b.Property<int>("SizeBytes")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasDefaultValue("Pending");
+
+                    b.Property<string>("StorageKey")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int?>("StudentId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Title")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("SYSUTCDATETIME()");
+
+                    b.Property<int?>("UpdatedBy")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("VerifiedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("VerifiedBy")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AdmissionId")
+                        .HasDatabaseName("IX_Documents_AdmissionId")
+                        .HasFilter("[AdmissionId] IS NOT NULL AND [IsDeleted] = 0");
+
+                    b.HasIndex("DeletedAt")
+                        .HasDatabaseName("IX_Documents_PurgeQueue")
+                        .HasFilter("[IsDeleted] = 1 AND [FilePurgedAt] IS NULL");
+
+                    b.HasIndex("DocumentTypeId");
+
+                    b.HasIndex("ExpiryDate")
+                        .HasDatabaseName("IX_Documents_ExpiryDate")
+                        .HasFilter("[ExpiryDate] IS NOT NULL AND [IsDeleted] = 0");
+
+                    b.HasIndex("StorageKey")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Documents_StorageKey");
+
+                    b.HasIndex("StudentId")
+                        .HasDatabaseName("IX_Documents_StudentId")
+                        .HasFilter("[StudentId] IS NOT NULL AND [IsDeleted] = 0");
+
+                    SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("StudentId"), new[] { "DocumentTypeId", "Status" });
+
+                    b.HasIndex("VerifiedBy");
+
+                    b.HasIndex("AdmissionId", "Sha256")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Documents_Admission_Sha256")
+                        .HasFilter("[AdmissionId] IS NOT NULL AND [IsDeleted] = 0");
+
+                    b.HasIndex("Status", "CreatedAt")
+                        .HasDatabaseName("IX_Documents_Status_CreatedAt")
+                        .HasFilter("[IsDeleted] = 0");
+
+                    b.HasIndex("StudentId", "Sha256")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Documents_Student_Sha256")
+                        .HasFilter("[StudentId] IS NOT NULL AND [IsDeleted] = 0");
+
+                    b.ToTable("Documents", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Documents_ContentType", "[ContentType] IN ('application/pdf','image/jpeg','image/png')");
+
+                            t.HasCheckConstraint("CK_Documents_ExactlyOneOwner", "(CASE WHEN [StudentId] IS NULL THEN 0 ELSE 1 END) + (CASE WHEN [AdmissionId] IS NULL THEN 0 ELSE 1 END) = 1");
+
+                            t.HasCheckConstraint("CK_Documents_NoSelfVerify", "[VerifiedBy] IS NULL OR [CreatedBy] IS NULL OR [VerifiedBy] <> [CreatedBy]");
+
+                            t.HasCheckConstraint("CK_Documents_PendingHasNoReviewer", "[Status] <> 'Pending' OR ([VerifiedBy] IS NULL AND [VerifiedAt] IS NULL AND [RejectionReason] IS NULL)");
+
+                            t.HasCheckConstraint("CK_Documents_RejectedHasReason", "[Status] <> 'Rejected' OR LEN(LTRIM(RTRIM([RejectionReason]))) > 0");
+
+                            t.HasCheckConstraint("CK_Documents_ReviewedHasReviewer", "[Status] = 'Pending' OR ([VerifiedBy] IS NOT NULL AND [VerifiedAt] IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_Documents_SizePositive", "[SizeBytes] > 0");
+
+                            t.HasCheckConstraint("CK_Documents_Status", "[Status] IN ('Pending','Verified','Rejected')");
+                        });
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Entities.DocumentType", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<bool>("ForStaff")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<bool>("ForStudents")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
+                    b.Property<bool>("HasExpiry")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
+                    b.Property<bool>("IsSensitive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<int>("SortOrder")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique()
+                        .HasDatabaseName("UX_DocumentTypes_Code");
+
+                    b.ToTable("DocumentTypes", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_DocumentTypes_CodeNotBlank", "LEN(LTRIM(RTRIM([Code]))) > 0");
+                        });
+                });
+
             modelBuilder.Entity("SchoolManagement.Domain.Entities.Parent", b =>
                 {
                     b.Property<int>("Id")
@@ -2131,6 +2352,38 @@ namespace SchoolManagement.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("Country");
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Entities.Document", b =>
+                {
+                    b.HasOne("SchoolManagement.Domain.Entities.Admission", "Admission")
+                        .WithMany()
+                        .HasForeignKey("AdmissionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("SchoolManagement.Domain.Entities.DocumentType", "DocumentType")
+                        .WithMany()
+                        .HasForeignKey("DocumentTypeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SchoolManagement.Domain.Entities.Student", "Student")
+                        .WithMany()
+                        .HasForeignKey("StudentId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("SchoolManagement.Domain.Entities.User", "VerifiedByUser")
+                        .WithMany()
+                        .HasForeignKey("VerifiedBy")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Admission");
+
+                    b.Navigation("DocumentType");
+
+                    b.Navigation("Student");
+
+                    b.Navigation("VerifiedByUser");
                 });
 
             modelBuilder.Entity("SchoolManagement.Domain.Entities.Parent", b =>

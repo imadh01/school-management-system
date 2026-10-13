@@ -532,6 +532,12 @@ tbody tr:hover td {
 .cell-muted {
   color: var(--text-muted);
 }
+/* G1b: text in a table cell that may be long (a reason, a file name): wraps instead of widening the table. */
+.cell-wrap {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  max-width: 260px;
+}
 .person {
   display: flex;
   align-items: center;
@@ -555,6 +561,12 @@ tbody tr:hover td {
 }
 @media (max-width: 1199px) {
   .hide-below-lg {
+    display: none;
+  }
+}
+/* G1b: the other half of hide-below-md: a short form of a hidden column, shown only on narrow screens. */
+@media (min-width: 900px) {
+  .show-below-md {
     display: none;
   }
 }

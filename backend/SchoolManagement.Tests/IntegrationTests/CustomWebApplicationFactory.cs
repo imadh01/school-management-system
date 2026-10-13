@@ -9,6 +9,9 @@
 //
 // D2: Turns off the daily refresh-token cleanup job, so no background
 //     work touches the test database while it is dropped and re-created.
+//
+// G1b: Uploaded files go to a throw-away folder in the temp directory (deleted at
+//      the end), and the document purge job is off.
 
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Hosting;
@@ -41,6 +44,10 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>, IAsyn
     private const string TestSigningKey =
         "test-signing-key-at-least-32-characters-long!!";
 
+    /// <summary>G1b: where this test run's uploaded files go. Deleted when the run ends.</summary>
+    public string DocumentStorageRoot { get; } =
+        Path.Combine(Path.GetTempPath(), "eschool-test-documents-" + Guid.NewGuid().ToString("N"));
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.ConfigureAppConfiguration((_, config) =>
@@ -53,6 +60,8 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>, IAsyn
                 ["Jwt:SigningKey"] = TestSigningKey,
                 ["Jwt:ExpiryMinutes"] = "60",
                 ["RefreshToken:CleanupEnabled"] = "false",
+                ["Documents:StorageRoot"] = DocumentStorageRoot,
+                ["Documents:PurgeEnabled"] = "false",
             });
         });
 
@@ -104,6 +113,9 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>, IAsyn
         using var scope = Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         await db.Database.EnsureDeletedAsync();
+
+        if (Directory.Exists(DocumentStorageRoot))
+            Directory.Delete(DocumentStorageRoot, recursive: true);
     }
 }
 

@@ -281,7 +281,7 @@ export const NAV_SECTIONS: NavSection[] = [
         label: "Documents",
         path: "/documents",
         icon: FolderOpen,
-        built: false,
+        built: true,
       },
     ],
   },

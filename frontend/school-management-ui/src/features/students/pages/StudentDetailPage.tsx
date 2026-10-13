@@ -1,6 +1,7 @@
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   BookOpen,
+  FileText,
   HeartPulse,
   History,
   Lock,
@@ -9,6 +10,7 @@ import {
   Users,
 } from "lucide-react";
 import { studentService } from "../services/studentService";
+import { DocumentsPanel } from "@/features/documents/components/DocumentsPanel";
 import {
   isFullStudent,
   type StudentDetail,
@@ -33,7 +35,7 @@ import { ageOn, formatDate } from "@/utils/format";
 
 /**
  * U2: one student on a page of its own (/students/:id). Tabs: Overview, Parents / guardians,
- * Academic history, Health, and Safeguarding (office staff only).
+ * Academic history, Health, Safeguarding (office staff only) and Documents (G1b, Documents.View).
  *
  * A teacher (Students.ViewScoped) gets the reduced record from the API (F1): only the fields that
  * record has are shown, read-only, with a note that the rest is for office staff.
@@ -69,11 +71,15 @@ export function StudentDetailPage() {
   });
 
   const full = student && isFullStudent(student) ? student : null;
-  const [activeTab, selectTab] = useTabParam(
-    full
-      ? ["overview", "guardians", "history", "health", "safeguarding"]
-      : ["overview", "guardians", "history", "health"],
-  );
+  const canSeeDocuments = can(Permission.DocumentsView);
+  const [activeTab, selectTab] = useTabParam([
+    "overview",
+    "guardians",
+    "history",
+    "health",
+    ...(full ? ["safeguarding"] : []),
+    ...(full && canSeeDocuments ? ["documents"] : []),
+  ]);
 
   if (error) {
     return (
@@ -107,6 +113,9 @@ export function StudentDetailPage() {
     { id: "health", label: "Health", icon: HeartPulse },
     ...(full
       ? [{ id: "safeguarding", label: "Safeguarding", icon: ShieldCheck }]
+      : []),
+    ...(full && canSeeDocuments
+      ? [{ id: "documents", label: "Documents", icon: FileText }]
       : []),
   ];
 
@@ -483,6 +492,15 @@ export function StudentDetailPage() {
               </ContactList>
             )}
           </DetailCard>
+        </TabPanel>
+      )}
+
+      {activeTab === "documents" && full && canSeeDocuments && (
+        <TabPanel idBase="student" id="documents">
+          <DocumentsPanel
+            owner={{ type: "student", id: full.id }}
+            ownerLabel={`${name} · ${full.admNo}`}
+          />
         </TabPanel>
       )}
 

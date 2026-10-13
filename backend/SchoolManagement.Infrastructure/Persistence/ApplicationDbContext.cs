@@ -39,6 +39,8 @@ public class ApplicationDbContext : DbContext
     public DbSet<Address> Addresses => Set<Address>();
     public DbSet<Country> Countries => Set<Country>();
     public DbSet<CountryRegion> CountryRegions => Set<CountryRegion>();
+    public DbSet<DocumentType> DocumentTypes => Set<DocumentType>();
+    public DbSet<Document> Documents => Set<Document>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
@@ -70,4 +72,4 @@ public class ApplicationDbContext : DbContext
         });
     }
 
-}
+}

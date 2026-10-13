@@ -1,6 +1,6 @@
 # G1 — Addresses & Documents — Database Design
 
-Status: **approved with changes 2026-10-13** (decisions recorded in the last section). G1a (Addresses) is built; G1b (Documents) and G1c (drop the old address columns) follow.
+Status: **approved with changes 2026-10-13** (decisions recorded in the last sections). G1a (Addresses) and G1b (Documents) are built; G1c (drop the old address columns) follows. The G1a copy check passed on 2026-10-13 (2 applications and 1 student copied, nothing left over), so G1c is unblocked.
 
 ## Purpose & scope
 
@@ -9,7 +9,7 @@ Two things that every "person" module needs and that today are either copied aro
 1. **Addresses.** `Students`, `Parents` and `Admissions` each carry the same four columns (`AddressLine`, `City`, `State`, `Pincode`), only one address per person, India-shaped (Pincode) although the school is in the UAE. Staff (E2) would add a fourth copy.
 2. **Documents.** The prototype has a Documents page (types, owner, file, Pending/Verified, uploaded by, verified by) but the system stores no files at all.
 
-Already decided (handoff, 2026-10-12): one `Addresses` table with real owner foreign keys; documents up to 5 MB, PDF/JPG/PNG checked by content, office staff only, no self-verify, files outside the web root behind `IFileStorage`, download through an authorized endpoint with a Read audit row, permissions `Documents.View/Upload/Verify/Delete`, identity documents also need `Students.ViewSensitive`, applicant documents move to the student on enrolment, files picked on a New form are uploaded after the record is saved (no server temp area).
+Already decided (handoff, 2026-10-12): one `Addresses` table with real owner foreign keys; documents up to 5 MB (a setting since G1b), PDF/JPG/PNG checked by content, office staff only, no self-verify, files outside the web root behind `IFileStorage`, download through an authorized endpoint with a Read audit row, permissions `Documents.View/Upload/Verify/Delete`, identity documents also need `Students.ViewSensitive`, applicant documents move to the student on enrolment, files picked on a New form are uploaded after the record is saved (no server temp area).
 
 Out of scope: staff addresses/documents (the `StaffProfiles` table arrives in E2 and gets its owner column then), parent portal uploads, document templates/generation (bonafide certificates etc.).
 
@@ -135,8 +135,8 @@ Why a table and not an enum or a string list: each type carries **rules** (sensi
 | Title | nvarchar(120) | Y | | | optional label, e.g. "Passport (old)" |
 | OriginalFileName | nvarchar(255) | N | | | shown and used as the download name; never used as a path |
 | ContentType | nvarchar(50) | N | | | from the file's own bytes, not the browser: application/pdf, image/jpeg, image/png |
-| SizeBytes | int | N | | | CHECK 1 … 5 242 880 |
-| Sha256 | binary(32) | N | | | integrity check on download; spots the same file uploaded twice |
+| SizeBytes | int | N | | | CHECK > 0; the LIMIT is the setting `Documents:MaxFileSizeBytes` (default 5 242 880), checked by the API |
+| Sha256 | binary(32) | N | | | integrity check on download; the same file once per owner (unique index, below) |
 | StorageKey | nvarchar(200) | N | UQ | | where `IFileStorage` keeps the bytes, e.g. `2026/10/7f3c…e1.pdf` (random, never the user's file name) |
 | ExpiryDate | date | Y | | | required when the type HasExpiry (checked by the service) |
 | Status | nvarchar(20) | N | | 'Pending' | Pending / Verified / Rejected; Unverify returns to Pending (decision 5) |
@@ -146,16 +146,19 @@ Why a table and not an enum or a string list: each type carries **rules** (sensi
 | CreatedAt / CreatedBy | | | | | CreatedBy = "uploaded by" |
 | UpdatedAt / UpdatedBy | | | | | |
 | IsDeleted / DeletedAt / DeletedBy | | | | | soft delete |
+| FilePurgedAt | datetime2 | Y | | | G1b: when the purge job removed the file of a deleted document; the row stays as the record |
 | RowVersion | rowversion | N | | | two people verifying/deleting at once → 409 |
 
 Constraints
 
 - `CK_Documents_ExactlyOneOwner` (as for Addresses).
 - `CK_Documents_Status`: IN ('Pending','Verified','Rejected').
-- `CK_Documents_SizeLimit`: SizeBytes BETWEEN 1 AND 5242880.
+- `CK_Documents_SizePositive`: SizeBytes > 0. (Changed in G1b: the limit is a setting, so the number is not in the database; a CHECK with it would need a migration for every change of the setting.)
 - `CK_Documents_ContentType`: IN ('application/pdf','image/jpeg','image/png').
 - `CK_Documents_ReviewedHasReviewer`: Status = 'Pending' OR (VerifiedBy IS NOT NULL AND VerifiedAt IS NOT NULL).
-- `CK_Documents_RejectedHasReason`: Status <> 'Rejected' OR RejectionReason IS NOT NULL.
+- `CK_Documents_RejectedHasReason`: Status <> 'Rejected' OR the reason is not blank.
+- `CK_Documents_PendingHasNoReviewer` (G1b): a Pending document has no reviewer, review date or reason, so Unverify must clear them.
+- `UX_Documents_Student_Sha256` / `UX_Documents_Admission_Sha256` (G1b): (owner, Sha256) unique where the document is not deleted. A repeated upload of the same file (double click, retry, the same scan picked twice) is refused with 409 instead of creating a second document; a deleted copy does not count, so a file deleted by mistake can be uploaded again. The same file for two different students (siblings) is allowed.
 - `CK_Documents_NoSelfVerify`: VerifiedBy IS NULL OR CreatedBy IS NULL OR VerifiedBy <> CreatedBy. (The service checks it first with a clear message; the constraint is the safety net, same pattern as the admission CHECKs.)
 
 Why the file bytes are **not** in the database: a `varbinary(max)` column would make every backup, restore and index rebuild carry every scan the school ever uploaded, and EF would load whole files into memory on ordinary queries. The table keeps the metadata; `IFileStorage` keeps the bytes. Development uses a folder outside the web root (path from configuration); production can switch to Azure Blob/S3 by adding another `IFileStorage` implementation, with no schema change. `Sha256` lets the download endpoint detect a file changed or corrupted on disk.
@@ -175,6 +178,8 @@ Why the file bytes are **not** in the database: a `varbinary(max)` column would 
 | IX_Documents_Status_CreatedAt | Status, CreatedAt WHERE IsDeleted=0 | Documents page: "Pending" queue, newest first (the prototype's pipeline) |
 | IX_Documents_ExpiryDate | ExpiryDate WHERE ExpiryDate IS NOT NULL AND IsDeleted=0 | "expiring in the next 60 days" list |
 | UX_Documents_StorageKey | StorageKey | one row per stored file |
+| UX_Documents_{Student,Admission}_Sha256 | owner, Sha256 WHERE owner NOT NULL AND IsDeleted=0 | the "same file once per owner" rule; also serves the duplicate check before storing |
+| IX_Documents_PurgeQueue | DeletedAt WHERE IsDeleted=1 AND FilePurgedAt IS NULL | the daily purge job |
 
 ## Audit strategy
 
@@ -210,7 +215,7 @@ Both G1a and G1b migrations are hand-checked (data copy SQL, seed SQL, CHECKs wr
 ## API shape (for orientation; built after approval)
 
 - Addresses: no endpoints of their own. Student / parent / admission requests gain `addresses: [{ addressType, isPrimary, line1, line2, city, countryId, regionId, postalCode }]` (null = keep); responses gain `addresses` (with country and region names) and `legacyAddress`. `GET /api/countries` returns the countries with regions and postcode rules.
-- Documents: `GET /api/students/{id}/documents`, `GET /api/admissions/{id}/documents`, `POST` the same URLs (multipart, one file per request), `GET /api/documents?status=&type=&expiringBefore=&page=` (Documents page), `GET /api/documents/{id}/file` (download), `POST /api/documents/{id}/verify`, `POST /api/documents/{id}/reject`, `POST /api/documents/{id}/unverify`, `DELETE /api/documents/{id}`.
+- Documents (as built in G1b): `GET /api/documents/options` (types + size limit for the upload form), `GET /api/students/{id}/documents`, `GET /api/admissions/{id}/documents`, `POST` the same URLs (multipart, one file per request), `GET /api/documents?status=&documentTypeId=&expiry=Expired|ExpiringSoon` (Documents page; not paged yet, like the other lists, see "Open points"), `GET /api/documents/{id}/file` (download), `POST /api/documents/{id}/verify`, `POST /api/documents/{id}/reject`, `POST /api/documents/{id}/unverify`, `DELETE /api/documents/{id}`.
 
 ## Decisions (approved 2026-10-13)
 
@@ -223,7 +228,21 @@ Both G1a and G1b migrations are hand-checked (data copy SQL, seed SQL, CHECKs wr
 7. **Required documents before enrolment:** later, as proposed.
 8. **Parents' documents:** not in G1.
 
+## G1b decisions (2026-10-13)
+
+1. **Size limit is a setting:** `Documents:MaxFileSizeBytes` (default 5 MB), not a constant. Both the browser and the API show the file's exact size and the limit, e.g. "The file is 5 MB (5,242,881 bytes). The largest file allowed is 5 MB (5,242,880 bytes)." A request whose total size is clearly over the limit is refused before it is read (413, with the upload size and the limit).
+2. **File type from the content:** PDF / JPG / PNG are recognised by their first bytes (`%PDF-`, `FF D8 FF`, `89 PNG`), never by the extension or the browser's Content-Type. A program renamed to `.pdf` is refused; a real PNG named `scan.pdf` is accepted as a PNG and downloads as `scan.png`. The browser runs the same check first for an instant answer.
+3. **Repeated upload:** the same file is attached to the same student or application once (409, unique index above).
+4. **No self-review:** the uploader cannot verify or reject their own upload (422 from the service, `CK_Documents_NoSelfVerify` in the database).
+5. **Unverify before delete:** deleting a verified document answers 409 "Unverify it first". Unverify applies to Verified only; a Rejected document is not reopened (it is replaced by a new upload, decision 5).
+6. **Grants:** the four Documents permissions are in the catalog; no seeded role gets them (Admin holds them in code). Office roles get them on the Roles page.
+
+## Open points
+
+- **Deleting an application does not touch its documents.** The application is soft-deleted and its documents simply disappear with it (they are hidden, not deleted), so their files are never purged. BUSINESS DECISION REQUIRED: should deleting an application also soft-delete its documents, so the retention period and the purge apply to them?
+- **Paging:** `GET /api/documents` returns every matching document (metadata only), like the other lists. Server paging comes with the DataTable "server mode" for all lists together.
+
 ## Operations notes
 
 - **G1a:** back up the database before applying the migration (script above); keep the old address columns until G1c; run the copy check before G1c.
-- **G1b (to do when it is built):** from G1b on, a backup is the database **and** the uploaded-files folder (`IFileStorage` root), taken together; one without the other cannot be restored to a consistent state. The deployment guide must say so.
+- **G1b:** from G1b on, a backup is the database **and** the uploaded-files folder (`Documents:StorageRoot`), taken together; one without the other cannot be restored to a consistent state. Written up in `docs/deployment.md` (routine, settings, folder permissions).

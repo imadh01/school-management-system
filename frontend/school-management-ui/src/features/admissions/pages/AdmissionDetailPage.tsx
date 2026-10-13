@@ -5,7 +5,6 @@ import {
   Check,
   CircleCheck,
   FileText,
-  FileUp,
   GraduationCap,
   UserRound,
   Users,
@@ -24,6 +23,7 @@ import type { ClassSectionResponse } from "@/features/class-sections/types/class
 import { ConfirmAdmissionModal } from "../components/ConfirmAdmissionModal";
 import { RejectAdmissionModal } from "../components/RejectAdmissionModal";
 import { EnrollModal } from "../components/EnrollModal";
+import { DocumentsPanel } from "@/features/documents/components/DocumentsPanel";
 import { DetailHeader } from "@/components/detail/DetailHeader";
 import { AddressList } from "@/components/detail/AddressList";
 import { DetailCard } from "@/components/detail/DetailCard";
@@ -107,6 +107,7 @@ export function AdmissionDetailPage() {
   const canEnrol = can(Permission.AdmissionsEnroll);
   const canDelete = can(Permission.AdmissionsDelete);
   const canOpenStudents = can(...PAGE_PERMISSIONS["/students"]);
+  const canSeeDocuments = can(Permission.DocumentsView);
 
   const {
     data: admission,
@@ -426,16 +427,33 @@ export function AdmissionDetailPage() {
 
       {shownTab === "documents" && (
         <TabPanel idBase="admission" id="documents">
-          <DetailCard title="Documents">
-            <div className="dropzone dropzone--disabled" aria-disabled="true">
-              <FileUp size={28} aria-hidden="true" />
-              <strong>Documents are not switched on yet</strong>
-              <span>
-                Uploading and viewing documents arrives with the documents
-                module (G1). They will move to the student record on enrolment.
-              </span>
-            </div>
-          </DetailCard>
+          {canSeeDocuments ? (
+            <DocumentsPanel
+              owner={{ type: "admission", id: a.id }}
+              ownerLabel={`${name} · ${a.regNo}`}
+              uploadBlockedNote={
+                enrolled ? (
+                  <>
+                    Enrolment moved this application's documents to the student
+                    record
+                    {a.studentId && canOpenStudents ? (
+                      <>
+                        {": "}
+                        <Link to={`/students/${a.studentId}?tab=documents`}>
+                          open the student's documents
+                        </Link>
+                      </>
+                    ) : null}
+                    . New documents are uploaded there.
+                  </>
+                ) : undefined
+              }
+            />
+          ) : (
+            <Notice>
+              Documents are visible to staff with the Documents permission.
+            </Notice>
+          )}
         </TabPanel>
       )}
 

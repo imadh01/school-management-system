@@ -42,6 +42,9 @@ public class GlobalExceptionMiddleware
             ForbiddenException => (StatusCodes.Status403Forbidden, "FORBIDDEN", ex.Message),
             BusinessRuleException => (StatusCodes.Status422UnprocessableEntity, "BUSINESS_RULE_VIOLATION", ex.Message),
             RequestValidationException => (StatusCodes.Status400BadRequest, "VALIDATION_ERROR", ex.Message),
+            // G1b: a request body over the server's limit (e.g. a chunked upload without Content-Length).
+            BadHttpRequestException { StatusCode: StatusCodes.Status413PayloadTooLarge } =>
+                (StatusCodes.Status413PayloadTooLarge, "PAYLOAD_TOO_LARGE", "The upload is larger than the server accepts."),
             _ => (StatusCodes.Status500InternalServerError, "INTERNAL_SERVER_ERROR", "An unexpected error occurred."),
         };
 

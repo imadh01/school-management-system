@@ -55,8 +55,11 @@ Routes for a module are one call in `routes/AppRoutes.tsx`:
 
 ## Shared helpers
 
-- `utils/format.ts` — `formatDate`, `ageOn` (dates from the API are calendar dates, never shifted by time zone).
+- `utils/format.ts` — `formatDate`, `ageOn` (dates from the API are calendar dates, never shifted by time zone); `formatUtcDate` for moments (uploadedAt, reviewedAt), which ARE converted to local time.
 - `utils/address.ts` + `components/form/AddressListEditor` + `components/detail/AddressList` + `hooks/useCountries` (G1a) — the address block of every person form and page: Home / Permanent / Mailing, one primary, country → state/emirate list and postcode rule from `GET /api/countries`. To add addresses to a new kind of person: keep `AddressFormRow[]` in the form state, convert with `toAddressRows` / `toAddressRequests`, check with `validateAddresses`.
+- `utils/file.ts` (G1b) — uploads: `describeSize` ("5.31 MB (5,567,201 bytes)", same wording as the API), `tooLargeMessage`, `detectFileType` (PDF/JPG/PNG from the first bytes, like the API), `saveBlob` + `fileNameFromDisposition` for downloads through the API.
+- `features/documents/components/DocumentsPanel` (G1b) — the Documents tab of any record that owns documents (student, application): list, upload, verify / reject / unverify, delete. `DocumentsTable` is the list on its own (the Documents page adds the owner column).
+- CSS: `.cell-wrap` lets a long text wrap inside a table cell (cells do not wrap by default); `.show-below-md` is the narrow-screen stand-in for a column hidden with `hideBelow: "md"`.
 - `utils/collections.ts` — `uniqueSorted` (filter drop-downs), `countBy` (status counts).
 - `utils/csv.ts` — `downloadCsv(filename, headers, rows)`.
 - `utils/form.ts` — `fieldBinder`, `blankToNull`, `numberOrNull`, `remapRowErrors`, `FormSectionDef`.

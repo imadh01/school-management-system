@@ -144,6 +144,19 @@ public class AccessMatrixTests
                       Requirement.AnyOf(Permissions.AttendanceManage, Permissions.AttendanceMark), HasBody: true),
         new("GET",    $"/api/attendance/students/{Missing}", AttendanceRead),
         new("GET",    $"/api/attendance/summary?classSectionId={Missing}&from=2026-01-05&to=2026-01-06", AttendanceRead),
+
+        // Documents (G1b). Uploads get a JSON body here, so an allowed caller stops at 415 (not multipart).
+        new("GET",    "/api/documents/options", P(Permissions.DocumentsView)),
+        new("GET",    "/api/documents", P(Permissions.DocumentsView)),
+        new("GET",    $"/api/students/{Missing}/documents", P(Permissions.DocumentsView)),
+        new("GET",    $"/api/admissions/{Missing}/documents", P(Permissions.DocumentsView)),
+        new("GET",    $"/api/documents/{Missing}/file", P(Permissions.DocumentsView)),
+        new("POST",   $"/api/students/{Missing}/documents", P(Permissions.DocumentsUpload), HasBody: true),
+        new("POST",   $"/api/admissions/{Missing}/documents", P(Permissions.DocumentsUpload), HasBody: true),
+        new("POST",   $"/api/documents/{Missing}/verify", P(Permissions.DocumentsVerify), HasBody: true),
+        new("POST",   $"/api/documents/{Missing}/reject", P(Permissions.DocumentsVerify), HasBody: true),
+        new("POST",   $"/api/documents/{Missing}/unverify", P(Permissions.DocumentsVerify), HasBody: true),
+        new("DELETE", $"/api/documents/{Missing}", P(Permissions.DocumentsDelete)),
     };
 
     public static IEnumerable<object[]> Cases() =>
