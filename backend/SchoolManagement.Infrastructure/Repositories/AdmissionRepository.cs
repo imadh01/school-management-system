@@ -64,6 +64,25 @@ public class AdmissionRepository : IAdmissionRepository
         });
     }
 
+    public async Task LockForEnrolmentAsync(int admissionId, CancellationToken cancellationToken)
+    {
+        if (_context.Database.CurrentTransaction is null)
+            throw new InvalidOperationException("LockForEnrolmentAsync must be called inside a transaction.");
+
+        // Same technique as the class-seat lock (ClassSectionRepository.LockSeatsAsync): an application
+        // lock owned by the transaction, released automatically on commit or rollback.
+        var result = new SqlParameter("@result", System.Data.SqlDbType.Int) { Direction = System.Data.ParameterDirection.Output };
+        await _context.Database.ExecuteSqlRawAsync(
+            "EXEC @result = sp_getapplock @Resource = @resource, @LockMode = 'Exclusive', " +
+            "@LockOwner = 'Transaction', @LockTimeout = 10000;",
+            new object[] { result, new SqlParameter("@resource", $"AdmissionEnrol:{admissionId}") },
+            cancellationToken);
+
+        // 0 / 1 = granted. Negative = timeout (-1), cancelled (-2), deadlock victim (-3), error (-999).
+        if ((int)result.Value < 0)
+            throw new ConflictException("This application is being enrolled by someone else right now. Please try again.");
+    }
+
     public Task SaveChangesAsync(CancellationToken cancellationToken) =>
         _context.SaveChangesAsync(cancellationToken);
 

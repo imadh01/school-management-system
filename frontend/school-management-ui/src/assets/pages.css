@@ -189,9 +189,10 @@
 /* Rows of repeating fields (pickup persons) */
 .repeat-row {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)) auto;
+  /* (An "auto" track next to repeat(auto-fit) is invalid CSS and collapsed the row to one column.) */
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: 12px;
-  align-items: end;
+  align-items: start;
   padding: 14px;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -523,4 +524,175 @@
 .person__link:hover {
   color: var(--accent-text);
   text-decoration: underline;
+}
+
+/* File drop area (documents). Disabled until the documents module (G1) is switched on. */
+.dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+  padding: 28px 20px;
+  border: 2px dashed var(--input-border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 14px;
+}
+.dropzone span {
+  color: var(--text-muted);
+  max-width: 460px;
+}
+.dropzone svg {
+  color: var(--text-muted);
+}
+.dropzone--disabled {
+  cursor: not-allowed;
+}
+
+/* Admission progress: Registered → Admitted → Enrolled (or Rejected) */
+.steps {
+  display: flex;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  flex-wrap: wrap;
+}
+.steps li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+.steps li + li::before {
+  content: "";
+  width: 28px;
+  height: 2px;
+  background: var(--border);
+}
+.steps__dot {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.steps li[data-state="done"] {
+  color: var(--text);
+}
+.steps li[data-state="done"] .steps__dot {
+  background: var(--ok-solid);
+  border-color: var(--ok-solid);
+  color: #fff;
+}
+.steps li[data-state="current"] {
+  color: var(--text);
+}
+.steps li[data-state="current"] .steps__dot {
+  border-color: var(--accent-solid);
+  color: var(--accent-text);
+}
+.steps li[data-state="rejected"] .steps__dot {
+  background: var(--bad-solid);
+  border-color: var(--bad-solid);
+  color: #fff;
+}
+.steps li[data-state="rejected"] {
+  color: var(--bad);
+}
+
+/* Review step of a pop-up (enrolment summary) */
+.review-list {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 8px 18px;
+  margin: 0 0 16px;
+  font-size: 14px;
+}
+.review-list dt {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+.review-list dd {
+  margin: 0;
+  font-weight: 700;
+}
+.review-heading {
+  font-size: 13px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin: 18px 0 10px;
+}
+
+.modal__header h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.modal:focus {
+  outline: none;
+}
+.modal__subtitle {
+  margin: 0 0 16px;
+  font-size: 14px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+.modal .form-grid {
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+}
+.choice-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  background: var(--surface-2);
+}
+.choice-card__title {
+  font-weight: 800;
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+.choice-card__title span {
+  font-weight: 500;
+  color: var(--text-muted);
+}
+.choice-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-height: 36px;
+  padding: 6px 0;
+  font-size: 14px;
+  cursor: pointer;
+}
+.choice-option input {
+  margin-top: 3px;
+  accent-color: var(--accent-solid);
+  width: 18px;
+  height: 18px;
+}
+.choice-option small {
+  display: block;
+  color: var(--text-muted);
+}
+
+.filter-date {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
 }

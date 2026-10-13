@@ -9,6 +9,8 @@ import { LoginPage } from "../features/authentication/pages/LoginPage";
 import { ChangePasswordRequiredPage } from "../features/authentication/pages/ChangePasswordRequiredPage";
 import { DashboardPage } from "../features/dashboard/pages/DashboardPage";
 import { AdmissionsPage } from "../features/admissions/pages/AdmissionsPage";
+import { AdmissionDetailPage } from "../features/admissions/pages/AdmissionDetailPage";
+import { AdmissionFormPage } from "../features/admissions/pages/AdmissionFormPage";
 import { StudentsPage } from "../features/students/pages/StudentsPage";
 import { StudentDetailPage } from "../features/students/pages/StudentDetailPage";
 import { StudentEditPage } from "../features/students/pages/StudentEditPage";
@@ -60,6 +62,17 @@ export const router = createBrowserRouter(
         <Route element={<AppLayout />}>
           <Route path="/dashboard" element={<DashboardPage />} />
           {guarded("/admissions", <AdmissionsPage />)}
+          {guarded("/admissions/new", <AdmissionFormPage />, [
+            Permission.AdmissionsCreate,
+          ])}
+          {guarded(
+            "/admissions/:id",
+            <AdmissionDetailPage />,
+            PAGE_PERMISSIONS["/admissions"],
+          )}
+          {guarded("/admissions/:id/edit", <AdmissionFormPage />, [
+            Permission.AdmissionsEdit,
+          ])}
           {guarded("/students", <StudentsPage />)}
           {guarded(
             "/students/:id",

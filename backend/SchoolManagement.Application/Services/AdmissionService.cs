@@ -90,6 +90,7 @@ public class AdmissionService : IAdmissionService
     public async Task<AdmissionResponse> UpdateAsync(int id, UpdateAdmissionRequest request, CancellationToken cancellationToken)
     {
         var admission = await GetOrThrowAsync(id, cancellationToken);
+        RequireEditable(admission);
         _concurrency.Expect(admission, request.RowVersion); // 409 if someone saved this application after it was loaded
         var classSection = await GetClassSectionOrThrowAsync(request.AppliedForClassSectionId, cancellationToken);
 
@@ -100,20 +101,16 @@ public class AdmissionService : IAdmissionService
 
         return await _admissionRepository.ExecuteInTransactionAsync(async () =>
         {
-            // Guardians are replaced as a set. Once enrolled, the guardians have already become
-            // Parents of the student, so editing the application's list would change nothing real
-            // — it is left as it was.
-            if (admission.Status != "Enrolled")
+            // Guardians are replaced as a set. (Only Registered/Admitted applications get here; once
+            // enrolled, the guardians have become Parents of the student and are edited there.)
+            if (admission.Guardians.Count > 0)
             {
-                if (admission.Guardians.Count > 0)
-                {
-                    // Separate save first so the "one primary contact" unique index never sees old + new rows together.
-                    admission.Guardians.Clear();
-                    await _admissionRepository.SaveChangesAsync(cancellationToken);
-                }
-                foreach (var guardian in MapGuardians(request.Guardians))
-                    admission.Guardians.Add(guardian);
+                // Separate save first so the "one primary contact" unique index never sees old + new rows together.
+                admission.Guardians.Clear();
+                await _admissionRepository.SaveChangesAsync(cancellationToken);
             }
+            foreach (var guardian in MapGuardians(request.Guardians))
+                admission.Guardians.Add(guardian);
 
             // Only registration-stage fields — Status and later-stage data
             // (fee, roll number, etc.) are never touched here, per the
@@ -218,6 +215,11 @@ public class AdmissionService : IAdmissionService
         // Student, StudentHealth, new Parents, StudentGuardian links and the status change.
         return await _admissionRepository.ExecuteInTransactionAsync(async () =>
         {
+            // U2: one enrolment per application at a time. The second request waits here, then reads
+            // the application fresh, finds it "Enrolled" and gets a clear 409 below. (Without the lock
+            // the rowversion check and the unique index on Students.AdmissionId still stop a second
+            // student, but with a vaguer message.)
+            await _admissionRepository.LockForEnrolmentAsync(id, cancellationToken);
             var admission = await GetOrThrowAsync(id, cancellationToken);
             RequireStatus(admission, "Admitted", "enroll");
 
@@ -439,6 +441,20 @@ public class AdmissionService : IAdmissionService
         var sections = await _classSectionRepository.GetAllAsync(cancellationToken);
         return sections.FirstOrDefault(c => c.Id == id)
             ?? throw new NotFoundException($"Class section {id} does not exist.");
+    }
+
+    /// <summary>
+    /// U2: an application can be edited only while it is in progress (Registered or Admitted).
+    /// Enrolled: the data now lives on the student record. Rejected: it is closed.
+    /// </summary>
+    public static bool IsEditable(string status) => status is "Registered" or "Admitted";
+
+    private static void RequireEditable(Admission admission)
+    {
+        if (!IsEditable(admission.Status))
+            throw new ConflictException(admission.Status == "Enrolled"
+                ? $"Application '{admission.RegNo}' is enrolled and can no longer be edited. Edit the student record instead."
+                : $"Application '{admission.RegNo}' is {admission.Status.ToLowerInvariant()} and can no longer be edited.");
     }
 
     private static void RequireStatus(Admission admission, string requiredStatus, string action)

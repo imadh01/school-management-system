@@ -1,13 +1,15 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { CircleCheck } from "lucide-react";
 import type {
   AdmissionResponse,
   ConfirmAdmissionRequest,
 } from "../types/admission.types";
-import { ValidationModal } from "@/components/ValidationModal";
+import { Dialog } from "@/components/Dialog";
+import { Field } from "@/components/form/Field";
 import { getApiErrors } from "@/utils/apiError";
 
 interface Props {
-  admission: AdmissionResponse | null;
+  admission: AdmissionResponse;
   onClose: () => void;
   onSubmit: (id: number, data: ConfirmAdmissionRequest) => Promise<void>;
 }
@@ -24,46 +26,28 @@ const RELIGIONS = [
 ];
 const CATEGORIES = ["General", "OBC", "SC", "ST", "EWS"];
 
-const emptyForm: ConfirmAdmissionRequest = {
-  admissionFee: null,
-  admissionFeeReference: null,
-  bloodGroup: null,
-  religion: null,
-  category: null,
-  medicalNotes: null,
-  remarks: null,
-};
-
+/** Registered → Admitted: the fee is recorded and a few profile details are added. */
 export function ConfirmAdmissionModal({ admission, onClose, onSubmit }: Props) {
-  const [form, setForm] = useState<ConfirmAdmissionRequest>(emptyForm);
+  // Remarks entered at registration are kept and shown here, because confirming replaces the
+  // remarks with whatever is in this box.
+  const [form, setForm] = useState<ConfirmAdmissionRequest>({
+    admissionFee: null,
+    admissionFeeReference: null,
+    remarks: admission.remarks,
+    bloodGroup: admission.bloodGroup,
+    religion: admission.religion,
+    category: admission.category,
+    medicalNotes: admission.medicalNotes,
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errors, setErrors] = useState<string[] | null>(null);
+  const [errors, setErrors] = useState<string[]>([]);
 
-  // Remarks entered at registration are kept and shown here, because
-  // confirming replaces the remarks with whatever is in this box.
-  useEffect(() => {
-    setForm(
-      admission
-        ? {
-            ...emptyForm,
-            remarks: admission.remarks,
-            bloodGroup: admission.bloodGroup,
-            religion: admission.religion,
-            category: admission.category,
-            medicalNotes: admission.medicalNotes,
-          }
-        : emptyForm,
-    );
-    setErrors(null);
-  }, [admission]);
-
-  if (!admission) return null;
-
-  const field = (key: keyof ConfirmAdmissionRequest, value: string) =>
-    setForm((f) => ({ ...f, [key]: value === "" ? null : value }));
+  const set = (patch: Partial<ConfirmAdmissionRequest>) =>
+    setForm((f) => ({ ...f, ...patch }));
+  const text = (v: string) => (v.trim() === "" ? null : v);
 
   const handleSubmit = async () => {
-    setErrors(null);
+    setErrors([]);
     setIsSubmitting(true);
     try {
       await onSubmit(admission.id, form);
@@ -72,128 +56,137 @@ export function ConfirmAdmissionModal({ admission, onClose, onSubmit }: Props) {
       setErrors(
         getApiErrors(
           err,
-          "Could not confirm this admission. It may have already progressed past Registered.",
+          "Could not confirm this admission. It may have already moved past Registered.",
         ),
       );
-    } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="modal-backdrop">
-      <div className="modal">
-        <div className="modal__header">
-          <h2>✅ Confirm Admission</h2>
-          <button className="modal__close" onClick={onClose}>
-            ✕
-          </button>
-        </div>
-        <div className="modal__body">
-          <div className="modal__note" style={{ marginTop: 0 }}>
-            {admission.firstName} {admission.lastName} · {admission.regNo}
-          </div>
-
-          <div className="modal__section-title">Admission Fee</div>
-          <div className="modal__grid">
-            <div className="field">
-              <label>Fee Amount</label>
-              <input
-                type="number"
-                value={form.admissionFee ?? ""}
-                onChange={(e) =>
-                  setForm((f) => ({
-                    ...f,
-                    admissionFee:
-                      e.target.value === "" ? null : Number(e.target.value),
-                  }))
-                }
-              />
-            </div>
-            <div className="field">
-              <label>Payment Reference</label>
-              <input
-                value={form.admissionFeeReference ?? ""}
-                onChange={(e) => field("admissionFeeReference", e.target.value)}
-              />
-            </div>
-          </div>
-
-          <div className="modal__section-title">Profile Details</div>
-          <div className="modal__grid">
-            <div className="field">
-              <label>Blood Group</label>
-              <select
-                value={form.bloodGroup ?? ""}
-                onChange={(e) => field("bloodGroup", e.target.value)}
-              >
-                <option value="">Unknown</option>
-                {BLOOD_GROUPS.map((b) => (
-                  <option key={b} value={b}>
-                    {b}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="field">
-              <label>Religion</label>
-              <select
-                value={form.religion ?? ""}
-                onChange={(e) => field("religion", e.target.value)}
-              >
-                <option value="">Not specified</option>
-                {RELIGIONS.map((r) => (
-                  <option key={r} value={r}>
-                    {r}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="field">
-              <label>Category</label>
-              <select
-                value={form.category ?? ""}
-                onChange={(e) => field("category", e.target.value)}
-              >
-                <option value="">General (default)</option>
-                {CATEGORIES.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="field">
-              <label>Medical Notes</label>
-              <input
-                value={form.medicalNotes ?? ""}
-                onChange={(e) => field("medicalNotes", e.target.value)}
-              />
-            </div>
-          </div>
-          <div className="field" style={{ marginTop: 14 }}>
-            <label>Remarks</label>
-            <textarea
-              rows={2}
-              value={form.remarks ?? ""}
-              onChange={(e) => field("remarks", e.target.value)}
-            />
-          </div>
-        </div>
-        <div className="modal__footer">
+    <Dialog
+      title="Confirm admission"
+      icon={CircleCheck}
+      subtitle={`${admission.firstName} ${admission.lastName} · ${admission.regNo}`}
+      errors={errors}
+      onClose={onClose}
+      closable={!isSubmitting}
+      footer={
+        <>
           <button
+            type="button"
+            className="btn btn--secondary"
+            onClick={onClose}
+            disabled={isSubmitting}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
             className="btn btn--primary"
             onClick={handleSubmit}
             disabled={isSubmitting}
           >
-            {isSubmitting ? "Confirming…" : "Confirm Admission"}
+            {isSubmitting ? "Confirming…" : "Confirm admission"}
           </button>
-          <button className="btn btn--secondary" onClick={onClose}>
-            Cancel
-          </button>
-        </div>
+        </>
+      }
+    >
+      <h3 className="form-subhead">Admission fee</h3>
+      <div className="form-grid" style={{ marginBottom: 18 }}>
+        <Field id="confirm-fee" label="Fee amount">
+          {(c) => (
+            <input
+              {...c}
+              type="number"
+              min={0}
+              value={form.admissionFee ?? ""}
+              onChange={(e) =>
+                set({
+                  admissionFee:
+                    e.target.value === "" ? null : Number(e.target.value),
+                })
+              }
+            />
+          )}
+        </Field>
+        <Field id="confirm-fee-ref" label="Payment reference">
+          {(c) => (
+            <input
+              {...c}
+              value={form.admissionFeeReference ?? ""}
+              onChange={(e) =>
+                set({ admissionFeeReference: text(e.target.value) })
+              }
+            />
+          )}
+        </Field>
       </div>
-      <ValidationModal errors={errors} onClose={() => setErrors(null)} />
-    </div>
+
+      <h3 className="form-subhead">Profile details</h3>
+      <div className="form-grid">
+        <Field id="confirm-blood" label="Blood group">
+          {(c) => (
+            <select
+              {...c}
+              value={form.bloodGroup ?? ""}
+              onChange={(e) => set({ bloodGroup: text(e.target.value) })}
+            >
+              <option value="">Unknown</option>
+              {BLOOD_GROUPS.map((b) => (
+                <option key={b}>{b}</option>
+              ))}
+            </select>
+          )}
+        </Field>
+        <Field id="confirm-religion" label="Religion">
+          {(c) => (
+            <select
+              {...c}
+              value={form.religion ?? ""}
+              onChange={(e) => set({ religion: text(e.target.value) })}
+            >
+              <option value="">Not specified</option>
+              {RELIGIONS.map((r) => (
+                <option key={r}>{r}</option>
+              ))}
+            </select>
+          )}
+        </Field>
+        <Field id="confirm-category" label="Category">
+          {(c) => (
+            <select
+              {...c}
+              value={form.category ?? ""}
+              onChange={(e) => set({ category: text(e.target.value) })}
+            >
+              <option value="">General (default)</option>
+              {CATEGORIES.map((cat) => (
+                <option key={cat}>{cat}</option>
+              ))}
+            </select>
+          )}
+        </Field>
+        <Field id="confirm-medical" label="Medical notes">
+          {(c) => (
+            <input
+              {...c}
+              value={form.medicalNotes ?? ""}
+              onChange={(e) => set({ medicalNotes: text(e.target.value) })}
+            />
+          )}
+        </Field>
+        <Field id="confirm-remarks" label="Remarks" span="full">
+          {(c) => (
+            <textarea
+              {...c}
+              rows={2}
+              value={form.remarks ?? ""}
+              onChange={(e) => set({ remarks: text(e.target.value) })}
+            />
+          )}
+        </Field>
+      </div>
+    </Dialog>
   );
 }

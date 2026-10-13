@@ -16,6 +16,13 @@ public interface IAdmissionRepository
     Task SaveChangesAsync(CancellationToken cancellationToken);
     Task<T> ExecuteInTransactionAsync<T>(Func<Task<T>> operation, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Holds an exclusive lock on one application until the current transaction ends, so two
+    /// enrolments of the SAME application run one after the other (the second then sees "Enrolled").
+    /// Must be called inside <see cref="ExecuteInTransactionAsync{T}"/>.
+    /// </summary>
+    Task LockForEnrolmentAsync(int admissionId, CancellationToken cancellationToken);
+
     Task<List<ParentCandidateRow>> GetParentCandidatesAsync(int admissionId, CancellationToken cancellationToken);
     Task<List<ParentChildRow>> GetLinkedChildrenAsync(IReadOnlyCollection<int> parentIds, CancellationToken cancellationToken);
 }

@@ -1,56 +1,61 @@
-import { useToast } from "@/components/Toast";
-import { PageHero } from "@/components/PageHero";
-import { Plus } from "lucide-react";
-import { isConcurrencyConflict } from "@/utils/apiError";
 import { useEffect, useMemo, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import {
+  CircleCheck,
+  ClipboardList,
+  Download,
+  Eye,
+  FileText,
+  GraduationCap,
+  Pencil,
+  Plus,
+  Printer,
+  Search,
+  Trash,
+  CircleX,
+} from "lucide-react";
 import { admissionService } from "../services/admissionService";
-import { classSectionService } from "@/features/class-sections/services/classSectionService";
-import type {
-  AdmissionResponse,
-  AdmissionStatus,
+import {
+  ADMISSION_STATUS_TONE,
+  isAdmissionEditable,
+  type AdmissionResponse,
+  type AdmissionStatus,
 } from "../types/admission.types";
-import type { ClassSectionResponse } from "@/features/class-sections/types/classSection.types";
-import { RegistrationModal } from "../components/RegistrationModal";
-import { ConfirmAdmissionModal } from "../components/ConfirmAdmissionModal";
-import { EnrollModal } from "../components/EnrollModal";
-import { ViewReasonModal } from "../components/ViewReasonModal";
-import { RejectAdmissionModal } from "../components/RejectAdmissionModal";
+import { PageHero } from "@/components/PageHero";
+import { StatCard, StatGrid } from "@/components/StatCard";
+import { Panel } from "@/components/Panel";
+import { FilterBar } from "@/components/FilterBar";
+import { DataTable, type Column } from "@/components/DataTable";
+import { Badge } from "@/components/Badge";
+import { IconButton } from "@/components/IconButton";
+import { EmptyState } from "@/components/EmptyState";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { ViewDetailsModal } from "@/components/ViewDetailsModal";
+import { useToast } from "@/components/Toast";
+import { getApiErrors, getReadErrors } from "@/utils/apiError";
+import { useAuth } from "@/store/AuthContext";
+import { Permission } from "@/routes/permissions";
 
-const PIPELINE_STEPS: {
-  key: AdmissionStatus | "All";
-  label: string;
-  activeClass: string;
-}[] = [
-  { key: "All", label: "All", activeClass: "pipeline__step--dark" },
-  {
-    key: "Registered",
-    label: "Registered",
-    activeClass: "pipeline__step--active",
-  },
-  { key: "Admitted", label: "Admitted", activeClass: "pipeline__step--amber" },
-  { key: "Enrolled", label: "Enrolled", activeClass: "pipeline__step--green" },
-  { key: "Rejected", label: "Rejected", activeClass: "" },
+const STATUS_FILTERS: (AdmissionStatus | "All")[] = [
+  "All",
+  "Registered",
+  "Admitted",
+  "Enrolled",
+  "Rejected",
 ];
 
-const STATUS_BADGE_CLASS: Record<AdmissionStatus, string> = {
-  Registered: "badge--info",
-  Admitted: "badge--warn",
-  Enrolled: "badge--active",
-  Rejected: "badge--inactive",
-};
-
 function unique(values: (string | null)[]): string[] {
-  const seen = new Set<string>();
-  const out: string[] = [];
-  values.forEach((v) => {
-    if (v && !seen.has(v)) {
-      seen.add(v);
-      out.push(v);
-    }
-  });
-  return out.sort();
+  return [...new Set(values.filter((v): v is string => !!v))].sort();
+}
+
+function formatDate(iso: string): string {
+  const d = new Date(`${iso}T00:00:00`);
+  return Number.isNaN(d.getTime())
+    ? iso
+    : d.toLocaleDateString("en-GB", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      });
 }
 
 function toCsv(rows: AdmissionResponse[]): string {
@@ -89,59 +94,47 @@ function toCsv(rows: AdmissionResponse[]): string {
   return [headers.join(","), ...lines].join("\n");
 }
 
+/**
+ * U2: the admissions list. Opening a row goes to the application's own page, where the decisions
+ * (confirm, reject, enrol) are made. Registering opens the full-page form.
+ */
 export function AdmissionsPage() {
   const toast = useToast();
+  const navigate = useNavigate();
+  const { hasAnyPermission } = useAuth();
+  const canCreate = hasAnyPermission([Permission.AdmissionsCreate]);
+  const canEdit = hasAnyPermission([Permission.AdmissionsEdit]);
+  const canDelete = hasAnyPermission([Permission.AdmissionsDelete]);
+
   const [admissions, setAdmissions] = useState<AdmissionResponse[]>([]);
-  const [classSections, setClassSections] = useState<ClassSectionResponse[]>(
-    [],
-  );
+  const [isLoading, setIsLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<AdmissionStatus | "All">(
     "All",
   );
   const [search, setSearch] = useState("");
-  const [quickSearch, setQuickSearch] = useState("");
   const [yearFilter, setYearFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [classFilter, setClassFilter] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const [pageSize, setPageSize] = useState(10);
-  const [page, setPage] = useState(1);
-  const [isLoading, setIsLoading] = useState(true);
-
-  const [isRegistrationOpen, setIsRegistrationOpen] = useState(false);
-  const [editingAdmission, setEditingAdmission] =
-    useState<AdmissionResponse | null>(null);
-  const [confirmTarget, setConfirmTarget] = useState<AdmissionResponse | null>(
-    null,
-  );
-  const [enrollTarget, setEnrollTarget] = useState<AdmissionResponse | null>(
-    null,
-  );
-  const [viewReason, setViewReason] = useState<string | null>(null);
-  const [rejectTarget, setRejectTarget] = useState<AdmissionResponse | null>(
-    null,
-  );
   const [deleteTarget, setDeleteTarget] = useState<AdmissionResponse | null>(
-    null,
-  );
-  const [detailsTarget, setDetailsTarget] = useState<AdmissionResponse | null>(
     null,
   );
 
   const loadData = async () => {
-    setIsLoading(true);
-    const [admissionsData, classSectionsData] = await Promise.all([
-      admissionService.getAll(),
-      classSectionService.getAll(),
-    ]);
-    setAdmissions(admissionsData);
-    setClassSections(classSectionsData);
-    setIsLoading(false);
+    try {
+      setAdmissions(await admissionService.getAll());
+    } catch (err) {
+      toast.error(getReadErrors(err, "Could not load applications.")[0]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   useEffect(() => {
-    loadData();
+    void loadData();
+    // Load once. (loadData uses toast, whose object changes on every message: listing it would reload in a loop.)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const years = useMemo(
@@ -154,20 +147,19 @@ export function AdmissionsPage() {
   );
 
   const counts = useMemo(() => {
-    const c: Record<string, number> = {
+    const c: Record<AdmissionStatus | "All", number> = {
       All: admissions.length,
       Registered: 0,
       Admitted: 0,
       Enrolled: 0,
       Rejected: 0,
     };
-    admissions.forEach((a) => {
-      c[a.status] = (c[a.status] ?? 0) + 1;
-    });
+    admissions.forEach((a) => (c[a.status] += 1));
     return c;
   }, [admissions]);
 
   const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
     return admissions.filter((a) => {
       if (statusFilter !== "All" && a.status !== statusFilter) return false;
       if (yearFilter && a.academicYearName !== yearFilter) return false;
@@ -176,16 +168,10 @@ export function AdmissionsPage() {
         return false;
       if (dateFrom && a.registrationDate < dateFrom) return false;
       if (dateTo && a.registrationDate > dateTo) return false;
-
-      if (search) {
+      if (q) {
         const haystack =
-          `${a.firstName} ${a.lastName} ${a.regNo}`.toLowerCase();
-        if (!haystack.includes(search.toLowerCase())) return false;
-      }
-      if (quickSearch) {
-        const everything =
-          `${a.firstName} ${a.lastName} ${a.regNo} ${a.email ?? ""} ${a.phone} ${a.appliedForClassSectionName} ${a.status}`.toLowerCase();
-        if (!everything.includes(quickSearch.toLowerCase())) return false;
+          `${a.firstName} ${a.lastName} ${a.regNo} ${a.phone} ${a.email ?? ""}`.toLowerCase();
+        if (!haystack.includes(q)) return false;
       }
       return true;
     });
@@ -193,7 +179,6 @@ export function AdmissionsPage() {
     admissions,
     statusFilter,
     search,
-    quickSearch,
     yearFilter,
     typeFilter,
     classFilter,
@@ -201,56 +186,40 @@ export function AdmissionsPage() {
     dateTo,
   ]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const pageRows = filtered.slice((page - 1) * pageSize, page * pageSize);
-
-  useEffect(() => {
-    setPage(1);
-  }, [
+  const filterKey = [
     statusFilter,
     search,
-    quickSearch,
     yearFilter,
     typeFilter,
     classFilter,
     dateFrom,
     dateTo,
-    pageSize,
-  ]);
+  ].join("|");
+  const anyFilter =
+    statusFilter !== "All" ||
+    !!(search || yearFilter || typeFilter || classFilter || dateFrom || dateTo);
 
   const clearFilters = () => {
+    setStatusFilter("All");
     setSearch("");
-    setQuickSearch("");
     setYearFilter("");
     setTypeFilter("");
     setClassFilter("");
     setDateFrom("");
     setDateTo("");
-    setStatusFilter("All");
-  };
-
-  const openCreate = () => {
-    setEditingAdmission(null);
-    setIsRegistrationOpen(true);
-  };
-  const openEdit = (a: AdmissionResponse) => {
-    setEditingAdmission(a);
-    setIsRegistrationOpen(true);
-  };
-
-  const handleReject = (a: AdmissionResponse) => {
-    setRejectTarget(a);
-  };
-
-  const handleDelete = (a: AdmissionResponse) => {
-    setDeleteTarget(a);
   };
 
   const confirmDelete = async () => {
-    if (!deleteTarget) return;
-    await admissionService.delete(deleteTarget.id);
+    const target = deleteTarget;
     setDeleteTarget(null);
-    await loadData();
+    if (!target) return;
+    try {
+      await admissionService.delete(target.id);
+      toast.success(`Application ${target.regNo} was deleted.`);
+      await loadData();
+    } catch (err) {
+      toast.error(getApiErrors(err, "Could not delete this application.")[0]);
+    }
   };
 
   const handleExportCsv = () => {
@@ -265,489 +234,321 @@ export function AdmissionsPage() {
     URL.revokeObjectURL(url);
   };
 
+  const fullName = (a: AdmissionResponse) => `${a.firstName} ${a.lastName}`;
+
+  const columns: Column<AdmissionResponse>[] = [
+    {
+      key: "regNo",
+      header: "Reg #",
+      sortValue: (a) => a.regNo,
+      render: (a) => <span className="cell-strong">{a.regNo}</span>,
+    },
+    {
+      key: "applicant",
+      header: "Applicant",
+      sortValue: (a) => fullName(a),
+      render: (a) => (
+        <div>
+          <Link
+            className="person__name person__link"
+            to={`/admissions/${a.id}`}
+          >
+            {fullName(a)}
+          </Link>
+          <div className="person__sub">
+            {a.gender} · born {formatDate(a.dateOfBirth)}
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: "class",
+      header: "Applied for",
+      sortValue: (a) => a.appliedForClassSectionName,
+      render: (a) => a.appliedForClassSectionName,
+    },
+    {
+      key: "type",
+      header: "Type",
+      hideBelow: "md",
+      sortValue: (a) => a.admissionType,
+      render: (a) => (
+        <Badge tone={a.admissionType === "Transfer" ? "warn" : "neutral"}>
+          {a.admissionType}
+        </Badge>
+      ),
+    },
+    {
+      key: "regDate",
+      header: "Registered",
+      hideBelow: "md",
+      sortValue: (a) => a.registrationDate,
+      render: (a) => formatDate(a.registrationDate),
+    },
+    {
+      key: "status",
+      header: "Status",
+      sortValue: (a) => a.status,
+      render: (a) => (
+        <Badge tone={ADMISSION_STATUS_TONE[a.status]}>{a.status}</Badge>
+      ),
+    },
+    {
+      key: "actions",
+      header: "Actions",
+      render: (a) => (
+        <div className="row-actions">
+          <IconButton
+            icon={Eye}
+            label={`Open the application of ${fullName(a)}`}
+            onClick={() => navigate(`/admissions/${a.id}`)}
+          />
+          {canEdit && isAdmissionEditable(a.status) && (
+            <IconButton
+              icon={Pencil}
+              tone="info"
+              label={`Edit the application of ${fullName(a)}`}
+              onClick={() => navigate(`/admissions/${a.id}/edit`)}
+            />
+          )}
+          {canDelete && (
+            <IconButton
+              icon={Trash}
+              tone="bad"
+              label={`Delete the application of ${fullName(a)}`}
+              onClick={() => setDeleteTarget(a)}
+            />
+          )}
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div>
       <PageHero
         title="Admissions"
         subtitle="Applications from registration to confirmation and enrolment."
         actions={
-          <button className="btn btn--primary" onClick={openCreate}>
-            <Plus size={16} aria-hidden="true" />
-            New registration
-          </button>
+          <>
+            <button
+              type="button"
+              className="btn btn--secondary"
+              onClick={() => window.print()}
+            >
+              <Printer size={16} aria-hidden="true" />
+              Print
+            </button>
+            {canCreate && (
+              <Link className="btn btn--primary" to="/admissions/new">
+                <Plus size={16} aria-hidden="true" />
+                New registration
+              </Link>
+            )}
+          </>
+        }
+        stats={
+          <StatGrid>
+            <StatCard
+              label="Registered"
+              value={counts.Registered}
+              icon={ClipboardList}
+              tone="info"
+            />
+            <StatCard
+              label="Admitted"
+              value={counts.Admitted}
+              icon={CircleCheck}
+              tone="warn"
+            />
+            <StatCard
+              label="Enrolled"
+              value={counts.Enrolled}
+              icon={GraduationCap}
+              tone="ok"
+            />
+            <StatCard
+              label="Rejected"
+              value={counts.Rejected}
+              icon={CircleX}
+              tone="bad"
+            />
+          </StatGrid>
         }
       />
 
-      <div className="card">
-        <div className="pipeline">
-          {PIPELINE_STEPS.map((step) => (
+      <Panel
+        title="All applications"
+        subtitle={`${admissions.length} applications · ${filtered.length} shown`}
+        icon={FileText}
+        actions={
+          <button
+            type="button"
+            className="btn btn--secondary"
+            onClick={handleExportCsv}
+            disabled={filtered.length === 0}
+          >
+            <Download size={16} aria-hidden="true" />
+            Export CSV
+          </button>
+        }
+      >
+        <div className="pipeline" role="group" aria-label="Filter by status">
+          {STATUS_FILTERS.map((s) => (
             <button
-              key={step.key}
-              className={`pipeline__step ${statusFilter === step.key ? step.activeClass : ""}`}
-              onClick={() => setStatusFilter(step.key)}
+              key={s}
+              type="button"
+              aria-pressed={statusFilter === s}
+              className={`pipeline__step ${statusFilter === s ? "pipeline__step--active" : ""}`}
+              onClick={() => setStatusFilter(s)}
             >
-              {step.label} ({counts[step.key] ?? 0})
+              {s} ({counts[s]})
             </button>
           ))}
         </div>
 
-        <div className="filters">
-          <div className="field">
-            <label>Search</label>
-            <input
-              placeholder="Search applicant, reg no..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-          <div className="field">
-            <label>Academic Year</label>
+        <FilterBar>
+          <label>
+            <span className="visually-hidden">Academic year</span>
             <select
+              className="select"
               value={yearFilter}
               onChange={(e) => setYearFilter(e.target.value)}
             >
-              <option value="">All Years</option>
+              <option value="">All years</option>
               {years.map((y) => (
-                <option key={y} value={y}>
-                  {y}
-                </option>
+                <option key={y}>{y}</option>
               ))}
             </select>
-          </div>
-          <div className="field">
-            <label>Admission Type</label>
+          </label>
+          <label>
+            <span className="visually-hidden">Admission type</span>
             <select
+              className="select"
               value={typeFilter}
               onChange={(e) => setTypeFilter(e.target.value)}
             >
-              <option value="">All Types</option>
-              <option value="New">New</option>
-              <option value="Transfer">Transfer</option>
+              <option value="">All types</option>
+              <option>New</option>
+              <option>Transfer</option>
             </select>
-          </div>
-          <div className="field">
-            <label>Applied-for Class</label>
+          </label>
+          <label>
+            <span className="visually-hidden">Applied-for class</span>
             <select
+              className="select"
               value={classFilter}
               onChange={(e) => setClassFilter(e.target.value)}
             >
-              <option value="">All Classes</option>
+              <option value="">All classes</option>
               {classNames.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
+                <option key={c}>{c}</option>
               ))}
             </select>
-          </div>
-          <div className="field">
-            <label>Reg. Date From</label>
+          </label>
+          <label className="filter-date">
+            <span>From</span>
             <input
+              className="select"
               type="date"
               value={dateFrom}
               onChange={(e) => setDateFrom(e.target.value)}
             />
-          </div>
-          <div className="field">
-            <label>Reg. Date To</label>
+          </label>
+          <label className="filter-date">
+            <span>To</span>
             <input
+              className="select"
               type="date"
               value={dateTo}
               onChange={(e) => setDateTo(e.target.value)}
             />
-          </div>
-          <button
-            className="btn btn--secondary filters__clear"
-            onClick={clearFilters}
+          </label>
+          <label
+            className="search-box"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              marginLeft: "auto",
+            }}
           >
-            Clear
-          </button>
-        </div>
-
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: 12,
-            flexWrap: "wrap",
-            gap: 8,
-          }}
-        >
-          <div style={{ display: "flex", gap: 8 }}>
-            <button
-              className="export-btn"
-              style={{ background: "var(--ok-solid)" }}
-              onClick={handleExportCsv}
-            >
-              CSV
-            </button>
-            <button
-              className="export-btn"
-              style={{ background: "var(--bad-solid)" }}
-              onClick={() =>
-                toast.info("PDF export is coming in a later release.")
-              }
-            >
-              PDF
-            </button>
-            <button
-              className="export-btn"
-              style={{ background: "var(--navy-700)" }}
-              onClick={() => window.print()}
-            >
-              PRINT
-            </button>
-          </div>
-          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-            <span style={{ fontSize: 12.5, color: "var(--muted)" }}>
-              Show{" "}
-              <select
-                value={pageSize}
-                onChange={(e) => setPageSize(Number(e.target.value))}
-              >
-                <option value={10}>10</option>
-                <option value={25}>25</option>
-                <option value={50}>50</option>
-              </select>{" "}
-              entries
-            </span>
+            <Search size={16} aria-hidden="true" />
+            <span className="visually-hidden">Search applications</span>
             <input
-              className="search-box"
               type="search"
-              placeholder="Search..."
-              value={quickSearch}
-              onChange={(e) => setQuickSearch(e.target.value)}
+              placeholder="Name, reg no., phone"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              style={{
+                border: 0,
+                outline: "none",
+                background: "transparent",
+                color: "inherit",
+                font: "inherit",
+                width: "100%",
+              }}
             />
-          </div>
-        </div>
-
-        {isLoading ? (
-          <div className="empty-state">Loading…</div>
-        ) : pageRows.length === 0 ? (
-          <div className="empty-state">
-            No applications match these filters.
-          </div>
-        ) : (
-          <div style={{ overflowX: "auto" }}>
-            <table>
-              <thead>
-                <tr>
-                  <th>Reg. No.</th>
-                  <th>Applicant</th>
-                  <th>Gender</th>
-                  <th>DOB</th>
-                  <th>Applied For</th>
-                  <th>Type</th>
-                  <th>Previous School</th>
-                  <th>Contact</th>
-                  <th>Reg. Date</th>
-                  <th>Admission Fee</th>
-                  <th>Status</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pageRows.map((a) => (
-                  <tr key={a.id}>
-                    <td>{a.regNo}</td>
-                    <td>
-                      {a.firstName} {a.lastName}
-                    </td>
-                    <td>{a.gender}</td>
-                    <td>{a.dateOfBirth}</td>
-                    <td>{a.appliedForClassSectionName}</td>
-                    <td>
-                      <span
-                        className={`badge ${a.admissionType === "Transfer" ? "badge--warn" : "badge--info"}`}
-                      >
-                        {a.admissionType}
-                      </span>
-                    </td>
-                    <td>{a.previousSchool || "—"}</td>
-                    <td>
-                      {a.phone}
-                      <br />
-                      <span style={{ color: "var(--muted)", fontSize: 11.5 }}>
-                        {a.email}
-                      </span>
-                    </td>
-                    <td>{a.registrationDate}</td>
-                    <td>
-                      {a.admissionFee ? (
-                        <>
-                          {a.admissionFee}
-                          <br />
-                          <span style={{ color: "var(--muted)", fontSize: 11 }}>
-                            {a.admissionFeeReference}
-                          </span>
-                        </>
-                      ) : (
-                        "—"
-                      )}
-                    </td>
-                    <td>
-                      <span className={`badge ${STATUS_BADGE_CLASS[a.status]}`}>
-                        {a.status}
-                      </span>
-                    </td>
-                    <td style={{ whiteSpace: "nowrap" }}>
-                      {a.status === "Rejected" ? (
-                        <>
-                          <button
-                            className="btn--icon"
-                            title="View Details"
-                            onClick={() => setDetailsTarget(a)}
-                          >
-                            👁
-                          </button>
-                          <button
-                            className="btn--icon"
-                            title="View Rejection Reason"
-                            style={{ color: "var(--warn)" }}
-                            onClick={() =>
-                              setViewReason(
-                                a.rejectionReason || "No reason recorded.",
-                              )
-                            }
-                          >
-                            ⚠
-                          </button>
-                          <button
-                            className="btn--icon danger"
-                            title="Delete"
-                            onClick={() => handleDelete(a)}
-                          >
-                            🗑
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <button
-                            className="btn--icon"
-                            title="View Details"
-                            onClick={() => setDetailsTarget(a)}
-                          >
-                            👁
-                          </button>
-                          <button
-                            className="btn--icon"
-                            title="Edit"
-                            onClick={() => openEdit(a)}
-                          >
-                            ✎
-                          </button>
-                          {a.status === "Registered" && (
-                            <button
-                              className="btn--icon"
-                              title="Confirm Admission"
-                              style={{ color: "var(--ok)" }}
-                              onClick={() => setConfirmTarget(a)}
-                            >
-                              ✓
-                            </button>
-                          )}
-                          {a.status === "Admitted" && (
-                            <button
-                              className="btn--icon"
-                              title="Enroll to Class"
-                              style={{ color: "var(--info)" }}
-                              onClick={() => setEnrollTarget(a)}
-                            >
-                              🎓
-                            </button>
-                          )}
-
-                          {a.studentId && (
-                            <span title="Student record created">🔗</span>
-                          )}
-
-                          {(a.status === "Registered" ||
-                            a.status === "Admitted") && (
-                            <button
-                              className="btn--icon danger"
-                              title="Reject"
-                              onClick={() => handleReject(a)}
-                            >
-                              ⊘
-                            </button>
-                          )}
-                          <button
-                            className="btn--icon danger"
-                            title="Delete"
-                            onClick={() => handleDelete(a)}
-                          >
-                            🗑
-                          </button>
-                        </>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        <div className="table-footer">
-          <span>
-            Showing {pageRows.length ? (page - 1) * pageSize + 1 : 0} to{" "}
-            {(page - 1) * pageSize + pageRows.length} of {filtered.length}{" "}
-            entries
-          </span>
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          </label>
+          {anyFilter && (
             <button
+              type="button"
               className="btn btn--secondary btn--sm"
-              disabled={page <= 1}
-              onClick={() => setPage((p) => p - 1)}
+              onClick={clearFilters}
             >
-              Previous
+              Clear
             </button>
-            <span>
-              {page} / {totalPages}
-            </span>
-            <button
-              className="btn btn--secondary btn--sm"
-              disabled={page >= totalPages}
-              onClick={() => setPage((p) => p + 1)}
-            >
-              Next
-            </button>
-          </div>
-        </div>
-      </div>
+          )}
+        </FilterBar>
 
-      <RegistrationModal
-        isOpen={isRegistrationOpen}
-        editingAdmission={editingAdmission}
-        classSections={classSections}
-        onClose={() => setIsRegistrationOpen(false)}
-        onSubmit={async (data) => {
-          if (editingAdmission) {
-            try {
-              await admissionService.update(editingAdmission.id, {
-                ...data,
-                rowVersion: editingAdmission.rowVersion,
-              });
-            } catch (err) {
-              // Someone else saved this application first: refresh the list so the next try starts fresh.
-              if (isConcurrencyConflict(err)) await loadData();
-              throw err;
-            }
-          } else {
-            await admissionService.create(data);
+        <DataTable
+          caption="Admission applications"
+          columns={columns}
+          rows={filtered}
+          rowKey={(a) => a.id}
+          loading={isLoading}
+          resetPageKey={filterKey}
+          empty={
+            <EmptyState
+              icon={FileText}
+              title={
+                admissions.length === 0
+                  ? "No applications yet"
+                  : "No applications match these filters"
+              }
+              action={
+                admissions.length === 0 && canCreate ? (
+                  <Link className="btn btn--primary" to="/admissions/new">
+                    <Plus size={16} aria-hidden="true" />
+                    New registration
+                  </Link>
+                ) : admissions.length > 0 ? (
+                  <button
+                    type="button"
+                    className="btn btn--secondary"
+                    onClick={clearFilters}
+                  >
+                    Clear filters
+                  </button>
+                ) : undefined
+              }
+            />
           }
-          await loadData();
-        }}
-      />
-
-      <ConfirmAdmissionModal
-        admission={confirmTarget}
-        onClose={() => setConfirmTarget(null)}
-        onSubmit={async (id, data) => {
-          await admissionService.confirmAdmission(id, data);
-          await loadData();
-        }}
-      />
-
-      <EnrollModal
-        admission={enrollTarget}
-        classSections={classSections}
-        onClose={() => setEnrollTarget(null)}
-        onSubmit={async (id, data) => {
-          await admissionService.enroll(id, data);
-          await loadData();
-        }}
-      />
-
-      <RejectAdmissionModal
-        admission={rejectTarget}
-        onClose={() => setRejectTarget(null)}
-        onSubmit={async (id, reason) => {
-          await admissionService.reject(id, { rejectionReason: reason });
-          await loadData();
-        }}
-      />
-
-      <ViewReasonModal
-        reason={viewReason}
-        onClose={() => setViewReason(null)}
-      />
+        />
+      </Panel>
 
       <ConfirmDialog
         isOpen={deleteTarget !== null}
-        title="Delete Application"
+        title="Delete application"
         message={
           deleteTarget
-            ? `Delete the application for ${deleteTarget.firstName} ${deleteTarget.lastName} (${deleteTarget.regNo})? This cannot be undone.`
+            ? `Delete the application for ${fullName(deleteTarget)} (${deleteTarget.regNo})? This cannot be undone.`
             : ""
         }
         confirmLabel="Delete"
+        danger
         onConfirm={confirmDelete}
         onCancel={() => setDeleteTarget(null)}
-      />
-
-      <ViewDetailsModal
-        isOpen={detailsTarget !== null}
-        title={
-          detailsTarget
-            ? `${detailsTarget.firstName} ${detailsTarget.lastName}`
-            : ""
-        }
-        subtitle={detailsTarget?.regNo}
-        onClose={() => setDetailsTarget(null)}
-        sections={
-          detailsTarget
-            ? [
-                {
-                  heading: "Applicant",
-                  rows: [
-                    { label: "Gender", value: detailsTarget.gender },
-                    {
-                      label: "Date of Birth",
-                      value: detailsTarget.dateOfBirth,
-                    },
-                    {
-                      label: "Applied For",
-                      value: detailsTarget.appliedForClassSectionName,
-                    },
-                    {
-                      label: "Admission Type",
-                      value: detailsTarget.admissionType,
-                    },
-                    {
-                      label: "Previous School",
-                      value: detailsTarget.previousSchool,
-                    },
-                  ],
-                },
-                {
-                  heading: "Contact",
-                  rows: [
-                    { label: "Phone", value: detailsTarget.phone },
-                    { label: "Email", value: detailsTarget.email },
-                  ],
-                },
-                {
-                  heading: "Registration",
-                  rows: [
-                    {
-                      label: "Reg. Date",
-                      value: detailsTarget.registrationDate,
-                    },
-                    {
-                      label: "Admission Fee",
-                      value: detailsTarget.admissionFee,
-                    },
-                    {
-                      label: "Fee Reference",
-                      value: detailsTarget.admissionFeeReference,
-                    },
-                    { label: "Status", value: detailsTarget.status },
-                  ],
-                },
-              ]
-            : []
-        }
       />
     </div>
   );

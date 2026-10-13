@@ -1,74 +1,84 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { Ban } from "lucide-react";
 import type { AdmissionResponse } from "../types/admission.types";
-import { ValidationModal } from "@/components/ValidationModal";
+import { Dialog } from "@/components/Dialog";
+import { Field } from "@/components/form/Field";
 import { getApiErrors } from "@/utils/apiError";
 
 interface Props {
-  admission: AdmissionResponse | null;
+  admission: AdmissionResponse;
   onClose: () => void;
   onSubmit: (id: number, reason: string) => Promise<void>;
 }
 
+/** Registered/Admitted → Rejected. A rejected application is closed: it cannot be edited or enrolled. */
 export function RejectAdmissionModal({ admission, onClose, onSubmit }: Props) {
   const [reason, setReason] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errors, setErrors] = useState<string[] | null>(null);
-
-  useEffect(() => {
-    setReason("");
-    setErrors(null);
-  }, [admission]);
-
-  if (!admission) return null;
+  const [errors, setErrors] = useState<string[]>([]);
 
   const handleSubmit = async () => {
+    setErrors([]);
     setIsSubmitting(true);
     try {
       await onSubmit(admission.id, reason.trim());
       onClose();
     } catch (err) {
       setErrors(getApiErrors(err, "Could not reject this application."));
-    } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="modal-backdrop">
-      <div className="modal" style={{ maxWidth: 440 }}>
-        <div className="modal__header">
-          <h2>✖ Reject Application</h2>
-          <button className="modal__close" onClick={onClose}>
-            ✕
-          </button>
-        </div>
-        <div className="modal__body">
-          <div className="modal__note" style={{ marginTop: 0 }}>
-            {admission.firstName} {admission.lastName} · {admission.regNo}
-          </div>
-          <div className="field">
-            <label>Reason (optional)</label>
-            <textarea
-              rows={3}
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-            />
-          </div>
-        </div>
-        <div className="modal__footer">
+    <Dialog
+      title="Reject application"
+      icon={Ban}
+      subtitle={`${admission.firstName} ${admission.lastName} · ${admission.regNo}`}
+      errors={errors}
+      onClose={onClose}
+      closable={!isSubmitting}
+      footer={
+        <>
           <button
+            type="button"
+            className="btn btn--secondary"
+            onClick={onClose}
+            disabled={isSubmitting}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
             className="btn btn--danger"
             onClick={handleSubmit}
             disabled={isSubmitting}
           >
-            {isSubmitting ? "Rejecting…" : "Reject"}
+            {isSubmitting ? "Rejecting…" : "Reject application"}
           </button>
-          <button className="btn btn--secondary" onClick={onClose}>
-            Cancel
-          </button>
-        </div>
+        </>
+      }
+    >
+      <div className="notice notice--warn" style={{ marginBottom: 16 }}>
+        <Ban size={16} aria-hidden="true" />
+        <span>
+          A rejected application is closed: it can no longer be edited or
+          enrolled.
+        </span>
       </div>
-      <ValidationModal errors={errors} onClose={() => setErrors(null)} />
-    </div>
+      <Field
+        id="reject-reason"
+        label="Reason (optional)"
+        hint="Shown on the application."
+      >
+        {(c) => (
+          <textarea
+            {...c}
+            rows={3}
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+          />
+        )}
+      </Field>
+    </Dialog>
   );
 }

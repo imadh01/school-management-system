@@ -802,6 +802,11 @@ export function StudentEditPage() {
           </div>
 
           <h3 className="form-subhead">Authorised pickup persons</h3>
+          {fieldErrors.pickupPersons && (
+            <p className="field__error" style={{ marginBottom: 12 }}>
+              {fieldErrors.pickupPersons}
+            </p>
+          )}
           {pickups.length === 0 && (
             <p className="cell-muted" style={{ margin: "0 0 12px" }}>
               No pickup persons added.

@@ -1,17 +1,13 @@
+import type { BadgeTone } from "@/components/Badge";
+
 export type AdmissionStatus =
-  | "Registered"
-  | "Admitted"
-  | "Enrolled"
-  | "Rejected";
+  "Registered" | "Admitted" | "Enrolled" | "Rejected";
 
 export type GuardianRelation = "Father" | "Mother" | "Guardian";
 
 /** What the server suggests / what staff decide for each guardian at enrolment. */
 export type GuardianAction =
-  | "UseExisting"
-  | "CreateNew"
-  | "MustChoose"
-  | "MissingMobile";
+  "UseExisting" | "CreateNew" | "MustChoose" | "MissingMobile";
 
 export interface AdmissionGuardianRequest {
   relationType: GuardianRelation;
@@ -152,3 +148,19 @@ export interface GuardianMatchesResponse {
   admissionId: number;
   guardians: GuardianMatch[];
 }
+
+/**
+ * U2: an application can be edited only while it is in progress. Enrolled: the data now lives on
+ * the student record. Rejected: closed. The API refuses the edit too (409); this only hides it.
+ */
+export function isAdmissionEditable(status: AdmissionStatus): boolean {
+  return status === "Registered" || status === "Admitted";
+}
+
+/** One colour per status, used by the list and the detail page. */
+export const ADMISSION_STATUS_TONE: Record<AdmissionStatus, BadgeTone> = {
+  Registered: "info",
+  Admitted: "warn",
+  Enrolled: "ok",
+  Rejected: "bad",
+};

@@ -16,6 +16,10 @@ export const Permission = {
   SubjectsView: "Subjects.View",
   TeachersView: "Teachers.View",
   AdmissionsView: "Admissions.View",
+  AdmissionsCreate: "Admissions.Create",
+  AdmissionsEdit: "Admissions.Edit",
+  AdmissionsEnroll: "Admissions.Enroll",
+  AdmissionsDelete: "Admissions.Delete",
 
   StudentsView: "Students.View",
   StudentsViewScoped: "Students.ViewScoped",
