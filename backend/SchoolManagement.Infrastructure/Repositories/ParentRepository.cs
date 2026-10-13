@@ -15,9 +15,7 @@ public class ParentRepository : IParentRepository
     }
 
     public Task<List<Parent>> GetAllAsync(DataScope scope, CancellationToken cancellationToken) =>
-        _context.Parents
-            .AsNoTracking()
-            .VisibleTo(_context, scope)
+        WithAddresses(_context.Parents.AsNoTracking().VisibleTo(_context, scope))
             .OrderByDescending(p => p.Id)
             .ToListAsync(cancellationToken);
 
@@ -28,7 +26,26 @@ public class ParentRepository : IParentRepository
             .FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
 
     public Task<Parent?> GetByIdAsync(int id, CancellationToken cancellationToken) =>
-        _context.Parents.FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
+        WithAddresses(_context.Parents).FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
+
+    // G1a: addresses with their country and region names (split query: one parent, several addresses).
+    private static IQueryable<Parent> WithAddresses(IQueryable<Parent> query) =>
+        query
+            .Include(p => p.Addresses).ThenInclude(a => a.Country)
+            .Include(p => p.Addresses).ThenInclude(a => a.Region)
+            .AsSplitQuery();
+
+    public async Task<T> ExecuteInTransactionAsync<T>(Func<Task<T>> operation, CancellationToken cancellationToken)
+    {
+        var strategy = _context.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
+        {
+            await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+            var result = await operation();
+            await transaction.CommitAsync(cancellationToken);
+            return result;
+        });
+    }
 
     public async Task AddAsync(Parent parent, CancellationToken cancellationToken)
     {

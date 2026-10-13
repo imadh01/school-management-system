@@ -11,4 +11,5 @@ public interface IParentRepository
     Task<Parent?> GetByIdAsync(int id, CancellationToken cancellationToken);
     Task AddAsync(Parent parent, CancellationToken cancellationToken);
     Task SaveChangesAsync(CancellationToken cancellationToken);
+    Task<T> ExecuteInTransactionAsync<T>(Func<Task<T>> operation, CancellationToken cancellationToken);
 }

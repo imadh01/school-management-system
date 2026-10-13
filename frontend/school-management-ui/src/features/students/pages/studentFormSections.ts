@@ -36,7 +36,7 @@ export const STUDENT_FORM_SECTIONS: readonly FormSectionDef[] = [
   {
     id: "contact",
     title: "Contact & address",
-    fields: ["mobile", "email", "addressLine", "city", "state", "pincode"],
+    fields: ["mobile", "email", "addresses"],
   },
   { id: "guardians", title: "Parents / guardians", fields: [] },
   {

@@ -84,6 +84,8 @@ public class StudentRepository : IStudentRepository
             .Include(s => s.Health)
             .Include(s => s.IdentityDocument)
             .Include(s => s.PickupPersons)
+            .Include(s => s.Addresses).ThenInclude(a => a.Country)
+            .Include(s => s.Addresses).ThenInclude(a => a.Region)
             // Only the current period is needed for edits; full history has its own query.
             .Include(s => s.Enrollments.Where(e => e.Status == EnrollmentStatuses.Active))
             .AsSplitQuery()

@@ -9,11 +9,13 @@ public class ParentService : IParentService
 {
     private readonly IParentRepository _parentRepository;
     private readonly IConcurrencyGuard _concurrency;
+    private readonly IAddressService _addressService;
 
-    public ParentService(IParentRepository parentRepository, IConcurrencyGuard concurrency)
+    public ParentService(IParentRepository parentRepository, IConcurrencyGuard concurrency, IAddressService addressService)
     {
         _parentRepository = parentRepository;
         _concurrency = concurrency;
+        _addressService = addressService;
     }
 
     public async Task<List<ParentResponse>> GetAllAsync(CancellationToken cancellationToken)
@@ -44,6 +46,7 @@ public class ParentService : IParentService
 
     public async Task<ParentResponse> CreateAsync(CreateParentRequest request, CancellationToken cancellationToken)
     {
+        var addresses = await _addressService.BuildAsync(request.Addresses ?? new(), cancellationToken);
         var parent = new Parent
         {
             Name = request.Name,
@@ -68,10 +71,7 @@ public class ParentService : IParentService
             WorkEmail = request.WorkEmail,
             WorkPhone = request.WorkPhone,
             BillingContact = request.BillingContact,
-            AddressLine = request.AddressLine,
-            City = request.City,
-            State = request.State,
-            Pincode = request.Pincode,
+            Addresses = addresses,
         };
 
         await _parentRepository.AddAsync(parent, cancellationToken);
@@ -82,6 +82,9 @@ public class ParentService : IParentService
     {
         var parent = await GetOrThrowAsync(id, cancellationToken);
         _concurrency.Expect(parent, request.RowVersion); // 409 if someone saved this parent after it was loaded
+        var addresses = request.Addresses is null
+            ? null
+            : await _addressService.BuildAsync(request.Addresses, cancellationToken);
 
         parent.Name = request.Name; parent.Email = request.Email; parent.Mobile = request.Mobile;
         parent.Status = request.Status;
@@ -95,11 +98,20 @@ public class ParentService : IParentService
         parent.Employer = request.Employer; parent.JobTitle = request.JobTitle;
         parent.WorkEmail = request.WorkEmail; parent.WorkPhone = request.WorkPhone;
         parent.BillingContact = request.BillingContact;
-        parent.AddressLine = request.AddressLine; parent.City = request.City;
-        parent.State = request.State; parent.Pincode = request.Pincode;
 
-        await _parentRepository.SaveChangesAsync(cancellationToken);
-        return ToResponse(parent);
+        if (addresses is null)
+        {
+            await _parentRepository.SaveChangesAsync(cancellationToken);
+            return ToResponse(parent);
+        }
+
+        // Replacing addresses may save twice: one transaction, so a failure leaves nothing half-done.
+        return await _parentRepository.ExecuteInTransactionAsync(async () =>
+        {
+            await _addressService.ReplaceAsync(parent.Addresses, addresses, cancellationToken);
+            await _parentRepository.SaveChangesAsync(cancellationToken);
+            return ToResponse(parent);
+        }, cancellationToken);
     }
 
     public async Task DeleteAsync(int id, CancellationToken cancellationToken)
@@ -122,6 +134,7 @@ public class ParentService : IParentService
         p.PreferredLanguage, p.PreferredContactMethod, p.Whatsapp, p.EmergencyOnly,
         p.NotifyAttendance, p.NotifyExams, p.NotifyFees, p.NotifyNotices, p.NotifyDiscipline,
         p.Employer, p.JobTitle, p.WorkEmail, p.WorkPhone, p.BillingContact,
-        p.AddressLine, p.City, p.State, p.Pincode,
+        AddressMapping.ToResponses(p.Addresses),
+        AddressMapping.LegacyText(p.Addresses, p.AddressLine, p.City, p.State, p.Pincode),
         Convert.ToBase64String(p.RowVersion));
 }

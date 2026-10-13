@@ -41,6 +41,7 @@ public class GlobalExceptionMiddleware
                 "This record was changed by someone else after you opened it. Reload it and make your changes again."),
             ForbiddenException => (StatusCodes.Status403Forbidden, "FORBIDDEN", ex.Message),
             BusinessRuleException => (StatusCodes.Status422UnprocessableEntity, "BUSINESS_RULE_VIOLATION", ex.Message),
+            RequestValidationException => (StatusCodes.Status400BadRequest, "VALIDATION_ERROR", ex.Message),
             _ => (StatusCodes.Status500InternalServerError, "INTERNAL_SERVER_ERROR", "An unexpected error occurred."),
         };
 
@@ -61,6 +62,7 @@ public class GlobalExceptionMiddleware
         {
             Message = message,
             ErrorCode = errorCode,
+            Errors = (ex as RequestValidationException)?.Errors.ToDictionary(e => e.Key, e => e.Value),
             TraceId = correlationId,
         };
 

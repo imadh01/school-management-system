@@ -1,4 +1,6 @@
-﻿namespace SchoolManagement.Application.DTOs.Admissions;
+﻿using SchoolManagement.Application.DTOs.Addresses;
+
+namespace SchoolManagement.Application.DTOs.Admissions;
 
 public record CreateAdmissionRequest(
     string FirstName, string? MiddleName, string LastName,
@@ -6,6 +8,6 @@ public record CreateAdmissionRequest(
     int AppliedForClassSectionId,
     string AdmissionType, string? PreviousSchool,
     string Phone, string? Email,
-    string? AddressLine, string? City, string? State, string? Pincode,
+    List<AddressRequest>? Addresses,
     string? Remarks,
     List<AdmissionGuardianRequest>? Guardians);

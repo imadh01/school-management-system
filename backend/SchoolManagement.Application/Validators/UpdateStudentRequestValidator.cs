@@ -27,5 +27,6 @@ public class UpdateStudentRequestValidator : AbstractValidator<UpdateStudentRequ
         RuleForEach(x => x.PickupPersons).SetValidator(new PickupPersonRequestValidator());
         RuleFor(x => x.PickupPersons).Must(StudentRequestRules.PickupPersonsWithinLimit)
             .WithMessage($"A student can have at most {StudentRequestRules.MaxPickupPersons} authorised pickup persons.");
+        this.ValidateAddresses(x => x.Addresses);
     }
 }

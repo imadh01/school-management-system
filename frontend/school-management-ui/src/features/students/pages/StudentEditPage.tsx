@@ -22,13 +22,21 @@ import {
   ToggleGroup,
 } from "@/components/form/Inputs";
 import { AddRowButton, RepeatRow } from "@/components/form/RepeatRow";
+import { AddressListEditor } from "@/components/form/AddressListEditor";
 import { ContactCard, ContactList } from "@/components/detail/ContactCard";
 import { EmptyState } from "@/components/EmptyState";
 import { Notice } from "@/components/Notice";
 import { Badge } from "@/components/Badge";
 import { PageLoadError, PageLoading } from "@/components/PageState";
 import { useAsyncData } from "@/hooks/useAsyncData";
+import { useCountries } from "@/hooks/useCountries";
 import { useRecordForm } from "@/hooks/useRecordForm";
+import type { AddressFormRow } from "@/types/address";
+import {
+  toAddressRequests,
+  toAddressRows,
+  validateAddresses,
+} from "@/utils/address";
 import {
   blankToNull,
   fieldBinder,
@@ -53,7 +61,7 @@ const MAX_PICKUP_PERSONS = 10;
 /** The editable part of a student (status, health, pickup persons and identity are kept apart). */
 type EditForm = Omit<
   UpdateStudentRequest,
-  "rowVersion" | "health" | "pickupPersons" | "status"
+  "rowVersion" | "health" | "pickupPersons" | "status" | "addresses"
 >;
 
 interface FormState {
@@ -61,6 +69,7 @@ interface FormState {
   status: StudentStatus;
   health: StudentHealthDto;
   pickups: PickupPersonRequest[];
+  addresses: AddressFormRow[];
   identity: UpdateStudentIdentityRequest;
 }
 
@@ -77,10 +86,6 @@ function stateFrom(s: StudentResponse): FormState {
       dateOfBirth: s.dateOfBirth,
       mobile: s.mobile,
       email: s.email,
-      addressLine: s.addressLine,
-      city: s.city,
-      state: s.state,
-      pincode: s.pincode,
       category: s.category,
       religion: s.religion,
       previousSchool: s.previousSchool,
@@ -103,6 +108,7 @@ function stateFrom(s: StudentResponse): FormState {
     },
     status: s.status,
     health: { ...s.health },
+    addresses: toAddressRows(s.addresses),
     pickups: s.pickupPersons.map((p) => ({
       name: p.name,
       relation: p.relation,
@@ -125,6 +131,7 @@ const EMPTY_STATE: FormState = {
   status: "Active",
   health: {} as StudentHealthDto,
   pickups: [],
+  addresses: [],
   identity: {} as UpdateStudentIdentityRequest,
 };
 
@@ -153,6 +160,7 @@ export function StudentEditPage() {
     [studentId],
     "Could not load this student.",
   );
+  const countries = useCountries();
   const record = useRecordForm<FormState>({
     sections: STUDENT_FORM_SECTIONS,
     initial: EMPTY_STATE,
@@ -197,7 +205,7 @@ export function StudentEditPage() {
   if (!student || record.form === EMPTY_STATE) return <PageLoading />;
 
   const classSections = loaded.data?.classSections ?? [];
-  const { form, health, pickups, identity, status } = record.form;
+  const { form, health, pickups, addresses, identity, status } = record.form;
   const errors = record.fieldErrors;
   // Identity numbers and allergy text need Students.ViewSensitive. Without it the API keeps the
   // stored values whatever is sent, so they are shown as notes instead of empty boxes.
@@ -258,7 +266,7 @@ export function StudentEditPage() {
         e[`pickupPersons.${i}.relation`] = "Relation is required.";
       if (!p.phone.trim()) e[`pickupPersons.${i}.phone`] = "Phone is required.";
     });
-    return e;
+    return { ...e, ...validateAddresses(addresses, countries.data ?? []) };
   };
 
   // Two requests, so this page uses the hook's lower-level steps instead of record.save().
@@ -280,6 +288,7 @@ export function StudentEditPage() {
         status,
         health: blankToNull(health),
         pickupPersons: sent.map(({ p }) => blankToNull(p)),
+        addresses: toAddressRequests(addresses),
         rowVersion: student.rowVersion,
       });
     } catch (err) {
@@ -411,17 +420,20 @@ export function StudentEditPage() {
         </FormSection>
 
         {/* 3. Contact & address */}
-        <FormSection
-          id="contact"
-          title="Contact & address"
-          description="Several addresses per student come with the address book (G1)."
-        >
-          <TextField {...bind("mobile")} label="Mobile" type="tel" />
-          <TextField {...bind("email")} label="Email" type="email" />
-          <TextField {...bind("addressLine")} label="Address" span={2} />
-          <TextField {...bind("city")} label="City" />
-          <TextField {...bind("state")} label="State" />
-          <TextField {...bind("pincode")} label="Pincode" />
+        <FormSection id="contact" title="Contact & address" grid={false}>
+          <div className="form-grid" style={{ marginBottom: 18 }}>
+            <TextField {...bind("mobile")} label="Mobile" type="tel" />
+            <TextField {...bind("email")} label="Email" type="email" />
+          </div>
+          <AddressListEditor
+            idPrefix="student"
+            rows={addresses}
+            onChange={(next) => update({ addresses: next })}
+            countries={countries.data ?? []}
+            countriesLoading={countries.isLoading}
+            errors={errors}
+            legacyAddress={student.legacyAddress}
+          />
         </FormSection>
 
         {/* 4. Parents / guardians (read-only here) */}

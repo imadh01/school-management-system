@@ -27,5 +27,6 @@ public class UpdateAdmissionRequestValidator : AbstractValidator<UpdateAdmission
             .WithMessage("Only one guardian can be the primary contact.");
         RuleFor(x => x.Guardians).Must(AdmissionGuardianListRules.AtMostOneFatherAndMother)
             .WithMessage("An application can list only one father and one mother.");
+        this.ValidateAddresses(x => x.Addresses);
     }
 }

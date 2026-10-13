@@ -24,6 +24,8 @@ public class AdmissionRepository : IAdmissionRepository
             .Include(a => a.AllottedClassSection)
             .Include(a => a.Student)
             .Include(a => a.Guardians)
+            .Include(a => a.Addresses).ThenInclude(x => x.Country)
+            .Include(a => a.Addresses).ThenInclude(x => x.Region)
             .AsSplitQuery();
 
     public Task<List<Admission>> GetAllAsync(CancellationToken cancellationToken) =>

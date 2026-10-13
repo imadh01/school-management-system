@@ -44,6 +44,10 @@ public class Parent : IHasRowVersion
     public string? State { get; set; }
     public string? Pincode { get; set; }
 
+    /// <summary>G1a: the addresses. AddressLine/City/State/Pincode above are the old single address,
+    /// kept read-only until G1c drops them; nothing writes them any more.</summary>
+    public ICollection<Address> Addresses { get; set; } = new List<Address>();
+
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 

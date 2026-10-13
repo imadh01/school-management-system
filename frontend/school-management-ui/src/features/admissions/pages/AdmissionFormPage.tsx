@@ -18,11 +18,19 @@ import {
   TextField,
 } from "@/components/form/Inputs";
 import { AddRowButton, RepeatRow } from "@/components/form/RepeatRow";
+import { AddressListEditor } from "@/components/form/AddressListEditor";
 import { EmptyState } from "@/components/EmptyState";
 import { Notice } from "@/components/Notice";
 import { PageLoadError, PageLoading } from "@/components/PageState";
 import { useAsyncData } from "@/hooks/useAsyncData";
+import { useCountries } from "@/hooks/useCountries";
 import { useRecordForm } from "@/hooks/useRecordForm";
+import type { AddressFormRow } from "@/types/address";
+import {
+  toAddressRequests,
+  toAddressRows,
+  validateAddresses,
+} from "@/utils/address";
 import { GENDERS, GUARDIAN_RELATIONS } from "@/types/lookups";
 import {
   blankToNull,
@@ -49,13 +57,18 @@ const SECTIONS: readonly FormSectionDef[] = [
   {
     id: "contact",
     title: "Contact & address",
-    fields: ["phone", "email", "addressLine", "city", "state", "pincode"],
+    fields: ["phone", "email", "addresses"],
   },
   { id: "remarks", title: "Remarks", fields: ["remarks"] },
   { id: "documents", title: "Documents", fields: [] },
 ];
 
-const EMPTY_FORM: CreateAdmissionRequest = {
+/** The form holds addresses as editable rows; everything else is the request itself. */
+type FormState = Omit<CreateAdmissionRequest, "addresses"> & {
+  addresses: AddressFormRow[];
+};
+
+const EMPTY_FORM: FormState = {
   firstName: "",
   middleName: null,
   lastName: "",
@@ -66,15 +79,12 @@ const EMPTY_FORM: CreateAdmissionRequest = {
   previousSchool: null,
   phone: "",
   email: null,
-  addressLine: null,
-  city: null,
-  state: null,
-  pincode: null,
+  addresses: [],
   remarks: null,
   guardians: [],
 };
 
-function formFrom(a: AdmissionResponse): CreateAdmissionRequest {
+function formFrom(a: AdmissionResponse): FormState {
   return {
     firstName: a.firstName,
     middleName: a.middleName,
@@ -86,10 +96,7 @@ function formFrom(a: AdmissionResponse): CreateAdmissionRequest {
     previousSchool: a.previousSchool,
     phone: a.phone,
     email: a.email,
-    addressLine: a.addressLine,
-    city: a.city,
-    state: a.state,
-    pincode: a.pincode,
+    addresses: toAddressRows(a.addresses),
     remarks: a.remarks,
     guardians: a.guardians.map((g) => ({
       relationType: g.relationType,
@@ -168,7 +175,8 @@ export function AdmissionFormPage() {
     [isNew, admissionId],
     "Could not load this application.",
   );
-  const record = useRecordForm<CreateAdmissionRequest>({
+  const countries = useCountries();
+  const record = useRecordForm<FormState>({
     sections: SECTIONS,
     initial: EMPTY_FORM,
     noun: "application",
@@ -256,7 +264,7 @@ export function AdmissionFormPage() {
             `Only one ${g.relationType.toLowerCase()} can be added.`;
       }
     });
-    return e;
+    return { ...e, ...validateAddresses(form.addresses, countries.data ?? []) };
   };
 
   const handleSave = () => {
@@ -271,6 +279,7 @@ export function AdmissionFormPage() {
       firstName: form.firstName.trim(),
       lastName: form.lastName.trim(),
       phone: form.phone.trim(),
+      addresses: toAddressRequests(form.addresses),
       guardians: sent.map(({ g }, i) => ({
         relationType: g.relationType,
         name: g.name.trim(),
@@ -461,13 +470,20 @@ export function AdmissionFormPage() {
         </FormSection>
 
         {/* 4. Contact & address */}
-        <FormSection id="contact" title="Contact & address">
-          <TextField {...bind("phone")} label="Phone" type="tel" required />
-          <TextField {...bind("email")} label="Email" type="email" />
-          <TextField {...bind("addressLine")} label="Address" span={2} />
-          <TextField {...bind("city")} label="City" />
-          <TextField {...bind("state")} label="State" />
-          <TextField {...bind("pincode")} label="Pincode" />
+        <FormSection id="contact" title="Contact & address" grid={false}>
+          <div className="form-grid" style={{ marginBottom: 18 }}>
+            <TextField {...bind("phone")} label="Phone" type="tel" required />
+            <TextField {...bind("email")} label="Email" type="email" />
+          </div>
+          <AddressListEditor
+            idPrefix="admission"
+            rows={form.addresses}
+            onChange={(addresses) => record.patch({ addresses })}
+            countries={countries.data ?? []}
+            countriesLoading={countries.isLoading}
+            errors={errors}
+            legacyAddress={admission?.legacyAddress}
+          />
         </FormSection>
 
         {/* 5. Remarks */}

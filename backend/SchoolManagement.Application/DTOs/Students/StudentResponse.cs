@@ -1,4 +1,5 @@
-﻿using SchoolManagement.Application.DTOs.Parents;
+﻿using SchoolManagement.Application.DTOs.Addresses;
+using SchoolManagement.Application.DTOs.Parents;
 
 namespace SchoolManagement.Application.DTOs.Students;
 
@@ -10,7 +11,8 @@ public record StudentResponse(
     int Id, string AdmNo, string RollNumber, int ClassSectionId, string ClassSectionName,
     DateOnly AdmissionDate, string Status, string? PhotoUrl,
     string FirstName, string? MiddleName, string LastName, string Gender, DateOnly DateOfBirth,
-    string? Mobile, string? Email, string? AddressLine, string? City, string? State, string? Pincode,
+    string? Mobile, string? Email,
+    List<AddressResponse> Addresses, string? LegacyAddress,
     string Category, string? Religion, string? PreviousSchool,
     bool TransportRequired, string? TransportRoute,
     string? Nationality, string? SecondNationality, string? CountryOfBirth, string? PreferredName,

@@ -8,6 +8,7 @@ public class CreateParentRequestValidator : AbstractValidator<CreateParentReques
     public CreateParentRequestValidator()
     {
         RuleFor(x => x.Name).NotEmpty().MaximumLength(100);
+        this.ValidateAddresses(x => x.Addresses);
         RuleFor(x => x.Mobile).NotEmpty().MaximumLength(20);
         RuleFor(x => x.Email).EmailAddress().When(x => !string.IsNullOrEmpty(x.Email));
     }

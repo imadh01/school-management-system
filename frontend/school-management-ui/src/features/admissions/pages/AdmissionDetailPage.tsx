@@ -25,6 +25,7 @@ import { ConfirmAdmissionModal } from "../components/ConfirmAdmissionModal";
 import { RejectAdmissionModal } from "../components/RejectAdmissionModal";
 import { EnrollModal } from "../components/EnrollModal";
 import { DetailHeader } from "@/components/detail/DetailHeader";
+import { AddressList } from "@/components/detail/AddressList";
 import { DetailCard } from "@/components/detail/DetailCard";
 import { ContactCard, ContactList } from "@/components/detail/ContactCard";
 import { DeleteButton, EditButton } from "@/components/detail/HeaderButtons";
@@ -39,7 +40,7 @@ import { useCan } from "@/hooks/useCan";
 import { useConfirmAction } from "@/hooks/useConfirmAction";
 import { useTabParam } from "@/hooks/useTabParam";
 import { PAGE_PERMISSIONS, Permission } from "@/routes/permissions";
-import { formatDate, joinParts } from "@/utils/format";
+import { formatDate } from "@/utils/format";
 
 /** Registered → Admitted → Enrolled, or Rejected at any point before enrolment. */
 function StatusSteps({ status }: { status: AdmissionStatus }) {
@@ -306,7 +307,7 @@ export function AdmissionDetailPage() {
                 ]}
               />
             </DetailCard>
-            <DetailCard title="Contact & address">
+            <DetailCard title="Contact">
               <KeyValueGrid
                 items={[
                   {
@@ -319,17 +320,13 @@ export function AdmissionDetailPage() {
                       <a href={`mailto:${a.email}`}>{a.email}</a>
                     ),
                   },
-                  {
-                    label: "Address",
-                    value: joinParts([
-                      a.addressLine,
-                      a.city,
-                      a.state,
-                      a.pincode,
-                    ]),
-                    wide: true,
-                  },
                 ]}
+              />
+            </DetailCard>
+            <DetailCard title="Addresses">
+              <AddressList
+                addresses={a.addresses}
+                legacyAddress={a.legacyAddress}
               />
             </DetailCard>
             <DetailCard title="Admission">

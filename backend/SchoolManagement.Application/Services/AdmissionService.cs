@@ -13,6 +13,7 @@ public class AdmissionService : IAdmissionService
     private readonly IParentRepository _parentRepository;
     private readonly IStudentGuardianRepository _studentGuardianRepository;
     private readonly IConcurrencyGuard _concurrency;
+    private readonly IAddressService _addressService;
 
     public AdmissionService(
         IAdmissionRepository admissionRepository,
@@ -20,7 +21,8 @@ public class AdmissionService : IAdmissionService
         IStudentRepository studentRepository,
         IParentRepository parentRepository,
         IStudentGuardianRepository studentGuardianRepository,
-        IConcurrencyGuard concurrency)
+        IConcurrencyGuard concurrency,
+        IAddressService addressService)
     {
         _admissionRepository = admissionRepository;
         _classSectionRepository = classSectionRepository;
@@ -28,6 +30,7 @@ public class AdmissionService : IAdmissionService
         _parentRepository = parentRepository;
         _studentGuardianRepository = studentGuardianRepository;
         _concurrency = concurrency;
+        _addressService = addressService;
     }
 
     public async Task<List<AdmissionResponse>> GetAllAsync(CancellationToken cancellationToken)
@@ -46,8 +49,9 @@ public class AdmissionService : IAdmissionService
     {
         var classSection = await GetClassSectionOrThrowAsync(request.AppliedForClassSectionId, cancellationToken);
         ClassSectionRules.EnsureActive(classSection);
+        var addresses = await _addressService.BuildAsync(request.Addresses ?? new(), cancellationToken);
 
-        // One transaction: the application, its guardians and the RegNo update succeed or fail together.
+        // One transaction: the application, its guardians, addresses and the RegNo update succeed or fail together.
         return await _admissionRepository.ExecuteInTransactionAsync(async () =>
         {
             var admission = new Admission
@@ -65,11 +69,8 @@ public class AdmissionService : IAdmissionService
                 Email = request.Email,
                 RegistrationDate = DateOnly.FromDateTime(DateTime.UtcNow),
                 Status = "Registered",
-                AddressLine = request.AddressLine,
-                City = request.City,
-                State = request.State,
-                Pincode = request.Pincode,
                 Remarks = request.Remarks,
+                Addresses = addresses,
                 RegNo = "PENDING", // placeholder until Id is assigned — see below
                 Guardians = MapGuardians(request.Guardians),
             };
@@ -99,6 +100,11 @@ public class AdmissionService : IAdmissionService
         if (admission.AppliedForClassSectionId != classSection.Id)
             ClassSectionRules.EnsureActive(classSection);
 
+        // null = addresses not sent: keep the stored ones.
+        var addresses = request.Addresses is null
+            ? null
+            : await _addressService.BuildAsync(request.Addresses, cancellationToken);
+
         return await _admissionRepository.ExecuteInTransactionAsync(async () =>
         {
             // Guardians are replaced as a set. (Only Registered/Admitted applications get here; once
@@ -111,6 +117,9 @@ public class AdmissionService : IAdmissionService
             }
             foreach (var guardian in MapGuardians(request.Guardians))
                 admission.Guardians.Add(guardian);
+
+            if (addresses is not null)
+                await _addressService.ReplaceAsync(admission.Addresses, addresses, cancellationToken);
 
             // Only registration-stage fields — Status and later-stage data
             // (fee, roll number, etc.) are never touched here, per the
@@ -126,10 +135,6 @@ public class AdmissionService : IAdmissionService
             admission.PreviousSchool = request.PreviousSchool;
             admission.Phone = request.Phone;
             admission.Email = request.Email;
-            admission.AddressLine = request.AddressLine;
-            admission.City = request.City;
-            admission.State = request.State;
-            admission.Pincode = request.Pincode;
             admission.Remarks = request.Remarks;
 
             await _admissionRepository.SaveChangesAsync(cancellationToken);
@@ -263,10 +268,8 @@ public class AdmissionService : IAdmissionService
                 LastName = admission.LastName,
                 Gender = admission.Gender,
                 DateOfBirth = admission.DateOfBirth,
-                AddressLine = admission.AddressLine,
-                City = admission.City,
-                State = admission.State,
-                Pincode = admission.Pincode,
+                // G1a: the student gets copies; the application keeps the addresses it was submitted with.
+                Addresses = AddressMapping.CopyOf(admission.Addresses),
                 Religion = admission.Religion,
                 Category = string.IsNullOrWhiteSpace(admission.Category) ? "General" : admission.Category,
                 AdmissionType = admission.AdmissionType,
@@ -476,7 +479,8 @@ public class AdmissionService : IAdmissionService
         a.AppliedForClassSectionId, a.AppliedForClassSection.DisplayName,
         a.AdmissionType, a.PreviousSchool, a.Phone, a.Email, a.RegistrationDate,
         a.Status, a.RejectionReason,
-        a.AddressLine, a.City, a.State, a.Pincode,
+        AddressMapping.ToResponses(a.Addresses),
+        AddressMapping.LegacyText(a.Addresses, a.AddressLine, a.City, a.State, a.Pincode),
         a.AdmissionFee, a.AdmissionFeeReference, a.BloodGroup, a.Religion, a.Category,
         a.MedicalNotes, a.Remarks,
         a.RollNumber, a.AdmissionNumber, a.AdmissionDate, a.EntryPoint, a.TransportRequired,

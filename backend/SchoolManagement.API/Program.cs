@@ -117,6 +117,8 @@ builder.Services.AddScoped<IValidator<UpdateStudentRequest>, UpdateStudentReques
 builder.Services.AddScoped<IValidator<UpdateStudentIdentityRequest>, UpdateStudentIdentityRequestValidator>();
 
 builder.Services.AddScoped<IParentRepository, ParentRepository>();
+builder.Services.AddScoped<IAddressRepository, AddressRepository>();
+builder.Services.AddScoped<IAddressService, AddressService>();
 builder.Services.AddScoped<IStudentGuardianRepository, StudentGuardianRepository>();
 builder.Services.AddScoped<IParentService, ParentService>();
 builder.Services.AddScoped<IStudentGuardianService, StudentGuardianService>();

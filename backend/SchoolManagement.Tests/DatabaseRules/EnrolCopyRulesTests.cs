@@ -22,10 +22,7 @@ public class ColumnWidthTests
         { typeof(Admission), "MiddleName",      typeof(Student), "MiddleName" },
         { typeof(Admission), "LastName",        typeof(Student), "LastName" },
         { typeof(Admission), "Gender",          typeof(Student), "Gender" },
-        { typeof(Admission), "AddressLine",     typeof(Student), "AddressLine" },
-        { typeof(Admission), "City",            typeof(Student), "City" },
-        { typeof(Admission), "State",           typeof(Student), "State" },
-        { typeof(Admission), "Pincode",         typeof(Student), "Pincode" },
+        // G1a: addresses are copied as whole Address rows (same table), so no width can differ.
         { typeof(Admission), "Religion",        typeof(Student), "Religion" },
         { typeof(Admission), "Category",        typeof(Student), "Category" },
         { typeof(Admission), "PreviousSchool",  typeof(Student), "PreviousSchool" },

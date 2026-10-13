@@ -26,9 +26,3 @@ export function ageOn(iso: string, today = new Date()): number | null {
   if (beforeBirthday) age -= 1;
   return age;
 }
-
-/** Non-empty parts joined with ", " (an address), or null when all are empty. */
-export function joinParts(parts: (string | null | undefined)[]): string | null {
-  const text = parts.filter((p) => p && p.trim()).join(", ");
-  return text || null;
-}

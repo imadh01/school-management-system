@@ -15,6 +15,7 @@ import {
   type StudentResponse,
 } from "../types/student.types";
 import { DetailHeader } from "@/components/detail/DetailHeader";
+import { AddressList } from "@/components/detail/AddressList";
 import { DetailCard } from "@/components/detail/DetailCard";
 import { DeleteButton, EditButton } from "@/components/detail/HeaderButtons";
 import { ContactCard, ContactList } from "@/components/detail/ContactCard";
@@ -28,7 +29,7 @@ import { useCan } from "@/hooks/useCan";
 import { useConfirmAction } from "@/hooks/useConfirmAction";
 import { useTabParam } from "@/hooks/useTabParam";
 import { Permission } from "@/routes/permissions";
-import { ageOn, formatDate, joinParts } from "@/utils/format";
+import { ageOn, formatDate } from "@/utils/format";
 
 /**
  * U2: one student on a page of its own (/students/:id). Tabs: Overview, Parents / guardians,
@@ -225,34 +226,32 @@ export function StudentDetailPage() {
             </DetailCard>
 
             {full && (
-              <DetailCard title="Contact & address">
-                <KeyValueGrid
-                  items={[
-                    {
-                      label: "Mobile",
-                      value: full.mobile && (
-                        <a href={`tel:${full.mobile}`}>{full.mobile}</a>
-                      ),
-                    },
-                    {
-                      label: "Email",
-                      value: full.email && (
-                        <a href={`mailto:${full.email}`}>{full.email}</a>
-                      ),
-                    },
-                    {
-                      label: "Address",
-                      value: joinParts([
-                        full.addressLine,
-                        full.city,
-                        full.state,
-                        full.pincode,
-                      ]),
-                      wide: true,
-                    },
-                  ]}
-                />
-              </DetailCard>
+              <>
+                <DetailCard title="Contact">
+                  <KeyValueGrid
+                    items={[
+                      {
+                        label: "Mobile",
+                        value: full.mobile && (
+                          <a href={`tel:${full.mobile}`}>{full.mobile}</a>
+                        ),
+                      },
+                      {
+                        label: "Email",
+                        value: full.email && (
+                          <a href={`mailto:${full.email}`}>{full.email}</a>
+                        ),
+                      },
+                    ]}
+                  />
+                </DetailCard>
+                <DetailCard title="Addresses">
+                  <AddressList
+                    addresses={full.addresses}
+                    legacyAddress={full.legacyAddress}
+                  />
+                </DetailCard>
+              </>
             )}
 
             {full && (

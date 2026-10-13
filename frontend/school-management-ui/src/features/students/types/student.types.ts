@@ -1,3 +1,4 @@
+import type { AddressRequest, AddressResponse } from "@/types/address";
 import type { StudentGuardianResponse } from "@/features/parents/types/parent.types";
 
 // BUSINESS DECISION REQUIRED: the API currently accepts only these three
@@ -91,10 +92,10 @@ export interface StudentResponse {
   dateOfBirth: string;
   mobile: string | null;
   email: string | null;
-  addressLine: string | null;
-  city: string | null;
-  state: string | null;
-  pincode: string | null;
+  /** G1a: Home / Permanent / Mailing, primary first. */
+  addresses: AddressResponse[];
+  /** The old one-line address, only when it could not be copied into addresses (until G1c). */
+  legacyAddress: string | null;
   category: string;
   religion: string | null;
   previousSchool: string | null;
@@ -139,10 +140,8 @@ export interface CreateStudentRequest {
   dateOfBirth: string;
   mobile: string | null;
   email: string | null;
-  addressLine: string | null;
-  city: string | null;
-  state: string | null;
-  pincode: string | null;
+  /** G1a: replaces the stored addresses; null keeps them. */
+  addresses: AddressRequest[] | null;
   category: string;
   religion: string | null;
   previousSchool: string | null;

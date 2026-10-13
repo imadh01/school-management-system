@@ -15,14 +15,25 @@ import {
   TextField,
   ToggleGroup,
 } from "@/components/form/Inputs";
+import { AddressListEditor } from "@/components/form/AddressListEditor";
 import { EmptyState } from "@/components/EmptyState";
 import { PageLoadError, PageLoading } from "@/components/PageState";
 import { useAsyncData } from "@/hooks/useAsyncData";
+import { useCountries } from "@/hooks/useCountries";
 import { useRecordForm } from "@/hooks/useRecordForm";
+import type { AddressFormRow } from "@/types/address";
+import {
+  toAddressRequests,
+  toAddressRows,
+  validateAddresses,
+} from "@/utils/address";
 import { CONTACT_METHODS, LANGUAGES } from "@/types/lookups";
 import { blankToNull, fieldBinder, type FormSectionDef } from "@/utils/form";
 
-type FormState = CreateParentRequest & { status: "Active" | "Inactive" };
+type FormState = Omit<CreateParentRequest, "addresses"> & {
+  status: "Active" | "Inactive";
+  addresses: AddressFormRow[];
+};
 type NotifyKey =
   | "notifyAttendance"
   | "notifyExams"
@@ -66,8 +77,8 @@ const SECTIONS: readonly FormSectionDef[] = [
   },
   {
     id: "address",
-    title: "Address",
-    fields: ["addressLine", "city", "state", "pincode"],
+    title: "Addresses",
+    fields: ["addresses"],
   },
 ];
 
@@ -103,16 +114,19 @@ const EMPTY_FORM: FormState = {
   workEmail: null,
   workPhone: null,
   billingContact: false,
-  addressLine: null,
-  city: null,
-  state: null,
-  pincode: null,
+  addresses: [],
 };
 
 function formFrom(p: ParentResponse): FormState {
   // Every editable field of the response, without id and rowVersion.
-  const { id: _id, rowVersion: _rowVersion, ...fields } = p;
-  return fields;
+  const {
+    id: _id,
+    rowVersion: _rowVersion,
+    addresses,
+    legacyAddress: _legacyAddress,
+    ...fields
+  } = p;
+  return { ...fields, addresses: toAddressRows(addresses) };
 }
 
 /**
@@ -130,6 +144,7 @@ export function ParentFormPage() {
     [isNew, parentId],
     "Could not load this parent.",
   );
+  const countries = useCountries();
   const record = useRecordForm<FormState>({
     sections: SECTIONS,
     initial: EMPTY_FORM,
@@ -179,7 +194,7 @@ export function ParentFormPage() {
     const e: Record<string, string> = {};
     if (!form.name.trim()) e.name = "Full name is required.";
     if (!form.mobile.trim()) e.mobile = "Mobile is required.";
-    return e;
+    return { ...e, ...validateAddresses(form.addresses, countries.data ?? []) };
   };
 
   const handleSave = () => {
@@ -187,6 +202,7 @@ export function ParentFormPage() {
       ...blankToNull(form),
       name: form.name.trim(),
       mobile: form.mobile.trim(),
+      addresses: toAddressRequests(form.addresses),
     };
     void record.save({
       validate,
@@ -320,11 +336,21 @@ export function ParentFormPage() {
           </div>
         </FormSection>
 
-        <FormSection id="address" title="Address">
-          <TextField {...bind("addressLine")} label="Street address" span={2} />
-          <TextField {...bind("city")} label="City" />
-          <TextField {...bind("state")} label="State" />
-          <TextField {...bind("pincode")} label="PIN / ZIP code" />
+        <FormSection
+          id="address"
+          title="Addresses"
+          grid={false}
+          description="Home, Permanent and Mailing: one of each, one of them primary."
+        >
+          <AddressListEditor
+            idPrefix="parent"
+            rows={form.addresses}
+            onChange={(addresses) => record.patch({ addresses })}
+            countries={countries.data ?? []}
+            countriesLoading={countries.isLoading}
+            errors={record.fieldErrors}
+            legacyAddress={parent?.legacyAddress}
+          />
         </FormSection>
       </FormPage>
     </>

@@ -1,4 +1,6 @@
-﻿namespace SchoolManagement.Application.DTOs.Students;
+﻿using SchoolManagement.Application.DTOs.Addresses;
+
+namespace SchoolManagement.Application.DTOs.Students;
 
 /// <summary>
 /// Direct creation (without an admission). Guardians are linked afterwards with
@@ -7,7 +9,7 @@
 public record CreateStudentRequest(
     string AdmNo, string RollNumber, int ClassSectionId, DateOnly AdmissionDate, string? PhotoUrl,
     string FirstName, string? MiddleName, string LastName, string Gender, DateOnly DateOfBirth,
-    string? Mobile, string? Email, string? AddressLine, string? City, string? State, string? Pincode,
+    string? Mobile, string? Email,
     string Category, string? Religion, string? PreviousSchool,
     bool TransportRequired, string? TransportRoute,
     string? Nationality, string? SecondNationality, string? CountryOfBirth, string? PreferredName,
@@ -15,4 +17,5 @@ public record CreateStudentRequest(
     string? CustodyArrangement, bool MediaConsent,
     string? House, string? EalCode, decimal? FeeConcessionPercent,
     StudentHealthDto? Health,
-    List<PickupPersonRequest>? PickupPersons);
+    List<PickupPersonRequest>? PickupPersons,
+    List<AddressRequest>? Addresses);

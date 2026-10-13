@@ -1,4 +1,6 @@
-﻿namespace SchoolManagement.Application.DTOs.Parents;
+﻿using SchoolManagement.Application.DTOs.Addresses;
+
+namespace SchoolManagement.Application.DTOs.Parents;
 
 public record UpdateParentRequest(
     string Name, string? Email, string Mobile, string Status,
@@ -6,5 +8,5 @@ public record UpdateParentRequest(
     string? PreferredLanguage, string? PreferredContactMethod, string? Whatsapp, bool EmergencyOnly,
     bool NotifyAttendance, bool NotifyExams, bool NotifyFees, bool NotifyNotices, bool NotifyDiscipline,
     string? Employer, string? JobTitle, string? WorkEmail, string? WorkPhone, bool BillingContact,
-    string? AddressLine, string? City, string? State, string? Pincode,
+    List<AddressRequest>? Addresses,
     string RowVersion);

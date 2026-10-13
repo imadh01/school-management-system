@@ -36,6 +36,9 @@ public class ApplicationDbContext : DbContext
     public DbSet<AttendanceRecord> AttendanceRecords => Set<AttendanceRecord>();
     public DbSet<StudentEnrollment> StudentEnrollments => Set<StudentEnrollment>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<Address> Addresses => Set<Address>();
+    public DbSet<Country> Countries => Set<Country>();
+    public DbSet<CountryRegion> CountryRegions => Set<CountryRegion>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)

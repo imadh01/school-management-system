@@ -9,6 +9,7 @@ import {
 } from "../types/parent.types";
 import { LinkChildDialog } from "../components/LinkChildDialog";
 import { DetailHeader } from "@/components/detail/DetailHeader";
+import { AddressList } from "@/components/detail/AddressList";
 import { DetailCard } from "@/components/detail/DetailCard";
 import { ContactCard, ContactList } from "@/components/detail/ContactCard";
 import { DeleteButton, EditButton } from "@/components/detail/HeaderButtons";
@@ -23,7 +24,6 @@ import { useCan } from "@/hooks/useCan";
 import { useConfirmAction } from "@/hooks/useConfirmAction";
 import { useTabParam } from "@/hooks/useTabParam";
 import { PAGE_PERMISSIONS, Permission } from "@/routes/permissions";
-import { joinParts } from "@/utils/format";
 
 const TAB_IDS = ["overview", "children"] as const;
 const yesNo = (value: boolean) => (value ? "Yes" : "No");
@@ -252,20 +252,10 @@ export function ParentDetailPage() {
                     ]}
                   />
                 </DetailCard>
-                <DetailCard title="Address">
-                  <KeyValueGrid
-                    items={[
-                      {
-                        label: "Address",
-                        value: joinParts([
-                          full.addressLine,
-                          full.city,
-                          full.state,
-                          full.pincode,
-                        ]),
-                        wide: true,
-                      },
-                    ]}
+                <DetailCard title="Addresses">
+                  <AddressList
+                    addresses={full.addresses}
+                    legacyAddress={full.legacyAddress}
                   />
                 </DetailCard>
               </>

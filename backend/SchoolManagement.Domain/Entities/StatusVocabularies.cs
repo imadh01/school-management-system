@@ -15,6 +15,18 @@ public static class AdmissionTypes
     public static bool IsValid(string? value) => value is not null && All.Contains(value);
 }
 
+/// <summary>G1a: the kinds of address a person can have, at most one of each.</summary>
+public static class AddressTypes
+{
+    public const string Home = "Home";
+    public const string Permanent = "Permanent";
+    public const string Mailing = "Mailing";
+
+    public static readonly string[] All = { Home, Permanent, Mailing };
+
+    public static bool IsValid(string? value) => value is not null && All.Contains(value);
+}
+
 /// <summary>Admission pipeline: Registered -> Admitted -> Enrolled, or Rejected.</summary>
 public static class AdmissionStatuses
 {

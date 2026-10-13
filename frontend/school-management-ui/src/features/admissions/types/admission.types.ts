@@ -1,3 +1,4 @@
+import type { AddressRequest, AddressResponse } from "@/types/address";
 import type { BadgeTone } from "@/components/Badge";
 
 export type AdmissionStatus =
@@ -44,10 +45,10 @@ export interface AdmissionResponse {
   registrationDate: string;
   status: AdmissionStatus;
   rejectionReason: string | null;
-  addressLine: string | null;
-  city: string | null;
-  state: string | null;
-  pincode: string | null;
+  /** G1a: Home / Permanent / Mailing, primary first. */
+  addresses: AddressResponse[];
+  /** The old one-line address, only when it could not be copied into addresses (until G1c). */
+  legacyAddress: string | null;
   admissionFee: number | null;
   admissionFeeReference: string | null;
   bloodGroup: string | null;
@@ -79,10 +80,8 @@ export interface CreateAdmissionRequest {
   previousSchool: string | null;
   phone: string;
   email: string | null;
-  addressLine: string | null;
-  city: string | null;
-  state: string | null;
-  pincode: string | null;
+  /** G1a: replaces the stored addresses; null keeps them. */
+  addresses: AddressRequest[] | null;
   remarks: string | null;
   guardians: AdmissionGuardianRequest[];
 }

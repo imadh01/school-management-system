@@ -55,7 +55,8 @@ Routes for a module are one call in `routes/AppRoutes.tsx`:
 
 ## Shared helpers
 
-- `utils/format.ts` — `formatDate`, `ageOn`, `joinParts` (dates from the API are calendar dates, never shifted by time zone).
+- `utils/format.ts` — `formatDate`, `ageOn` (dates from the API are calendar dates, never shifted by time zone).
+- `utils/address.ts` + `components/form/AddressListEditor` + `components/detail/AddressList` + `hooks/useCountries` (G1a) — the address block of every person form and page: Home / Permanent / Mailing, one primary, country → state/emirate list and postcode rule from `GET /api/countries`. To add addresses to a new kind of person: keep `AddressFormRow[]` in the form state, convert with `toAddressRows` / `toAddressRequests`, check with `validateAddresses`.
 - `utils/collections.ts` — `uniqueSorted` (filter drop-downs), `countBy` (status counts).
 - `utils/csv.ts` — `downloadCsv(filename, headers, rows)`.
 - `utils/form.ts` — `fieldBinder`, `blankToNull`, `numberOrNull`, `remapRowErrors`, `FormSectionDef`.

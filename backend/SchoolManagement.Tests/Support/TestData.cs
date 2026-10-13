@@ -58,14 +58,14 @@ public static class TestData
         new(RollNumber: rollNumber, ClassSectionId: targetClassSectionId, Status: "Active", PhotoUrl: null,
             FirstName: student.FirstName, MiddleName: null, LastName: student.LastName,
             Gender: student.Gender, DateOfBirth: student.DateOfBirth,
-            Mobile: null, Email: null, AddressLine: null, City: null, State: null, Pincode: null,
+            Mobile: null, Email: null,
             Category: "General", Religion: null, PreviousSchool: null,
             TransportRequired: false, TransportRoute: null,
             Nationality: null, SecondNationality: null, CountryOfBirth: null, PreferredName: null,
             MotherTongue: null, HomeLanguage: null, EnglishProficiency: null, CurriculumTrack: null,
             AdmissionType: "New", CustodyArrangement: null, MediaConsent: false,
             House: null, EalCode: null, FeeConcessionPercent: null,
-            Health: null, PickupPersons: null,
+            Health: null, PickupPersons: null, Addresses: null,
             RowVersion: rowVersion ?? Convert.ToBase64String(student.RowVersion));
 
     /// <summary>A student with one enrollment row, written straight to the database (no service rules).</summary>

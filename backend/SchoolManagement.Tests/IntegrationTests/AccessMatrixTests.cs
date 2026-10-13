@@ -57,6 +57,9 @@ public class AccessMatrixTests
     {
         // Auth
         new("GET",    "/api/auth/me", SignedIn),
+
+        // Countries for address forms (G1a): reference data, any signed-in user
+        new("GET",    "/api/countries", SignedIn),
         new("POST",   "/api/auth/change-password", SignedIn, HasBody: true),
         new("POST",   $"/api/auth/unlock/{Missing}", P(Permissions.UsersChangeStatus)),
 

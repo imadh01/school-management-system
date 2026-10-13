@@ -1,4 +1,6 @@
-﻿namespace SchoolManagement.Application.DTOs.Admissions;
+﻿using SchoolManagement.Application.DTOs.Addresses;
+
+namespace SchoolManagement.Application.DTOs.Admissions;
 
 public record AdmissionResponse(
     int Id, string RegNo,
@@ -9,7 +11,7 @@ public record AdmissionResponse(
     string AdmissionType, string? PreviousSchool,
     string Phone, string? Email, DateOnly RegistrationDate,
     string Status, string? RejectionReason,
-    string? AddressLine, string? City, string? State, string? Pincode,
+    List<AddressResponse> Addresses, string? LegacyAddress,
     decimal? AdmissionFee, string? AdmissionFeeReference,
     string? BloodGroup, string? Religion, string? Category,
     string? MedicalNotes, string? Remarks,

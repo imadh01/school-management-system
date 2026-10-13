@@ -10,6 +10,7 @@ public class UpdateParentRequestValidator : AbstractValidator<UpdateParentReques
     {
         RuleFor(x => x.RowVersion).Must(RowVersionRules.IsValid).WithMessage(RowVersionRules.Message);
         RuleFor(x => x.Name).NotEmpty().MaximumLength(100);
+        this.ValidateAddresses(x => x.Addresses);
         RuleFor(x => x.Mobile).NotEmpty().MaximumLength(20);
         RuleFor(x => x.Email).EmailAddress().When(x => !string.IsNullOrEmpty(x.Email));
         RuleFor(x => x.Status).Must(ActiveStatuses.IsValid)

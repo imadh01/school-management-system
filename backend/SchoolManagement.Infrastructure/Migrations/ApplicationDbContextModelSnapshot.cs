@@ -91,6 +91,119 @@ namespace SchoolManagement.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("SchoolManagement.Domain.Entities.Address", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("AddressType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<int?>("AdmissionId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("City")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.Property<int>("CountryId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("SYSUTCDATETIME()");
+
+                    b.Property<int?>("CreatedBy")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsPrimary")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<string>("Line1")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("Line2")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int?>("ParentId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("PostalCode")
+                        .HasMaxLength(12)
+                        .HasColumnType("nvarchar(12)");
+
+                    b.Property<int?>("RegionId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("StudentId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("SYSUTCDATETIME()");
+
+                    b.Property<int?>("UpdatedBy")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AdmissionId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Addresses_Admission_Primary")
+                        .HasFilter("[AdmissionId] IS NOT NULL AND [IsPrimary] = 1");
+
+                    b.HasIndex("ParentId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Addresses_Parent_Primary")
+                        .HasFilter("[ParentId] IS NOT NULL AND [IsPrimary] = 1");
+
+                    b.HasIndex("StudentId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Addresses_Student_Primary")
+                        .HasFilter("[StudentId] IS NOT NULL AND [IsPrimary] = 1");
+
+                    b.HasIndex("AdmissionId", "AddressType")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Addresses_Admission_Type")
+                        .HasFilter("[AdmissionId] IS NOT NULL");
+
+                    b.HasIndex("CountryId", "RegionId");
+
+                    b.HasIndex("ParentId", "AddressType")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Addresses_Parent_Type")
+                        .HasFilter("[ParentId] IS NOT NULL");
+
+                    b.HasIndex("StudentId", "AddressType")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Addresses_Student_Type")
+                        .HasFilter("[StudentId] IS NOT NULL");
+
+                    b.ToTable("Addresses", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Addresses_AddressType", "[AddressType] IN ('Home','Permanent','Mailing')");
+
+                            t.HasCheckConstraint("CK_Addresses_CityNotBlank", "LEN(LTRIM(RTRIM([City]))) > 0");
+
+                            t.HasCheckConstraint("CK_Addresses_ExactlyOneOwner", "(CASE WHEN [StudentId] IS NULL THEN 0 ELSE 1 END) + (CASE WHEN [ParentId] IS NULL THEN 0 ELSE 1 END) + (CASE WHEN [AdmissionId] IS NULL THEN 0 ELSE 1 END) = 1");
+
+                            t.HasCheckConstraint("CK_Addresses_Line1NotBlank", "LEN(LTRIM(RTRIM([Line1]))) > 0");
+                        });
+                });
+
             modelBuilder.Entity("SchoolManagement.Domain.Entities.Admission", b =>
                 {
                     b.Property<int>("Id")
@@ -629,6 +742,107 @@ namespace SchoolManagement.Infrastructure.Migrations
 
                             t.HasCheckConstraint("CK_ClassSections_Status", "[Status] IN ('Active','Inactive')");
                         });
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Entities.Country", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(2)
+                        .HasColumnType("nchar(2)")
+                        .IsFixedLength();
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.Property<string>("PostalCodeHint")
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.Property<string>("PostalCodePattern")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<bool>("PostalCodeRequired")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<string>("RegionLabel")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<int>("SortOrder")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Countries_Code");
+
+                    b.HasIndex("Name")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Countries_Name");
+
+                    b.ToTable("Countries", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Countries_Code", "LEN([Code]) = 2 AND [Code] = UPPER([Code])");
+                        });
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Entities.CountryRegion", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("CountryId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.Property<int>("SortOrder")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("CountryId", "Id")
+                        .HasName("AK_CountryRegions_CountryId_Id");
+
+                    b.HasIndex("CountryId", "Name")
+                        .IsUnique()
+                        .HasDatabaseName("UX_CountryRegions_Country_Name");
+
+                    b.ToTable("CountryRegions", (string)null);
                 });
 
             modelBuilder.Entity("SchoolManagement.Domain.Entities.Parent", b =>
@@ -1769,6 +1983,47 @@ namespace SchoolManagement.Infrastructure.Migrations
                     b.ToTable("UserRoles", (string)null);
                 });
 
+            modelBuilder.Entity("SchoolManagement.Domain.Entities.Address", b =>
+                {
+                    b.HasOne("SchoolManagement.Domain.Entities.Admission", "Admission")
+                        .WithMany("Addresses")
+                        .HasForeignKey("AdmissionId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.HasOne("SchoolManagement.Domain.Entities.Country", "Country")
+                        .WithMany()
+                        .HasForeignKey("CountryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SchoolManagement.Domain.Entities.Parent", "Parent")
+                        .WithMany("Addresses")
+                        .HasForeignKey("ParentId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.HasOne("SchoolManagement.Domain.Entities.Student", "Student")
+                        .WithMany("Addresses")
+                        .HasForeignKey("StudentId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.HasOne("SchoolManagement.Domain.Entities.CountryRegion", "Region")
+                        .WithMany()
+                        .HasForeignKey("CountryId", "RegionId")
+                        .HasPrincipalKey("CountryId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("FK_Addresses_CountryRegions_CountryId_RegionId");
+
+                    b.Navigation("Admission");
+
+                    b.Navigation("Country");
+
+                    b.Navigation("Parent");
+
+                    b.Navigation("Region");
+
+                    b.Navigation("Student");
+                });
+
             modelBuilder.Entity("SchoolManagement.Domain.Entities.Admission", b =>
                 {
                     b.HasOne("SchoolManagement.Domain.Entities.AcademicYear", "AcademicYear")
@@ -1865,6 +2120,17 @@ namespace SchoolManagement.Infrastructure.Migrations
                     b.Navigation("AcademicYear");
 
                     b.Navigation("ClassTeacher");
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Entities.CountryRegion", b =>
+                {
+                    b.HasOne("SchoolManagement.Domain.Entities.Country", "Country")
+                        .WithMany("Regions")
+                        .HasForeignKey("CountryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Country");
                 });
 
             modelBuilder.Entity("SchoolManagement.Domain.Entities.Parent", b =>
@@ -2087,6 +2353,8 @@ namespace SchoolManagement.Infrastructure.Migrations
 
             modelBuilder.Entity("SchoolManagement.Domain.Entities.Admission", b =>
                 {
+                    b.Navigation("Addresses");
+
                     b.Navigation("Guardians");
 
                     b.Navigation("Student");
@@ -2097,8 +2365,15 @@ namespace SchoolManagement.Infrastructure.Migrations
                     b.Navigation("Records");
                 });
 
+            modelBuilder.Entity("SchoolManagement.Domain.Entities.Country", b =>
+                {
+                    b.Navigation("Regions");
+                });
+
             modelBuilder.Entity("SchoolManagement.Domain.Entities.Parent", b =>
                 {
+                    b.Navigation("Addresses");
+
                     b.Navigation("StudentGuardians");
                 });
 
@@ -2116,6 +2391,8 @@ namespace SchoolManagement.Infrastructure.Migrations
 
             modelBuilder.Entity("SchoolManagement.Domain.Entities.Student", b =>
                 {
+                    b.Navigation("Addresses");
+
                     b.Navigation("Enrollments");
 
                     b.Navigation("Health");

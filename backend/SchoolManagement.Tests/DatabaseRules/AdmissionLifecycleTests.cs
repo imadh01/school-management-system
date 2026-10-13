@@ -209,7 +209,7 @@ public class AdmissionLifecycleTests
             AppliedForClassSectionId: section.Id,
             AdmissionType: admission.AdmissionType, PreviousSchool: null,
             Phone: admission.Phone, Email: null,
-            AddressLine: null, City: null, State: null, Pincode: null,
+            Addresses: null,
             Remarks: null,
             Guardians: new List<AdmissionGuardianRequest>
             {

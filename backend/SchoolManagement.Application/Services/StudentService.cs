@@ -13,19 +13,22 @@ public class StudentService : IStudentService
     private readonly IStudentGuardianRepository _guardianRepository;
     private readonly IConcurrencyGuard _concurrency;
     private readonly ISensitiveReadLog _sensitiveReads;
+    private readonly IAddressService _addressService;
 
     public StudentService(
         IStudentRepository studentRepository,
         IClassSectionRepository classSectionRepository,
         IStudentGuardianRepository guardianRepository,
         IConcurrencyGuard concurrency,
-        ISensitiveReadLog sensitiveReads)
+        ISensitiveReadLog sensitiveReads,
+        IAddressService addressService)
     {
         _studentRepository = studentRepository;
         _classSectionRepository = classSectionRepository;
         _guardianRepository = guardianRepository;
         _concurrency = concurrency;
         _sensitiveReads = sensitiveReads;
+        _addressService = addressService;
     }
 
     // The health block and identity numbers are sensitive: every opening of a detail leaves a "Read"
@@ -100,6 +103,7 @@ public class StudentService : IStudentService
             throw new ConflictException($"Roll number '{request.RollNumber}' is already in use in this class.");
 
         var classSection = await GetClassSectionOrThrowAsync(request.ClassSectionId, cancellationToken);
+        var addresses = await _addressService.BuildAsync(request.Addresses ?? new(), cancellationToken);
 
         // Business rules: the section must be active and not full.
         ClassSectionRules.EnsureActive(classSection);
@@ -124,15 +128,16 @@ public class StudentService : IStudentService
             // First academic-history period; saved in the same SaveChanges as the student.
             student.Enrollments.Add(StudentEnrollmentRules.StartNew(classSection, request.RollNumber, request.AdmissionDate));
             ApplyCore(student, request.PhotoUrl, request.FirstName, request.MiddleName, request.LastName, request.Gender,
-                request.DateOfBirth, request.Mobile, request.Email, request.AddressLine, request.City, request.State, request.Pincode,
+                request.DateOfBirth, request.Mobile, request.Email,
                 request.Category, request.Religion, request.PreviousSchool, request.TransportRequired, request.TransportRoute,
                 request.Nationality, request.SecondNationality, request.CountryOfBirth, request.PreferredName,
                 request.MotherTongue, request.HomeLanguage, request.EnglishProficiency, request.CurriculumTrack, request.AdmissionType,
                 request.CustodyArrangement, request.MediaConsent, request.House, request.EalCode, request.FeeConcessionPercent);
             ApplyHealth(student.Health, request.Health);
             foreach (var p in MapPickupPersons(request.PickupPersons)) student.PickupPersons.Add(p);
+            foreach (var a in addresses) student.Addresses.Add(a);
 
-            await _studentRepository.AddAsync(student, cancellationToken); // one SaveChanges = student + health + pickup persons
+            await _studentRepository.AddAsync(student, cancellationToken); // one SaveChanges = student + health + pickup persons + addresses
             student.ClassSection = classSection;
             return await ToResponseAsync(student, includeSensitive, cancellationToken);
         }, cancellationToken);
@@ -166,6 +171,11 @@ public class StudentService : IStudentService
         // A move to another class, or a returning student, takes a seat. That whole edit then runs in
         // one transaction behind a lock on the target class, so two people cannot both take the last seat.
         var takesSeat = !becomesLeft && (classChanged || needsFreshPeriod);
+
+        // null = addresses not sent: keep the stored ones. Checked before anything is written.
+        var addresses = request.Addresses is null
+            ? null
+            : await _addressService.BuildAsync(request.Addresses, cancellationToken);
 
         async Task<StudentResponse> ApplyAsync()
         {
@@ -219,7 +229,7 @@ public class StudentService : IStudentService
             }
             student.Status = request.Status;
             ApplyCore(student, request.PhotoUrl, request.FirstName, request.MiddleName, request.LastName, request.Gender,
-                request.DateOfBirth, request.Mobile, request.Email, request.AddressLine, request.City, request.State, request.Pincode,
+                request.DateOfBirth, request.Mobile, request.Email,
                 request.Category, request.Religion, request.PreviousSchool, request.TransportRequired, request.TransportRoute,
                 request.Nationality, request.SecondNationality, request.CountryOfBirth, request.PreferredName,
                 request.MotherTongue, request.HomeLanguage, request.EnglishProficiency, request.CurriculumTrack, request.AdmissionType,
@@ -241,6 +251,8 @@ public class StudentService : IStudentService
                 student.PickupPersons.Clear();
                 foreach (var p in MapPickupPersons(request.PickupPersons)) student.PickupPersons.Add(p);
             }
+            if (addresses is not null)
+                await _addressService.ReplaceAsync(student.Addresses, addresses, cancellationToken);
 
             if (closeOldAndStartNew)
             {
@@ -259,8 +271,11 @@ public class StudentService : IStudentService
             return await ToResponseAsync(student, includeSensitive, cancellationToken);
         }
 
+        // Replacing addresses may save twice, so it always runs in a transaction.
         if (!takesSeat)
-            return await ApplyAsync();
+            return addresses is null
+                ? await ApplyAsync()
+                : await _studentRepository.ExecuteInTransactionAsync(ApplyAsync, cancellationToken);
 
         return await _studentRepository.ExecuteInTransactionAsync(async () =>
         {
@@ -350,7 +365,7 @@ public class StudentService : IStudentService
     // Fields shared by create and update. Parent/guardian contact data is NOT here: it lives on Parent.
     private static void ApplyCore(
         Student s, string? photoUrl, string firstName, string? middleName, string lastName, string gender, DateOnly dob,
-        string? mobile, string? email, string? addressLine, string? city, string? state, string? pincode,
+        string? mobile, string? email,
         string category, string? religion, string? previousSchool, bool transportRequired, string? transportRoute,
         string? nationality, string? secondNationality, string? countryOfBirth, string? preferredName,
         string? motherTongue, string? homeLanguage, string? englishProficiency, string? curriculumTrack, string admissionType,
@@ -360,7 +375,6 @@ public class StudentService : IStudentService
         s.FirstName = firstName; s.MiddleName = middleName; s.LastName = lastName;
         s.Gender = gender; s.DateOfBirth = dob;
         s.Mobile = mobile; s.Email = email;
-        s.AddressLine = addressLine; s.City = city; s.State = state; s.Pincode = pincode;
         s.Category = category; s.Religion = religion; s.PreviousSchool = previousSchool;
         s.TransportRequired = transportRequired; s.TransportRoute = transportRoute;
         s.Nationality = nationality; s.SecondNationality = secondNationality;
@@ -424,7 +438,9 @@ public class StudentService : IStudentService
             s.Id, s.AdmNo, s.RollNumber, s.ClassSectionId, s.ClassSection.DisplayName,
             s.AdmissionDate, s.Status, s.PhotoUrl,
             s.FirstName, s.MiddleName, s.LastName, s.Gender, s.DateOfBirth,
-            s.Mobile, s.Email, s.AddressLine, s.City, s.State, s.Pincode,
+            s.Mobile, s.Email,
+            AddressMapping.ToResponses(s.Addresses),
+            AddressMapping.LegacyText(s.Addresses, s.AddressLine, s.City, s.State, s.Pincode),
             s.Category, s.Religion, s.PreviousSchool,
             s.TransportRequired, s.TransportRoute,
             s.Nationality, s.SecondNationality, s.CountryOfBirth, s.PreferredName,

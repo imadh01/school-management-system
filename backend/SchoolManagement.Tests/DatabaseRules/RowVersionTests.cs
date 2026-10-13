@@ -85,7 +85,7 @@ public class RowVersionTests
             null, null, null, null, null, null, null, false,
             true, true, true, true, true,
             null, null, null, null, false,
-            null, null, null, null,
+            null,
             stale);
 
         using (var scope = _factory.Services.CreateScope())

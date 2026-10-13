@@ -1,3 +1,4 @@
+import type { AddressRequest, AddressResponse } from "@/types/address";
 export interface ParentResponse {
   id: number;
   name: string;
@@ -22,10 +23,10 @@ export interface ParentResponse {
   workEmail: string | null;
   workPhone: string | null;
   billingContact: boolean;
-  addressLine: string | null;
-  city: string | null;
-  state: string | null;
-  pincode: string | null;
+  /** G1a: Home / Permanent / Mailing, primary first. */
+  addresses: AddressResponse[];
+  /** The old one-line address, only when it could not be copied into addresses (until G1c). */
+  legacyAddress: string | null;
   /** Version stamp. Send it back unchanged when saving, so a concurrent edit is detected (409). */
   rowVersion: string;
 }
@@ -66,10 +67,8 @@ export interface CreateParentRequest {
   workEmail: string | null;
   workPhone: string | null;
   billingContact: boolean;
-  addressLine: string | null;
-  city: string | null;
-  state: string | null;
-  pincode: string | null;
+  /** G1a: replaces the stored addresses; null keeps them. */
+  addresses: AddressRequest[] | null;
 }
 
 export interface UpdateParentRequest extends CreateParentRequest {
