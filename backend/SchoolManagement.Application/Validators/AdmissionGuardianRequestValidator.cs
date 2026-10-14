@@ -9,14 +9,18 @@ public class AdmissionGuardianRequestValidator : AbstractValidator<AdmissionGuar
     {
         RuleFor(x => x.RelationType).Must(r => r is "Father" or "Mother" or "Guardian")
             .WithMessage("RelationType must be 'Father', 'Mother', or 'Guardian'.");
-        RuleFor(x => x.Name).NotEmpty().MaximumLength(100);
+
+        // G2: a guardian that IS an existing parent gets name, mobile and email copied by the server, so what the
+        // form sent for those three fields is not checked (and not used).
+        RuleFor(x => x.ParentId).GreaterThan(0).When(x => x.ParentId is not null);
+        RuleFor(x => x.Name).NotEmpty().MaximumLength(100).When(x => x.ParentId is null);
 
         // Mobile is optional on a draft application; enrolment is blocked until it exists.
         RuleFor(x => x.Mobile).Must(PhoneNumberRules.IsValid)
-            .When(x => !string.IsNullOrWhiteSpace(x.Mobile))
+            .When(x => x.ParentId is null && !string.IsNullOrWhiteSpace(x.Mobile))
             .WithMessage(PhoneNumberRules.Message);
         RuleFor(x => x.Email).EmailAddress().MaximumLength(100)
-            .When(x => !string.IsNullOrWhiteSpace(x.Email));
+            .When(x => x.ParentId is null && !string.IsNullOrWhiteSpace(x.Email));
     }
 }
 

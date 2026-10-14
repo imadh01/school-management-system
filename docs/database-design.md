@@ -121,6 +121,7 @@ erDiagram
     AdmissionGuardians {
         int Id PK
         int AdmissionId FK
+        int ParentId FK "nullable, G2"
         string RelationType
         string MobileKey "computed"
     }
@@ -245,7 +246,7 @@ Read it top-down: **Security** and **School setup** are the foundation. **Admiss
 
 Single source of truth rules (do not duplicate these elsewhere):
 
-- Parent contact data lives **only** in `Parents`. `AdmissionGuardians` is a snapshot of what was typed on the application.
+- Parent contact data lives **only** in `Parents`. `AdmissionGuardians` is a snapshot of what was typed on the application (G2: or, when `ParentId` is set, a copy of the existing parent picked at registration; see `admission-existing-parent-design.md`).
 - The student's health lives **only** in `StudentHealth`; identity numbers **only** in `StudentIdentityDocuments`.
 - `Students.ClassSectionId` / `RollNumber` is a **mirror of the one Active row** in `StudentEnrollments`. History lives in `StudentEnrollments`.
 - The Admission ↔ Student link lives **only** in `Students.AdmissionId`.
@@ -270,6 +271,7 @@ someone deletes rows by hand in SSMS.
 | Admissions.AppliedForClassSectionId | ClassSections | Restrict | |
 | Admissions.AllottedClassSectionId (nullable) | ClassSections | Restrict | Filled at enrolment |
 | AdmissionGuardians.AdmissionId | Admissions | Cascade | |
+| AdmissionGuardians.ParentId (nullable) | Parents | Restrict | G2: the existing parent picked at registration |
 | Students.AdmissionId (nullable, unique) | Admissions | Restrict | **The only Admission↔Student link** |
 | Students.ClassSectionId | ClassSections | Restrict | Current class |
 | Students.UserId (nullable) | Users | Restrict | Future student login |
@@ -341,6 +343,7 @@ Delete guards enforced by the application (otherwise the delete returns 409):
 | Admissions | `RegNo` unique | Unique |
 | AdmissionGuardians | At most one `IsPrimaryContact = 1` per admission | Filtered unique |
 | AdmissionGuardians | `RelationType` in Father/Mother/Guardian | Check |
+| AdmissionGuardians | The same `ParentId` at most once per admission (`UX_AdmissionGuardians_Admission_Parent`, where `ParentId` is not null) | Filtered unique |
 | Students | `AdmNo` unique | Unique |
 | Students | (`ClassSectionId`, `RollNumber`) unique (**includes left and soft-deleted students**) | Unique |
 | Students | `AdmissionId` unique (one student per admission) | Unique |

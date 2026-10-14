@@ -19,6 +19,14 @@ public class AdmissionGuardian
     public string? Email { get; set; }
     public bool IsPrimaryContact { get; set; }
 
+    /// <summary>
+    /// G2: set when staff picked an EXISTING parent while registering. Name, Mobile and Email are then
+    /// copies of that parent's details, written by the server. Null = typed by hand (matched by mobile at enrolment).
+    /// At enrolment it is updated to the parent the guardian actually became, so a changed choice is in the audit log.
+    /// </summary>
+    public int? ParentId { get; set; }
+    public Parent? Parent { get; set; }
+
     /// <summary>Database-computed digits-only copy of Mobile (see Parent.MobileKey).</summary>
     public string? MobileKey { get; private set; }
 

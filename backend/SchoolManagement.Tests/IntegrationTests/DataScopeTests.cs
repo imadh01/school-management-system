@@ -366,6 +366,10 @@ public class DataScopeTests
         }
     }
 
+    // Endpoints that deliberately need the full (unscoped) View permission. G2's parent search shows other families'
+    // mobiles and children to admissions staff, so a ViewScoped user must be refused, not filtered.
+    private static readonly HashSet<string> PlainViewExceptions = new() { "AdmissionsController.SearchParents" };
+
     [Fact]
     public void Every_scoped_read_endpoint_is_in_the_enumeration_table()
     {
@@ -397,6 +401,7 @@ public class DataScopeTests
             .SelectMany(t => t.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly)
                 .Where(m => m.GetCustomAttributes<AuthorizeAttribute>().Any(a => a.Policy is not null && plainViews.Contains(a.Policy)))
                 .Select(m => $"{t.Name}.{m.Name}"))
+            .Where(a => !PlainViewExceptions.Contains(a))
             .ToList();
         Assert.Empty(stillPlain);
     }

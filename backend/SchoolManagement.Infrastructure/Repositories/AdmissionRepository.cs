@@ -98,6 +98,27 @@ public class AdmissionRepository : IAdmissionRepository
          select new ParentCandidateRow(g.Id, p.Id, p.Name, p.Mobile, p.Email))
         .ToListAsync(cancellationToken);
 
+    public Task<List<ParentSummaryRow>> SearchParentsAsync(string? nameText, string? digits, int take, CancellationToken cancellationToken)
+    {
+        // EF turns Contains into a parameterised LIKE and escapes % and _ in the text.
+        var hasName = !string.IsNullOrEmpty(nameText);
+        var hasDigits = !string.IsNullOrEmpty(digits);
+        if (!hasName && !hasDigits)
+            return Task.FromResult(new List<ParentSummaryRow>());
+
+        var parents = _context.Parents.AsNoTracking();
+        var query =
+            hasName && hasDigits ? parents.Where(p => p.Name.Contains(nameText!) || (p.MobileKey != null && p.MobileKey.Contains(digits!))) :
+            hasName ? parents.Where(p => p.Name.Contains(nameText!)) :
+            parents.Where(p => p.MobileKey != null && p.MobileKey.Contains(digits!));
+
+        return query
+            .OrderBy(p => p.Name).ThenBy(p => p.Id)
+            .Take(take)
+            .Select(p => new ParentSummaryRow(p.Id, p.Name, p.Mobile, p.Email))
+            .ToListAsync(cancellationToken);
+    }
+
     public Task<List<ParentChildRow>> GetLinkedChildrenAsync(IReadOnlyCollection<int> parentIds, CancellationToken cancellationToken) =>
         _context.StudentGuardians
             .Where(sg => parentIds.Contains(sg.ParentId))

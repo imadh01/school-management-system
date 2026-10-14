@@ -8,7 +8,7 @@ export type GuardianRelation = "Father" | "Mother" | "Guardian";
 
 /** What the server suggests / what staff decide for each guardian at enrolment. */
 export type GuardianAction =
-  "UseExisting" | "CreateNew" | "MustChoose" | "MissingMobile";
+  "UseExisting" | "CreateNew" | "MustChoose" | "MissingMobile" | "ParentRemoved";
 
 export interface AdmissionGuardianRequest {
   relationType: GuardianRelation;
@@ -16,6 +16,11 @@ export interface AdmissionGuardianRequest {
   mobile: string | null;
   email: string | null;
   isPrimaryContact: boolean;
+  /**
+   * G2: set when this guardian IS an existing parent. The server then copies the parent's name, mobile
+   * and email itself and ignores what is sent for them.
+   */
+  parentId?: number | null;
 }
 
 export interface AdmissionGuardianResponse {
@@ -25,6 +30,7 @@ export interface AdmissionGuardianResponse {
   mobile: string | null;
   email: string | null;
   isPrimaryContact: boolean;
+  parentId: number | null;
 }
 
 export interface AdmissionResponse {
@@ -139,6 +145,8 @@ export interface GuardianMatch {
   mobile: string | null;
   suggestedAction: GuardianAction;
   candidates: ParentCandidate[];
+  /** G2: the parent chosen at registration (it is the first candidate unless it was deleted). */
+  linkedParentId: number | null;
 }
 
 export interface GuardianMatchesResponse {

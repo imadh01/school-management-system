@@ -1,10 +1,10 @@
 # Data Dictionary (every column)
 
-Generated from `ApplicationDbContextModelSnapshot.cs` (the EF model after migration `E2c_DropTeacherNameAndPhone`), so it matches the real database.
+Generated from `ApplicationDbContextModelSnapshot.cs` (the EF model after migration `20261014150000_G2_AdmissionGuardianParentLink`), so it matches the real database.
 Regenerate it after every migration: `python3 database/scripts/generate-data-dictionary.py backend/SchoolManagement.Infrastructure/Migrations/ApplicationDbContextModelSnapshot.cs docs/data-dictionary.md <last-migration-name>`.
 
 Legend: **PK** primary key · **FK** foreign key (→ table, delete behaviour) · **UQ** single-column unique · **NULL** nullable · Default shown when the model sets one.
-Total: **29 tables, 417 columns**.
+Total: **29 tables, 418 columns**.
 
 Audit columns (`CreatedAt`, `CreatedBy`, `UpdatedAt`, `UpdatedBy`) and soft-delete columns (`IsDeleted`, `DeletedAt`, `DeletedBy`) repeat on many tables and are listed last in each table. Sensitive columns are masked in `AuditLogs`.
 
@@ -523,7 +523,7 @@ Entity: `Admission` · Columns: **37**
 ## AdmissionGuardians
 
 Father/mother/guardian written on an application (a snapshot, matched to real parents at enrolment).  
-Entity: `AdmissionGuardian` · Columns: **12**
+Entity: `AdmissionGuardian` · Columns: **13**
 
 | # | Column | SQL type | Null | Default / notes | Key |
 |---|---|---|---|---|---|
@@ -534,17 +534,20 @@ Entity: `AdmissionGuardian` · Columns: **12**
 | 5 | `Mobile` | nvarchar(20) | NULL |  |  |
 | 6 | `MobileKey` | nvarchar(20) | NULL | computed `CAST(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE([Mobile],' ',''),'-',''),'+',''),'(',''),')',''),'.','') AS nvarchar(20))` |  |
 | 7 | `Name` | nvarchar(100) | NOT NULL |  |  |
-| 8 | `RelationType` | nvarchar(30) | NOT NULL |  |  |
-| 9 | `CreatedAt` | datetime2 | NOT NULL | default `SYSUTCDATETIME()` |  |
-| 10 | `CreatedBy` | int | NULL |  |  |
-| 11 | `UpdatedAt` | datetime2 | NOT NULL | default `SYSUTCDATETIME()` |  |
-| 12 | `UpdatedBy` | int | NULL |  |  |
+| 8 | `ParentId` | int | NULL |  | FK → Parents (Restrict) |
+| 9 | `RelationType` | nvarchar(30) | NOT NULL |  |  |
+| 10 | `CreatedAt` | datetime2 | NOT NULL | default `SYSUTCDATETIME()` |  |
+| 11 | `CreatedBy` | int | NULL |  |  |
+| 12 | `UpdatedAt` | datetime2 | NOT NULL | default `SYSUTCDATETIME()` |  |
+| 13 | `UpdatedBy` | int | NULL |  |  |
 
 **Indexes**
 
 | Columns | Unique | Filter | Name |
 |---|---|---|---|
 | AdmissionId | yes | `[IsPrimaryContact] = 1` | UX_AdmissionGuardians_Admission_Primary |
+| ParentId |  |  | IX_AdmissionGuardians_ParentId |
+| AdmissionId, ParentId | yes | `[ParentId] IS NOT NULL` | UX_AdmissionGuardians_Admission_Parent |
 
 **Check constraints**
 

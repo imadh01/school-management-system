@@ -111,9 +111,10 @@ export function EnrollModal({
       .catch((err) => setErrors(getApiErrors(err, "Could not load parents.")));
   };
 
-  const hasMissingMobile = matches.some(
-    (g) => g.suggestedAction === "MissingMobile",
-  );
+  // These cannot be fixed here: the application itself has to be edited first.
+  const isBlocked = (action: GuardianMatch["suggestedAction"]) =>
+    action === "MissingMobile" || action === "ParentRemoved";
+  const hasBlockedGuardian = matches.some((g) => isBlocked(g.suggestedAction));
   const allottedSection = classSections.find(
     (c) => c.id === form.allottedClassSectionId,
   );
@@ -149,12 +150,16 @@ export function EnrollModal({
       problems.push(
         `${g.name} has no mobile number. Edit the application and add one first.`,
       );
+    for (const g of matches.filter(
+      (m) => m.suggestedAction === "ParentRemoved",
+    ))
+      problems.push(
+        `The parent chosen for ${g.name} has been deleted. Edit the application and choose “Use a different person” first.`,
+      );
 
     const decisions: GuardianDecision[] = [];
     const used = new Set<number>();
-    for (const g of matches.filter(
-      (m) => m.suggestedAction !== "MissingMobile",
-    )) {
+    for (const g of matches.filter((m) => !isBlocked(m.suggestedAction))) {
       const choice = choices[g.admissionGuardianId];
       if (choice === null || choice === undefined) {
         problems.push(
@@ -213,7 +218,7 @@ export function EnrollModal({
         label="Review enrolment"
         busyLabel="Review enrolment"
         isSubmitting={false}
-        disabled={matchesData.isLoading || hasMissingMobile}
+        disabled={matchesData.isLoading || hasBlockedGuardian}
       />
     ) : (
       <>
@@ -380,7 +385,7 @@ export function EnrollModal({
           <ReviewList
             title="Parents"
             items={matches
-              .filter((g) => g.suggestedAction !== "MissingMobile")
+              .filter((g) => !isBlocked(g.suggestedAction))
               .map((g) => {
                 const choice = choices[g.admissionGuardianId];
                 return {

@@ -437,6 +437,9 @@ namespace SchoolManagement.Infrastructure.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<int?>("ParentId")
+                        .HasColumnType("int");
+
                     b.Property<string>("RelationType")
                         .IsRequired()
                         .HasMaxLength(30)
@@ -456,6 +459,14 @@ namespace SchoolManagement.Infrastructure.Migrations
                         .IsUnique()
                         .HasDatabaseName("UX_AdmissionGuardians_Admission_Primary")
                         .HasFilter("[IsPrimaryContact] = 1");
+
+                    b.HasIndex("ParentId")
+                        .HasDatabaseName("IX_AdmissionGuardians_ParentId");
+
+                    b.HasIndex("AdmissionId", "ParentId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_AdmissionGuardians_Admission_Parent")
+                        .HasFilter("[ParentId] IS NOT NULL");
 
                     b.ToTable("AdmissionGuardians", null, t =>
                         {
@@ -2437,7 +2448,14 @@ namespace SchoolManagement.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("SchoolManagement.Domain.Entities.Parent", "Parent")
+                        .WithMany()
+                        .HasForeignKey("ParentId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("Admission");
+
+                    b.Navigation("Parent");
                 });
 
             modelBuilder.Entity("SchoolManagement.Domain.Entities.AttendanceRecord", b =>

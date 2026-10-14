@@ -65,6 +65,12 @@ export function GuardianMatchCard({
           A mobile number is required. Edit the application and add one before
           enrolling.
         </p>
+      ) : g.suggestedAction === "ParentRemoved" ? (
+        <p className="field__error" role="alert">
+          The parent chosen when this application was registered has since been
+          deleted. Open the application, choose “Use a different person” for
+          this guardian (or pick another parent), save, and enrol again.
+        </p>
       ) : (
         <>
           {g.suggestedAction === "MustChoose" && (
@@ -76,6 +82,14 @@ export function GuardianMatchCard({
               More than one parent has this number. Choose carefully.
             </Notice>
           )}
+          {g.linkedParentId != null &&
+            choice !== null &&
+            choice !== g.linkedParentId && (
+              <Notice tone="warn" icon={TriangleAlert} style={{ margin: "0 0 8px" }}>
+                You are replacing the parent chosen at registration. This
+                change is recorded.
+              </Notice>
+            )}
           {g.candidates.length === 0 && extraParents.length === 0 && (
             <p className="field-note" style={{ margin: "0 0 6px" }}>
               No parent in the school has this mobile number.
@@ -87,6 +101,9 @@ export function GuardianMatchCard({
               c.parentId,
               <>
                 Link to existing parent <b>{c.name}</b> · {c.mobile}
+                {c.parentId === g.linkedParentId && (
+                  <em> (chosen at registration)</em>
+                )}
                 {c.linkedChildren.length > 0 && (
                   <small>Children: {c.linkedChildren.join(", ")}</small>
                 )}

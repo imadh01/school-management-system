@@ -6,6 +6,7 @@ using SchoolManagement.API.Extensions;
 using SchoolManagement.Application.DTOs.Admissions;
 using SchoolManagement.Application.Interfaces;
 using SchoolManagement.Domain.Constants;
+using SchoolManagement.Domain.Exceptions;
 
 namespace SchoolManagement.API.Controllers;
 
@@ -15,6 +16,7 @@ namespace SchoolManagement.API.Controllers;
 public class AdmissionsController : ControllerBase
 {
     private readonly IAdmissionService _admissionService;
+    private readonly ICurrentUserPermissions _permissions;
     private readonly IValidator<CreateAdmissionRequest> _createValidator;
     private readonly IValidator<UpdateAdmissionRequest> _updateValidator;
     private readonly IValidator<ConfirmAdmissionRequest> _confirmValidator;
@@ -23,6 +25,7 @@ public class AdmissionsController : ControllerBase
 
     public AdmissionsController(
         IAdmissionService admissionService,
+        ICurrentUserPermissions permissions,
         IValidator<CreateAdmissionRequest> createValidator,
         IValidator<UpdateAdmissionRequest> updateValidator,
         IValidator<ConfirmAdmissionRequest> confirmValidator,
@@ -30,6 +33,7 @@ public class AdmissionsController : ControllerBase
         IValidator<RejectAdmissionRequest> rejectValidator)
     {
         _admissionService = admissionService;
+        _permissions = permissions;
         _createValidator = createValidator;
         _updateValidator = updateValidator;
         _confirmValidator = confirmValidator;
@@ -51,6 +55,26 @@ public class AdmissionsController : ControllerBase
         });
     }
 
+    /// <summary>G2: naming an existing parent on an application needs Parents.View (the search shows their children).</summary>
+    private Task<bool> CanLinkParentsAsync(CancellationToken cancellationToken) =>
+        _permissions.HasPermissionAsync(Permissions.ParentsView, cancellationToken);
+
+    /// <summary>
+    /// G2: "Find an existing parent" on the registration form. Both permissions are needed: Parents.View (the answer
+    /// includes the parents' mobile numbers and their children) and the right to register or edit applications.
+    /// </summary>
+    [HttpGet("parent-search")]
+    [Authorize(Policy = Permissions.ParentsView)]
+    public async Task<IActionResult> SearchParents(
+        [FromQuery] string? q, [FromQuery] int take, CancellationToken cancellationToken)
+    {
+        if (!await _permissions.HasPermissionAsync(Permissions.AdmissionsCreate, cancellationToken) &&
+            !await _permissions.HasPermissionAsync(Permissions.AdmissionsEdit, cancellationToken))
+            throw new ForbiddenException("Searching parents needs permission to register or edit applications.");
+
+        return Ok(await _admissionService.SearchParentsAsync(q, take == 0 ? 8 : take, cancellationToken));
+    }
+
     [HttpGet]
     [Authorize(Policy = Permissions.AdmissionsView)]
     public async Task<IActionResult> GetAll(CancellationToken cancellationToken) =>
@@ -68,7 +92,7 @@ public class AdmissionsController : ControllerBase
         var validationError = await ValidateAsync(_createValidator, request, cancellationToken);
         if (validationError is not null) return validationError;
 
-        var result = await _admissionService.CreateAsync(request, cancellationToken);
+        var result = await _admissionService.CreateAsync(request, cancellationToken, await CanLinkParentsAsync(cancellationToken));
         return Created($"api/admissions/{result.Id}", result);
     }
 
@@ -79,7 +103,7 @@ public class AdmissionsController : ControllerBase
         var validationError = await ValidateAsync(_updateValidator, request, cancellationToken);
         if (validationError is not null) return validationError;
 
-        return Ok(await _admissionService.UpdateAsync(id, request, cancellationToken));
+        return Ok(await _admissionService.UpdateAsync(id, request, cancellationToken, await CanLinkParentsAsync(cancellationToken)));
     }
 
     [HttpPost("{id:int}/confirm-admission")]

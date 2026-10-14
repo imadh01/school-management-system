@@ -32,6 +32,22 @@ public class AdmissionGuardianConfiguration : IEntityTypeConfiguration<Admission
             .HasForeignKey(g => g.AdmissionId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        // G2: an optional link to an existing parent. Restrict: a parent that an application points at cannot be
+        // hard-deleted (parents are soft-deleted anyway; this only protects against a raw DELETE).
+        builder.HasOne(g => g.Parent)
+            .WithMany()
+            .HasForeignKey(g => g.ParentId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // "Which applications point at this parent?"; also the FK index.
+        builder.HasIndex(g => g.ParentId).HasDatabaseName("IX_AdmissionGuardians_ParentId");
+
+        // The same parent cannot be two guardians of one application.
+        builder.HasIndex(g => new { g.AdmissionId, g.ParentId })
+            .IsUnique()
+            .HasFilter("[ParentId] IS NOT NULL")
+            .HasDatabaseName("UX_AdmissionGuardians_Admission_Parent");
+
         // Loading guardians of one application; also the FK index.
         builder.HasIndex(g => g.AdmissionId).HasDatabaseName("IX_AdmissionGuardians_AdmissionId");
 

@@ -51,6 +51,10 @@ public class AccessMatrixTests
     // F1: the "X.Read" policies (full View OR ViewScoped).
     private static readonly Requirement StudentsRead = Requirement.AnyOf(Permissions.StudentsView, Permissions.StudentsViewScoped);
     private static readonly Requirement ParentsRead = Requirement.AnyOf(Permissions.ParentsView, Permissions.ParentsViewScoped);
+    private static readonly Requirement ParentSearch = new(
+        "Parents.View + (Admissions.Create | Admissions.Edit)",
+        held => held.Contains(Permissions.ParentsView) &&
+                (held.Contains(Permissions.AdmissionsCreate) || held.Contains(Permissions.AdmissionsEdit)));
     private static readonly Requirement AttendanceRead = Requirement.AnyOf(Permissions.AttendanceView, Permissions.AttendanceViewScoped);
 
     private static readonly Endpoint[] Endpoints =
@@ -124,6 +128,8 @@ public class AccessMatrixTests
         new("PUT",    $"/api/admissions/{Missing}", P(Permissions.AdmissionsEdit), HasBody: true),
         new("POST",   $"/api/admissions/{Missing}/confirm-admission", P(Permissions.AdmissionsEdit), HasBody: true),
         new("GET",    $"/api/admissions/{Missing}/guardian-matches", P(Permissions.AdmissionsEdit)),
+        // G2: Parents.View AND the right to register or edit applications.
+        new("GET",    "/api/admissions/parent-search?q=zz", ParentSearch),
         new("POST",   $"/api/admissions/{Missing}/enroll", P(Permissions.AdmissionsEnroll), HasBody: true),
         new("POST",   $"/api/admissions/{Missing}/reject", P(Permissions.AdmissionsEdit), HasBody: true),
         new("DELETE", $"/api/admissions/{Missing}", P(Permissions.AdmissionsDelete)),

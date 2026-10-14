@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { Lock } from "lucide-react";
+import { Link2, Lock } from "lucide-react";
 import { admissionService } from "../services/admissionService";
+import { ExistingParentPicker, SameNumberHint } from "../components/ExistingParentPicker";
 import { documentService } from "@/features/documents/services/documentService";
 import {
   PendingDocumentsEditor,
@@ -15,6 +16,7 @@ import {
   type AdmissionResponse,
   type CreateAdmissionRequest,
   type GuardianRelation,
+  type ParentCandidate,
 } from "../types/admission.types";
 import { FormPage } from "@/components/form/FormPage";
 import { FormSection } from "@/components/form/FormSection";
@@ -117,13 +119,14 @@ function formFrom(a: AdmissionResponse): FormState {
       mobile: g.mobile,
       email: g.email,
       isPrimaryContact: g.isPrimaryContact,
+      parentId: g.parentId,
     })),
     documents: [],
   };
 }
 
 const isBlankGuardian = (g: AdmissionGuardianRequest) =>
-  !g.name.trim() && !g.mobile?.trim() && !g.email?.trim();
+  g.parentId == null && !g.name.trim() && !g.mobile?.trim() && !g.email?.trim();
 
 /** Shown instead of the form for an application that is already enrolled or rejected (the API refuses edits too). */
 function LockedApplication({ admission }: { admission: AdmissionResponse }) {
@@ -191,7 +194,14 @@ export function AdmissionFormPage() {
   );
   const countries = useCountries();
   const toast = useToast();
-  const canUpload = useCan()(Permission.DocumentsUpload) && isNew;
+  const can = useCan();
+  const canUpload = can(Permission.DocumentsUpload) && isNew;
+  // G2: picking an existing parent shows their mobile number and children, so it needs Parents.View.
+  const canLinkParents = can(Permission.ParentsView);
+  // Children of the parents picked in this session (the application itself never carries them).
+  const [pickedChildren, setPickedChildren] = useState<
+    Record<number, string[]>
+  >({});
   const docOptions = useAsyncData(
     () => (canUpload ? documentService.getOptions() : Promise.resolve(null)),
     [canUpload],
@@ -282,9 +292,26 @@ export function AdmissionFormPage() {
         mobile: "",
         email: "",
         isPrimaryContact: false,
+        parentId: null,
       },
     ]);
   };
+  /** G2: this guardian becomes an existing parent (the server copies the details; they show here meanwhile). */
+  const linkParent = (index: number, p: ParentCandidate) => {
+    setPickedChildren((m) => ({ ...m, [p.parentId]: p.linkedChildren }));
+    setGuardian(index, {
+      parentId: p.parentId,
+      name: p.name,
+      mobile: p.mobile,
+      email: p.email ?? "",
+    });
+  };
+  /** "Use a different person": back to a blank, typed guardian. */
+  const unlinkParent = (index: number) =>
+    setGuardian(index, { parentId: null, name: "", mobile: "", email: "" });
+  const linkedParentIds = form.guardians.flatMap((g) =>
+    g.parentId == null ? [] : [g.parentId],
+  );
 
   // ---------------------------------------------------------------- saving
   const validate = (): Record<string, string> => {
@@ -298,7 +325,8 @@ export function AdmissionFormPage() {
     const counted: Record<string, number> = {};
     form.guardians.forEach((g, i) => {
       if (isBlankGuardian(g)) return; // an empty row is ignored
-      if (!g.name.trim()) e[`guardians.${i}.name`] = "Name is required.";
+      if (g.parentId == null && !g.name.trim())
+        e[`guardians.${i}.name`] = "Name is required.";
       if (g.relationType !== "Guardian") {
         counted[g.relationType] = (counted[g.relationType] ?? 0) + 1;
         if (counted[g.relationType] > 1)
@@ -338,6 +366,7 @@ export function AdmissionFormPage() {
         email: g.email?.trim() || null,
         // If nobody was marked as primary contact, the first guardian is.
         isPrimaryContact: anyPrimary ? g.isPrimaryContact : i === 0,
+        parentId: g.parentId ?? null,
       })),
     };
 
@@ -551,9 +580,24 @@ export function AdmissionFormPage() {
                   label="Relation"
                   options={GUARDIAN_RELATIONS}
                 />
-                <TextField {...bindRow("name")} label="Name" required />
-                <TextField {...bindRow("mobile")} label="Mobile" type="tel" />
-                <TextField {...bindRow("email")} label="Email" type="email" />
+                <TextField
+                  {...bindRow("name")}
+                  label="Name"
+                  required
+                  disabled={g.parentId != null}
+                />
+                <TextField
+                  {...bindRow("mobile")}
+                  label="Mobile"
+                  type="tel"
+                  disabled={g.parentId != null}
+                />
+                <TextField
+                  {...bindRow("email")}
+                  label="Email"
+                  type="email"
+                  disabled={g.parentId != null}
+                />
                 <label
                   className="checkbox-row"
                   style={{ marginTop: 0, minHeight: 44 }}
@@ -573,6 +617,43 @@ export function AdmissionFormPage() {
                   />
                   Primary contact
                 </label>
+
+                {g.parentId != null ? (
+                  <div style={{ gridColumn: "1 / -1" }}>
+                    <Notice icon={Link2}>
+                      Existing parent in the school
+                      {pickedChildren[g.parentId]?.length
+                        ? ` · Children: ${pickedChildren[g.parentId].join(", ")}`
+                        : ""}
+                      . Their details are copied from the parent record, so edit
+                      them on the parent, not here.{" "}
+                      <button
+                        type="button"
+                        className="btn btn--secondary btn--sm"
+                        onClick={() => unlinkParent(i)}
+                      >
+                        Use a different person
+                      </button>
+                    </Notice>
+                  </div>
+                ) : (
+                  canLinkParents && (
+                    <>
+                      <div style={{ gridColumn: "1 / -1" }}>
+                        <ExistingParentPicker
+                          idPrefix={`admission-guardian-${i}`}
+                          excludeParentIds={linkedParentIds}
+                          onPick={(p) => linkParent(i, p)}
+                        />
+                      </div>
+                      <SameNumberHint
+                        mobile={g.mobile}
+                        excludeParentIds={linkedParentIds}
+                        onUse={(p) => linkParent(i, p)}
+                      />
+                    </>
+                  )
+                )}
               </RepeatRow>
             );
           })}

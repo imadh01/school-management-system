@@ -1,0 +1,661 @@
+--- /dev/null
++++ b/database/scripts/f2-attendance-dates-check.sql
+@@ -0,0 +1,16 @@
++-- F2 (school time zone): proof that existing attendance dates do not change.
++-- Run this in SSMS BEFORE deploying F2 and again AFTER (and after changing the school time zone in Settings).
++-- The two result rows must be IDENTICAL. F2 has no migration and never rewrites AttendanceSessions.Date:
++-- the school's time zone only decides what "today" means for NEW requests (future-date and 7-day checks,
++-- the default range of a student's history).
++USE [SchoolManagementDb];
++
++SELECT COUNT(*)                                              AS Sessions,
++       MIN([Date])                                           AS FirstDate,
++       MAX([Date])                                           AS LastDate,
++       CHECKSUM_AGG(CHECKSUM([Id], [ClassSectionId], [SubjectId], [Date])) AS DatesChecksum
++FROM [dbo].[AttendanceSessions];
++
++SELECT COUNT(*)                                              AS Records,
++       CHECKSUM_AGG(CHECKSUM([SessionId], [StudentId], [Status])) AS RecordsChecksum
++FROM [dbo].[AttendanceRecords];
+--- a/frontend/school-management-ui/src/services/schoolService.ts
++++ b/frontend/school-management-ui/src/services/schoolService.ts
+@@ -5,6 +5,11 @@
+   schoolName: string;
+   shortName: string | null;
+   countryId: number | null;
++  /**
++   * F2: the date in the school's time zone (yyyy-MM-dd) at the moment of the request. The cached copy of
++   * the basics goes stale after midnight: call `schoolService.getToday()` when you need today.
++   */
++  today: string;
+ }
+ 
+ let cached: Promise<SchoolBasics> | null = null;
+@@ -29,6 +34,16 @@
+     return cached;
+   },
+ 
++  /**
++   * F2: today's date in the SCHOOL's time zone, fresh from the server (never cached). Attendance uses it so
++   * the page and the API agree on "today" even when the browser is in another time zone.
++   */
++  getToday(): Promise<string> {
++    return apiClient
++      .get<SchoolBasics>("/settings/basics")
++      .then((res) => res.data.today);
++  },
++
+   /** Forget the cached values and tell every user of them to load again. */
+   invalidate() {
+     cached = null;
+--- a/frontend/school-management-ui/src/features/attendance/pages/AttendancePage.tsx
++++ b/frontend/school-management-ui/src/features/attendance/pages/AttendancePage.tsx
+@@ -8,6 +8,9 @@
+ import type { SubjectResponse } from "@/features/subjects/types/subject.types";
+ import { getApiErrors, getApiStatus } from "@/utils/apiError";
+ import { attendanceService } from "../services/attendanceService.ts";
++import { schoolService } from "@/services/schoolService";
++import { PageLoading } from "@/components/PageState";
++import { useAsyncData } from "@/hooks/useAsyncData";
+ import {
+   ATTENDANCE_STATUSES,
+   STATUS_COLOR,
+@@ -77,9 +80,21 @@
+   );
+ }
+ 
++/**
++ * F2: "today" is the school's date (Settings > time zone), the same one the API uses to refuse future dates.
++ * If it cannot be loaded the page falls back to the browser's date and the API still checks every save.
++ */
+ export function AttendancePage() {
+-  const today = toDateInput(new Date());
++  const school = useAsyncData(
++    () => schoolService.getToday(),
++    [],
++    "Could not load the school's date.",
++  );
++  if (school.isLoading) return <PageLoading />;
++  return <AttendanceView today={school.data ?? toDateInput(new Date())} />;
++}
+ 
++function AttendanceView({ today }: { today: string }) {
+   const [classSections, setClassSections] = useState<ClassSectionResponse[]>(
+     [],
+   );
+--- /dev/null
++++ b/backend/SchoolManagement.Tests/DatabaseRules/AttendanceDatesAndTimeZoneTests.cs
+@@ -0,0 +1,117 @@
++﻿using Microsoft.EntityFrameworkCore;
++using Microsoft.Extensions.DependencyInjection;
++using SchoolManagement.Application.DTOs.Attendance;
++using SchoolManagement.Application.Interfaces;
++using SchoolManagement.Domain.Entities;
++using SchoolManagement.Infrastructure.Persistence;
++using SchoolManagement.Tests.Support;
++using Xunit;
++
++namespace SchoolManagement.Tests.DatabaseRules;
++
++/// <summary>
++/// F2: the school time zone decides what "today" means for NEW requests. It never rewrites attendance that was
++/// already saved: a session keeps exactly the date it was saved under, whatever the setting is later.
++/// </summary>
++[Collection("Database")]
++public class AttendanceDatesAndTimeZoneTests
++{
++    private readonly SqlServerWebApplicationFactory _factory;
++
++    public AttendanceDatesAndTimeZoneTests(SqlServerWebApplicationFactory factory) => _factory = factory;
++
++    [Fact]
++    public async Task Saved_attendance_keeps_its_dates_when_the_school_time_zone_changes()
++    {
++        using var scope = _factory.Services.CreateScope();
++        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
++        var attendance = scope.ServiceProvider.GetRequiredService<IAttendanceService>();
++        var clock = scope.ServiceProvider.GetRequiredService<ISchoolClock>();
++        var provider = scope.ServiceProvider.GetRequiredService<ISchoolSettingsProvider>();
++
++        var section = await TestData.CreateSectionAsync(db, capacity: 10);
++        var student = TestData.NewStudent(section, "1");
++        db.Students.Add(student);
++        await db.SaveChangesAsync();
++
++        var teacher = new User
++        {
++            Username = "att_" + TestData.Unique(), Email = $"att{TestData.Unique()}@test.local", PasswordHash = "x", Status = "Active",
++        };
++        db.Users.Add(teacher);
++        await db.SaveChangesAsync();
++        var admin = new AttendanceActor(teacher.Id, CanManageAll: true, IsAdmin: true);
++        var originalZone = (await db.SchoolSettings.SingleAsync()).TimeZoneId;
++
++        try
++        {
++            var today = await clock.TodayAsync(CancellationToken.None);
++            var days = new[] { today.AddDays(-1), today.AddDays(-3) };
++            foreach (var day in days)
++                await attendance.SaveAsync(admin, new SaveAttendanceRequest(
++                    section.Id, day, null, new List<AttendanceEntry> { new(student.Id, "Present", null) }),
++                    CancellationToken.None);
++
++            var before = await StoredDatesAsync(db, section.Id);
++            Assert.Equal(days.OrderBy(d => d), before);
++
++            // The two extremes (UTC+14 and UTC-11) and India: "today" moves, saved dates must not.
++            foreach (var zone in new[] { "Pacific/Kiritimati", "Pacific/Pago_Pago", "Asia/Kolkata" })
++            {
++                await SetZoneAsync(db, provider, zone);
++
++                Assert.Equal(before, await StoredDatesAsync(db, section.Id));
++                foreach (var day in days)
++                {
++                    var roster = await attendance.GetRosterAsync(
++                        admin, DataScope.Unrestricted, section.Id, day, null, CancellationToken.None);
++                    Assert.True(roster.IsSaved, $"The session of {day} disappeared under {zone}.");
++                    Assert.Equal(day, roster.Date);
++                }
++            }
++        }
++        finally
++        {
++            await SetZoneAsync(db, provider, originalZone); // the other tests share this database
++        }
++    }
++
++    [Fact]
++    public async Task Changing_the_time_zone_changes_the_clock_for_the_very_next_request()
++    {
++        using var scope = _factory.Services.CreateScope();
++        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
++        var clock = scope.ServiceProvider.GetRequiredService<ISchoolClock>();
++        var provider = scope.ServiceProvider.GetRequiredService<ISchoolSettingsProvider>();
++        var originalZone = (await db.SchoolSettings.SingleAsync()).TimeZoneId;
++
++        try
++        {
++            await SetZoneAsync(db, provider, "Pacific/Kiritimati"); // UTC+14: ahead of everyone
++            var ahead = await clock.TodayAsync(CancellationToken.None);
++            await SetZoneAsync(db, provider, "Pacific/Pago_Pago");  // UTC-11: behind everyone
++            var behind = await clock.TodayAsync(CancellationToken.None);
++
++            Assert.True(ahead > behind, $"Expected {ahead} (UTC+14) to be later than {behind} (UTC-11).");
++        }
++        finally
++        {
++            await SetZoneAsync(db, provider, originalZone);
++        }
++    }
++
++    private static async Task SetZoneAsync(ApplicationDbContext db, ISchoolSettingsProvider provider, string zone)
++    {
++        var settings = await db.SchoolSettings.SingleAsync();
++        settings.TimeZoneId = zone;
++        await db.SaveChangesAsync();
++        provider.Invalidate(); // what SchoolSettingsService does after its save
++    }
++
++    private static Task<List<DateOnly>> StoredDatesAsync(ApplicationDbContext db, int classSectionId) =>
++        db.AttendanceSessions.AsNoTracking()
++            .Where(s => s.ClassSectionId == classSectionId)
++            .OrderBy(s => s.Date)
++            .Select(s => s.Date)
++            .ToListAsync();
++}
+--- a/backend/SchoolManagement.Tests/IntegrationTests/DataScopeTests.cs
++++ b/backend/SchoolManagement.Tests/IntegrationTests/DataScopeTests.cs
+@@ -405,7 +405,8 @@
+     // Helpers
+     // ─────────────────────────────────────────────────────────────────
+ 
+-    private static DateOnly Today => DateOnly.FromDateTime(DateTime.UtcNow);
++    // F2: attendance's "today" is the school's date; the test database is seeded with Asia/Dubai.
++    private static DateOnly Today => SchoolClock.TodayIn("Asia/Dubai", DateTimeOffset.UtcNow);
+ 
+     private Actor Role(string roleName) => new(0, RoleSessions.GetTokenAsync(_factory, roleName).GetAwaiter().GetResult());
+ 
+--- a/backend/SchoolManagement.Tests/IntegrationTests/InActionPermissionTests.cs
++++ b/backend/SchoolManagement.Tests/IntegrationTests/InActionPermissionTests.cs
+@@ -35,7 +35,8 @@
+         _client = factory.CreateClient();
+     }
+ 
+-    private static DateOnly Today => DateOnly.FromDateTime(DateTime.UtcNow);
++    // F2: attendance's "today" is the school's date; the test database is seeded with Asia/Dubai.
++    private static DateOnly Today => SchoolClock.TodayIn("Asia/Dubai", DateTimeOffset.UtcNow);
+ 
+     // ─────────────────────────────────────────────────────────────────
+     // 1. Attendance scope
+--- /dev/null
++++ b/backend/SchoolManagement.Tests/UnitTests/AttendanceTodayTests.cs
+@@ -0,0 +1,116 @@
++﻿using Moq;
++using SchoolManagement.Application.DTOs.Attendance;
++using SchoolManagement.Application.Interfaces;
++using SchoolManagement.Application.Services;
++using SchoolManagement.Domain.Entities;
++using Xunit;
++
++namespace SchoolManagement.Tests.UnitTests;
++
++/// <summary>
++/// F2: the attendance rules ("no future dates", "non-admins edit only the last 7 days") use the SCHOOL's today.
++/// Setup: the server's UTC date is the 14th, but it is already the 15th at the school (India).
++/// </summary>
++public class AttendanceTodayTests
++{
++    private static readonly DateOnly UtcToday = new(2026, 10, 14);
++    private static readonly DateOnly SchoolToday = new(2026, 10, 15);
++
++    private static readonly AttendanceActor Admin = new(UserId: 1, CanManageAll: true, IsAdmin: true);
++    private static readonly AttendanceActor ClassTeacher = new(UserId: 2, CanManageAll: true, IsAdmin: false);
++
++    private static (AttendanceService Service, Mock<IAttendanceRepository> Repo) Build(DateOnly schoolToday)
++    {
++        var section = new ClassSection
++        {
++            Id = 5, Name = "Class 1", Section = "A", AcademicYear = new AcademicYear { Name = "AY" },
++        };
++        var repo = new Mock<IAttendanceRepository>();
++        repo.Setup(r => r.GetClassSectionAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync(section);
++        repo.Setup(r => r.CanSeeSessionsAsync(5, null, It.IsAny<DataScope>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
++        repo.Setup(r => r.GetSessionAsync(5, It.IsAny<DateOnly>(), null, false, It.IsAny<CancellationToken>()))
++            .ReturnsAsync((AttendanceSession?)null);
++        repo.Setup(r => r.GetRosterStudentsAsync(5, It.IsAny<IReadOnlyCollection<int>>(), It.IsAny<CancellationToken>()))
++            .ReturnsAsync(new List<AttendanceStudentInfo>());
++        repo.Setup(r => r.GetRecentSessionsAsync(5, It.IsAny<DateOnly>(), null, It.IsAny<int>(), It.IsAny<CancellationToken>()))
++            .ReturnsAsync(new List<AttendanceSessionRef>());
++
++        var clock = new Mock<ISchoolClock>();
++        clock.Setup(c => c.TodayAsync(It.IsAny<CancellationToken>())).ReturnsAsync(schoolToday);
++
++        // The TimeProvider says it is the 14th (UTC); only the school clock knows it is the 15th.
++        var time = new FixedTime(new DateTimeOffset(UtcToday.ToDateTime(new TimeOnly(20, 0)), TimeSpan.Zero));
++        return (new AttendanceService(repo.Object, time, clock.Object), repo);
++    }
++
++    private static Task<AttendanceRosterResponse> RosterAsync(
++        AttendanceService service, AttendanceActor actor, DateOnly date) =>
++        service.GetRosterAsync(actor, DataScope.Unrestricted, 5, date, null, CancellationToken.None);
++
++    [Fact]
++    public async Task The_schools_today_can_be_marked_even_though_it_is_still_yesterday_in_UTC()
++    {
++        var (service, _) = Build(SchoolToday);
++
++        var roster = await RosterAsync(service, Admin, SchoolToday);
++
++        Assert.True(roster.CanEdit, roster.CannotEditReason);
++    }
++
++    [Fact]
++    public async Task The_day_after_the_schools_today_is_a_future_date()
++    {
++        var (service, _) = Build(SchoolToday);
++
++        var roster = await RosterAsync(service, Admin, SchoolToday.AddDays(1));
++
++        Assert.False(roster.CanEdit);
++        Assert.Contains("future", roster.CannotEditReason);
++    }
++
++    [Fact]
++    public async Task The_seven_day_window_for_non_admins_counts_back_from_the_schools_today()
++    {
++        var (service, _) = Build(SchoolToday);
++
++        var edge = await RosterAsync(service, ClassTeacher, SchoolToday.AddDays(-AttendanceRules.EditWindowDays));
++        var tooOld = await RosterAsync(service, ClassTeacher, SchoolToday.AddDays(-AttendanceRules.EditWindowDays - 1));
++
++        Assert.True(edge.CanEdit, edge.CannotEditReason);
++        Assert.False(tooOld.CanEdit);
++        Assert.Contains("older than", tooOld.CannotEditReason);
++    }
++
++    [Fact]
++    public async Task A_student_history_without_dates_ends_on_the_schools_today()
++    {
++        var (service, repo) = Build(SchoolToday);
++        repo.Setup(r => r.GetStudentAsync(9, It.IsAny<DataScope>(), It.IsAny<CancellationToken>()))
++            .ReturnsAsync(new AttendanceStudentInfo(9, "Test", null, "Student", "A1", "1", 5, "Active"));
++        repo.Setup(r => r.GetStudentRecordsAsync(9, It.IsAny<DateOnly>(), It.IsAny<DateOnly>(), It.IsAny<DataScope>(), It.IsAny<CancellationToken>()))
++            .ReturnsAsync(new List<StudentAttendanceRow>());
++
++        var history = await service.GetStudentHistoryAsync(DataScope.Unrestricted, 9, null, null, CancellationToken.None);
++
++        Assert.Equal(SchoolToday, history.To);
++        Assert.Equal(SchoolToday.AddDays(-29), history.From);
++    }
++
++    [Fact]
++    public async Task Without_the_school_clock_the_same_request_would_have_been_refused_which_is_the_bug_F2_fixes()
++    {
++        // Documents the "before": with today = UTC date (the 14th), the school's 15th is a future date.
++        var (service, _) = Build(UtcToday);
++
++        var roster = await RosterAsync(service, Admin, SchoolToday);
++
++        Assert.False(roster.CanEdit);
++    }
++
++    private sealed class FixedTime : TimeProvider
++    {
++        private readonly DateTimeOffset _now;
++        public FixedTime(DateTimeOffset now) => _now = now;
++        public override DateTimeOffset GetUtcNow() => _now;
++    }
++}
+--- /dev/null
++++ b/backend/SchoolManagement.Tests/UnitTests/SchoolClockTests.cs
+@@ -0,0 +1,72 @@
++﻿using Moq;
++using SchoolManagement.Application.Interfaces;
++using SchoolManagement.Application.Services;
++using Xunit;
++
++namespace SchoolManagement.Tests.UnitTests;
++
++/// <summary>F2: "today" is the date in the school's time zone, not the server's UTC date.</summary>
++public class SchoolClockTests
++{
++    private static DateTimeOffset Utc(int y, int m, int d, int h, int min = 0) =>
++        new(y, m, d, h, min, 0, TimeSpan.Zero);
++
++    [Theory]
++    // India is UTC+05:30: 20:00 UTC on the 14th is already 01:30 on the 15th.
++    [InlineData("Asia/Kolkata", 2026, 10, 14, 20, 0, "2026-10-15")]
++    [InlineData("Asia/Kolkata", 2026, 10, 14, 18, 29, "2026-10-14")] // 23:59 local: still the 14th
++    [InlineData("Asia/Kolkata", 2026, 10, 14, 18, 30, "2026-10-15")] // 00:00 local: the 15th begins
++    [InlineData("UTC", 2026, 10, 14, 20, 0, "2026-10-14")]
++    // West of UTC the local date is BEHIND: 03:00 UTC is still the evening before in Los Angeles.
++    [InlineData("America/Los_Angeles", 2026, 10, 14, 3, 0, "2026-10-13")]
++    // Daylight saving is followed (London is UTC+1 in summer, so 23:30 UTC on 1 July is already the 2nd).
++    [InlineData("Europe/London", 2026, 7, 1, 23, 30, "2026-07-02")]
++    [InlineData("Europe/London", 2026, 12, 1, 23, 30, "2026-12-01")]
++    public void Today_is_the_calendar_date_in_the_school_time_zone(
++        string zone, int y, int m, int d, int h, int min, string expected)
++    {
++        Assert.Equal(DateOnly.Parse(expected), SchoolClock.TodayIn(zone, Utc(y, m, d, h, min)));
++    }
++
++    [Theory]
++    [InlineData(null)]
++    [InlineData("")]
++    [InlineData("   ")]
++    [InlineData("Not/A_Zone")]
++    public void An_empty_or_unknown_zone_falls_back_to_UTC_which_is_how_it_behaved_before_F2(string? zone)
++    {
++        Assert.Equal(new DateOnly(2026, 10, 14), SchoolClock.TodayIn(zone, Utc(2026, 10, 14, 20)));
++    }
++
++    [Fact]
++    public async Task The_clock_reads_the_zone_from_the_school_settings_and_the_instant_from_the_TimeProvider()
++    {
++        var settings = new Mock<ISchoolSettingsProvider>();
++        settings.Setup(s => s.GetAsync(It.IsAny<CancellationToken>())).ReturnsAsync(
++            new SchoolSettingsSnapshot("School", null, null, "Asia/Kolkata", "INR", 0));
++        var clock = new SchoolClock(settings.Object, new FixedTime(Utc(2026, 10, 14, 20)));
++
++        Assert.Equal(new DateOnly(2026, 10, 15), await clock.TodayAsync(CancellationToken.None));
++    }
++
++    [Fact]
++    public async Task Changing_the_setting_changes_today_on_the_next_call()
++    {
++        var zone = "UTC";
++        var settings = new Mock<ISchoolSettingsProvider>();
++        settings.Setup(s => s.GetAsync(It.IsAny<CancellationToken>()))
++            .ReturnsAsync(() => new SchoolSettingsSnapshot("School", null, null, zone, "INR", 0));
++        var clock = new SchoolClock(settings.Object, new FixedTime(Utc(2026, 10, 14, 20)));
++
++        Assert.Equal(new DateOnly(2026, 10, 14), await clock.TodayAsync(CancellationToken.None));
++        zone = "Asia/Kolkata";
++        Assert.Equal(new DateOnly(2026, 10, 15), await clock.TodayAsync(CancellationToken.None));
++    }
++
++    private sealed class FixedTime : TimeProvider
++    {
++        private readonly DateTimeOffset _now;
++        public FixedTime(DateTimeOffset now) => _now = now;
++        public override DateTimeOffset GetUtcNow() => _now;
++    }
++}
+--- a/backend/SchoolManagement.Application/DTOs/Settings/SchoolSettingsDtos.cs
++++ b/backend/SchoolManagement.Application/DTOs/Settings/SchoolSettingsDtos.cs
+@@ -35,5 +35,8 @@
+ /// <summary>One entry of the time-zone picker: IANA id, a readable name and today's offset from UTC.</summary>
+ public record TimeZoneOption(string Id, string DisplayName, int UtcOffsetMinutes);
+ 
+-/// <summary>What every page may know about the school (top bar, address forms): no permission needed.</summary>
+-public record SchoolBasicsResponse(string SchoolName, string? ShortName, int? CountryId);
++/// <summary>
++/// What every page may know about the school (top bar, address forms): no permission needed.
++/// F2: <paramref name="Today"/> is the date in the school's time zone (yyyy-MM-dd), what attendance means by "today".
++/// </summary>
++public record SchoolBasicsResponse(string SchoolName, string? ShortName, int? CountryId, DateOnly Today);
+--- a/backend/SchoolManagement.Application/Services/AttendanceService.cs
++++ b/backend/SchoolManagement.Application/Services/AttendanceService.cs
+@@ -11,16 +11,18 @@
+ 
+     private readonly IAttendanceRepository _attendance;
+     private readonly TimeProvider _time;
++    private readonly ISchoolClock _schoolClock;
+ 
+-    public AttendanceService(IAttendanceRepository attendance, TimeProvider time)
++    public AttendanceService(IAttendanceRepository attendance, TimeProvider time, ISchoolClock schoolClock)
+     {
+         _attendance = attendance;
+         _time = time;
++        _schoolClock = schoolClock;
+     }
+ 
+-    // "Today" is the server's UTC date for now. If the school's local date can differ
+-    // from UTC during school hours, introduce a configured school time zone here.
+-    private DateOnly Today => DateOnly.FromDateTime(_time.GetUtcNow().UtcDateTime);
++    // F2: "today" is the date in the school's time zone (Settings), so "no future dates" and the 7-day edit
++    // window follow the school's calendar. Stored session dates are never derived from it: a session keeps
++    // exactly the date it was saved under. Timestamps (CreatedAt, UpdatedAt) stay UTC via _time.
+ 
+     // ---------- Roster ----------
+ 
+@@ -127,7 +129,7 @@
+         var student = await _attendance.GetStudentAsync(studentId, scope, cancellationToken)
+             ?? throw new NotFoundException("Student could not be found.");
+ 
+-        var end = to ?? Today;
++        var end = to ?? await _schoolClock.TodayAsync(cancellationToken);
+         var start = from ?? end.AddDays(-29);
+         ValidateRange(start, end);
+ 
+@@ -240,7 +242,7 @@
+                 return AccessDecision.Forbidden("Only the teacher assigned to this subject can take its attendance.");
+         }
+ 
+-        var today = Today;
++        var today = await _schoolClock.TodayAsync(cancellationToken);
+         if (date > today)
+             return AccessDecision.RuleViolation("Attendance cannot be marked for a future date.");
+ 
+--- /dev/null
++++ b/backend/SchoolManagement.Application/Services/SchoolClock.cs
+@@ -0,0 +1,32 @@
++﻿using SchoolManagement.Application.Interfaces;
++
++namespace SchoolManagement.Application.Services;
++
++/// <summary>
++/// F2: today's date in the school's time zone. The zone comes from the school settings (kept in memory by
++/// <see cref="ISchoolSettingsProvider"/>, so no query per call) and the instant from <see cref="TimeProvider"/>
++/// (so tests can set the time). An unknown or empty zone falls back to UTC, the behaviour before F2.
++/// </summary>
++public sealed class SchoolClock : ISchoolClock
++{
++    private readonly ISchoolSettingsProvider _settings;
++    private readonly TimeProvider _time;
++
++    public SchoolClock(ISchoolSettingsProvider settings, TimeProvider time)
++    {
++        _settings = settings;
++        _time = time;
++    }
++
++    public async Task<DateOnly> TodayAsync(CancellationToken cancellationToken) =>
++        TodayIn((await _settings.GetAsync(cancellationToken)).TimeZoneId, _time.GetUtcNow());
++
++    /// <summary>The calendar date at <paramref name="utcNow"/> in the given IANA zone (UTC when unknown).</summary>
++    public static DateOnly TodayIn(string? timeZoneId, DateTimeOffset utcNow)
++    {
++        var zone = !string.IsNullOrWhiteSpace(timeZoneId) && TimeZoneInfo.TryFindSystemTimeZoneById(timeZoneId.Trim(), out var found)
++            ? found
++            : TimeZoneInfo.Utc;
++        return DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(utcNow, zone).DateTime);
++    }
++}
+--- a/backend/SchoolManagement.Application/Services/SchoolSettingsService.cs
++++ b/backend/SchoolManagement.Application/Services/SchoolSettingsService.cs
+@@ -63,7 +63,8 @@
+     public async Task<SchoolBasicsResponse> GetBasicsAsync(CancellationToken cancellationToken)
+     {
+         var s = await _provider.GetAsync(cancellationToken);
+-        return new SchoolBasicsResponse(s.SchoolName, s.ShortName, s.CountryId);
++        return new SchoolBasicsResponse(s.SchoolName, s.ShortName, s.CountryId,
++            SchoolClock.TodayIn(s.TimeZoneId, _clock.GetUtcNow()));
+     }
+ 
+     private static SchoolSettingsResponse ToResponse(SchoolSettings s) => new(
+--- a/backend/SchoolManagement.Application/Services/StudentEnrollmentRules.cs
++++ b/backend/SchoolManagement.Application/Services/StudentEnrollmentRules.cs
+@@ -8,9 +8,6 @@
+ /// </summary>
+ public static class StudentEnrollmentRules
+ {
+-    // TODO(school time zone): "today" is UTC for now, same as the rest of the system.
+-    public static DateOnly Today() => DateOnly.FromDateTime(DateTime.UtcNow);
+-
+     /// <summary>A new Active period in the given section (its academic year is taken from the section).</summary>
+     public static StudentEnrollment StartNew(ClassSection classSection, string rollNumber, DateOnly startDate) => new()
+     {
+--- a/backend/SchoolManagement.Application/Services/StudentService.cs
++++ b/backend/SchoolManagement.Application/Services/StudentService.cs
+@@ -14,6 +14,7 @@
+     private readonly IConcurrencyGuard _concurrency;
+     private readonly ISensitiveReadLog _sensitiveReads;
+     private readonly IAddressService _addressService;
++    private readonly ISchoolClock _schoolClock;
+ 
+     public StudentService(
+         IStudentRepository studentRepository,
+@@ -21,7 +22,8 @@
+         IStudentGuardianRepository guardianRepository,
+         IConcurrencyGuard concurrency,
+         ISensitiveReadLog sensitiveReads,
+-        IAddressService addressService)
++        IAddressService addressService,
++        ISchoolClock schoolClock)
+     {
+         _studentRepository = studentRepository;
+         _classSectionRepository = classSectionRepository;
+@@ -29,6 +31,7 @@
+         _concurrency = concurrency;
+         _sensitiveReads = sensitiveReads;
+         _addressService = addressService;
++        _schoolClock = schoolClock;
+     }
+ 
+     // The health block and identity numbers are sensitive: every opening of a detail leaves a "Read"
+@@ -194,7 +197,9 @@
+                     throw new ConflictException($"Roll number '{request.RollNumber}' is already in use in this class.");
+             }
+ 
+-            var today = StudentEnrollmentRules.Today();
++            // F2: the date in the school's time zone, the same "today" attendance uses, so a class move and the
++            // attendance of that day cannot disagree around midnight UTC.
++            var today = await _schoolClock.TodayAsync(cancellationToken);
+             // Which academic-history change does this edit imply?
+             var closeOldAndStartNew = false;
+             if (becomesLeft)
+--- /dev/null
++++ b/backend/SchoolManagement.Application/Interfaces/ISchoolClock.cs
+@@ -0,0 +1,11 @@
++﻿namespace SchoolManagement.Application.Interfaces;
++
++/// <summary>
++/// F2: the school's calendar date. "Today" means the date on the wall in the school's time zone (Settings),
++/// not the server's UTC date, so 07:00 in India on the 15th is the 15th even though UTC still says the 14th.
++/// Use it for business dates (attendance, "moved today"); keep UTC for timestamps (CreatedAt, audit, tokens).
++/// </summary>
++public interface ISchoolClock
++{
++    Task<DateOnly> TodayAsync(CancellationToken cancellationToken);
++}
+--- a/backend/SchoolManagement.API/Program.cs
++++ b/backend/SchoolManagement.API/Program.cs
+@@ -151,6 +151,7 @@
+ builder.Services.AddScoped<IValidator<AssignSubjectsRequest>, AssignSubjectsRequestValidator>();
+ builder.Services.AddScoped<IValidator<SetClassTeacherRequest>, SetClassTeacherRequestValidator>();
+ builder.Services.AddSingleton(TimeProvider.System);
++builder.Services.AddSingleton<ISchoolClock, SchoolClock>(); // F2: "today" in the school's time zone
+ builder.Services.AddScoped<IAttendanceRepository, AttendanceRepository>();
+ builder.Services.AddScoped<IAttendanceService, AttendanceService>();
+ builder.Services.AddScoped<IValidator<SaveAttendanceRequest>, SaveAttendanceRequestValidator>();
+--- /dev/null
++++ b/docs/f2-school-time-zone.md
+@@ -0,0 +1,57 @@
++# F2: the school's time zone decides "today"
++
++**Status:** built on its own branch (`feature/f2-school-timezone`), not merged. No migration, no data change.
++
++## The problem
++
++Until now "today" was the server's **UTC** date. A school in India (UTC+05:30) starts its day at 18:30 UTC of the day before, so between
++00:00 and 05:30 local time the server still believed it was yesterday: "attendance cannot be marked for a future date" appeared for the
++school's own today, and the 7-day edit window was off by one for the first hours of every day. The browser made it worse: the Attendance
++page used the **browser's** date, a third opinion.
++
++## The rule
++
++* **Business dates** (attendance "today", "moved to this class today") use the school's calendar date in the time zone set in Settings.
++* **Timestamps** (CreatedAt, UpdatedAt, audit rows, tokens, lockouts) stay UTC. They are instants, not calendar dates.
++
++## What changed
++
++| Where | Change |
++|---|---|
++| `ISchoolClock` / `SchoolClock` (new, Application) | `TodayAsync()`: the date at `TimeProvider.GetUtcNow()` in the zone from the school settings (read from the in-memory settings cache, no query). An empty or unknown zone falls back to UTC, the behaviour before F2. Registered as a singleton. |
++| `AttendanceService` | "no future dates", the 7-day edit window and the default range of a student's history use `ISchoolClock`. |
++| `StudentService` | The date of a class move / leaving (`StudentEnrollmentRules.Today()` removed, with its TODO) uses `ISchoolClock`, so a move and that day's attendance agree. |
++| `GET /api/settings/basics` | Also returns `today` (yyyy-MM-dd, school time zone). |
++| Attendance page | Default and maximum date come from `schoolService.getToday()` (fresh, never cached); only if that cannot be loaded does it fall back to the browser's date. The API still checks every save. |
++
++## Existing attendance dates do not change
++
++* `AttendanceSessions.Date` is only ever written from the date in the save request; "today" is never used to compute a stored date.
++* There is no migration and no data script.
++* `database/scripts/f2-attendance-dates-check.sql`: run it before deploying and after (and after changing the time zone). The two result sets must be identical.
++* `AttendanceDatesAndTimeZoneTests` saves sessions, switches the school to UTC+14, UTC-11 and India, and checks the stored dates and the saved rosters are unchanged.
++
++What *does* change: at the edges of the day the answer to "is this date in the future?" now follows the school. A date that was refused at 02:00 local time is accepted (it is the school's today); at the other end of the world (a school west of UTC) the evening hours no longer allow tomorrow's UTC date.
++
++## Not changed (still UTC), on purpose
++
++| Use | Why left |
++|---|---|
++| `Admission.RegistrationDate` and the `REG-yyyy-nnnn` year | A registration date is not part of attendance; changing it changes the numbers staff see. Decide with the business first. |
++| Document expiry "today" (`DocumentService`) | Same. |
++| Date-of-birth "must be in the past" validators | A one-day tolerance, no business effect. |
++| Enrol pop-up default admission date (`toISOString`) | Frontend default only; staff can change it. Easy to move to `getToday()` later. |
++
++## Tests
++
++* `SchoolClockTests`: India midnight edges, Los Angeles (behind UTC), London daylight saving, unknown zone falls back to UTC, the clock follows a changed setting.
++* `AttendanceTodayTests`: with UTC = 14th and school = 15th, the school's 15th is editable, the 16th is "future", the 7-day window counts from the school's today, history ends on the school's today, and "before F2" the same request was refused.
++* `AttendanceDatesAndTimeZoneTests` (SQL Server): stored dates unchanged under zone changes; the clock follows the setting immediately.
++* `DataScopeTests` / `InActionPermissionTests`: their "today" helper now uses the school's zone (the test database is seeded with Asia/Dubai).
++
++## How to use this branch
++
++1. Commit G2 (and anything else pending) on `develop` first. This patch is made on top of that.
++2. `git checkout -b feature/f2-school-timezone`
++3. Copy the files from `patches/f2/files/` over the repository (same paths). `patches/f2/f2.patch` is the same change as a diff for reading.
++4. Delete the `patches` folder, run the tests, commit.

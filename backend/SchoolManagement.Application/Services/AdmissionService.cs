@@ -48,11 +48,12 @@ public class AdmissionService : IAdmissionService
         return ToResponse(admission);
     }
 
-    public async Task<AdmissionResponse> CreateAsync(CreateAdmissionRequest request, CancellationToken cancellationToken)
+    public async Task<AdmissionResponse> CreateAsync(CreateAdmissionRequest request, CancellationToken cancellationToken, bool canLinkParents = false)
     {
         var classSection = await GetClassSectionOrThrowAsync(request.AppliedForClassSectionId, cancellationToken);
         ClassSectionRules.EnsureActive(classSection);
         var addresses = await _addressService.BuildAsync(request.Addresses ?? new(), cancellationToken);
+        var guardians = await MapGuardiansAsync(request.Guardians, new HashSet<int>(), canLinkParents, cancellationToken);
 
         // One transaction: the application, its guardians, addresses and the RegNo update succeed or fail together.
         return await _admissionRepository.ExecuteInTransactionAsync(async () =>
@@ -75,7 +76,7 @@ public class AdmissionService : IAdmissionService
                 Remarks = request.Remarks,
                 Addresses = addresses,
                 RegNo = "PENDING", // placeholder until Id is assigned — see below
-                Guardians = MapGuardians(request.Guardians),
+                Guardians = guardians,
             };
 
             await _admissionRepository.AddAsync(admission, cancellationToken); // Id now assigned by identity column
@@ -91,7 +92,7 @@ public class AdmissionService : IAdmissionService
         }, cancellationToken);
     }
 
-    public async Task<AdmissionResponse> UpdateAsync(int id, UpdateAdmissionRequest request, CancellationToken cancellationToken)
+    public async Task<AdmissionResponse> UpdateAsync(int id, UpdateAdmissionRequest request, CancellationToken cancellationToken, bool canLinkParents = false)
     {
         var admission = await GetOrThrowAsync(id, cancellationToken);
         RequireEditable(admission);
@@ -108,6 +109,11 @@ public class AdmissionService : IAdmissionService
             ? null
             : await _addressService.BuildAsync(request.Addresses, cancellationToken);
 
+        // G2: parents already linked to this application may stay linked without Parents.View; a NEW link needs it.
+        // Read before the guardians are cleared below.
+        var alreadyLinked = admission.Guardians.Where(g => g.ParentId is not null).Select(g => g.ParentId!.Value).ToHashSet();
+        var newGuardians = await MapGuardiansAsync(request.Guardians, alreadyLinked, canLinkParents, cancellationToken);
+
         return await _admissionRepository.ExecuteInTransactionAsync(async () =>
         {
             // Guardians are replaced as a set. (Only Registered/Admitted applications get here; once
@@ -118,7 +124,7 @@ public class AdmissionService : IAdmissionService
                 admission.Guardians.Clear();
                 await _admissionRepository.SaveChangesAsync(cancellationToken);
             }
-            foreach (var guardian in MapGuardians(request.Guardians))
+            foreach (var guardian in newGuardians)
                 admission.Guardians.Add(guardian);
 
             if (addresses is not null)
@@ -164,8 +170,34 @@ public class AdmissionService : IAdmissionService
     }
 
     /// <summary>
+    /// G2: the registration form's "Find an existing parent". Needs at least 2 letters or 3 digits, so one keystroke
+    /// does not list the whole school. Returns the linked children's names (the caller holds Parents.View).
+    /// </summary>
+    public async Task<List<ParentCandidateResponse>> SearchParentsAsync(string? query, int take, CancellationToken cancellationToken)
+    {
+        var text = (query ?? string.Empty).Trim();
+        var digits = new string(text.Where(char.IsDigit).ToArray());
+        var nameText = text.Length >= 2 ? text : null;
+        var digitText = digits.Length >= 3 ? digits : null;
+        take = Math.Clamp(take, 1, 10);
+
+        var rows = await _admissionRepository.SearchParentsAsync(nameText, digitText, take, cancellationToken);
+        if (rows.Count == 0)
+            return new List<ParentCandidateResponse>();
+
+        var children = await _admissionRepository.GetLinkedChildrenAsync(rows.Select(r => r.ParentId).ToList(), cancellationToken);
+        var byParent = children.GroupBy(c => c.ParentId)
+            .ToDictionary(g => g.Key, g => g.Select(c => c.StudentName).Distinct().ToList());
+
+        return rows.Select(r => new ParentCandidateResponse(
+            r.ParentId, r.Name, r.Mobile, r.Email, byParent.GetValueOrDefault(r.ParentId) ?? new List<string>())).ToList();
+    }
+
+    /// <summary>
     /// For each guardian on the application, find existing Parents with the same mobile number
     /// and say what we suggest. Nothing is linked here — staff confirm every decision at enrolment.
+    /// G2: a guardian registered as an existing parent is suggested that parent first (even if the number was
+    /// changed since); if that parent has been deleted the suggestion is ParentRemoved.
     /// </summary>
     public async Task<GuardianMatchesResponse> GetGuardianMatchesAsync(int id, CancellationToken cancellationToken)
     {
@@ -173,7 +205,16 @@ public class AdmissionService : IAdmissionService
         RequireStatus(admission, "Admitted", "match guardians for");
 
         var rows = await _admissionRepository.GetParentCandidatesAsync(id, cancellationToken);
-        var parentIds = rows.Select(r => r.ParentId).Distinct().ToList();
+
+        var linkedParents = new Dictionary<int, Parent>();
+        foreach (var linkedId in admission.Guardians.Where(g => g.ParentId is not null).Select(g => g.ParentId!.Value).Distinct())
+        {
+            var linkedParent = await _parentRepository.GetByIdAsync(linkedId, cancellationToken); // null when deleted
+            if (linkedParent is not null)
+                linkedParents[linkedId] = linkedParent;
+        }
+
+        var parentIds = rows.Select(r => r.ParentId).Concat(linkedParents.Keys).Distinct().ToList();
         var children = parentIds.Count == 0
             ? new List<ParentChildRow>()
             : await _admissionRepository.GetLinkedChildrenAsync(parentIds, cancellationToken);
@@ -191,22 +232,35 @@ public class AdmissionService : IAdmissionService
                     childrenByParent.GetValueOrDefault(r.ParentId) ?? new List<string>()))
                 .ToList();
 
+            Parent? linked = g.ParentId is int lid && linkedParents.TryGetValue(lid, out var lp) ? lp : null;
+            if (linked is not null)
+            {
+                candidates.RemoveAll(c => c.ParentId == linked.Id);
+                candidates.Insert(0, new ParentCandidateResponse(
+                    linked.Id, linked.Name, linked.Mobile, linked.Email,
+                    childrenByParent.GetValueOrDefault(linked.Id) ?? new List<string>()));
+            }
+
             var suggestion =
+                g.ParentId is not null && linked is null ? GuardianActions.ParentRemoved :
+                linked is not null ? GuardianActions.UseExisting :
                 string.IsNullOrWhiteSpace(g.Mobile) ? GuardianActions.MissingMobile :
                 candidates.Count == 0 ? GuardianActions.CreateNew :
                 candidates.Count == 1 ? GuardianActions.UseExisting :
                 GuardianActions.MustChoose;
 
-            return new GuardianMatchResponse(g.Id, g.RelationType, g.Name, g.Mobile, suggestion, candidates);
+            return new GuardianMatchResponse(g.Id, g.RelationType, g.Name, g.Mobile, suggestion, candidates, g.ParentId);
         }).ToList();
 
         // Father and mother sharing one number would both be pointed at the same Parent;
         // one Parent cannot be two guardians of a student, so make staff choose.
+        // (A guardian registered as that very parent keeps it; only the OTHER guardians pointed at it must choose.)
         var contested = result
             .Where(m => m.SuggestedAction == GuardianActions.UseExisting)
             .GroupBy(m => m.Candidates[0].ParentId)
             .Where(grp => grp.Count() > 1)
             .SelectMany(grp => grp)
+            .Where(m => m.LinkedParentId != m.Candidates[0].ParentId)
             .Select(m => m.AdmissionGuardianId)
             .ToHashSet();
 
@@ -306,6 +360,8 @@ public class AdmissionService : IAdmissionService
             }
 
             // 2 + 3. Create or reuse each Parent, then link it to the student.
+            // G2: remember guardians whose registered parent differs from the parent they became (see below).
+            var changedLinks = new List<(AdmissionGuardian Guardian, int ParentId)>();
             foreach (var item in plan)
             {
                 var parent = item.ExistingParent;
@@ -327,6 +383,26 @@ public class AdmissionService : IAdmissionService
                     RelationType = item.Guardian.RelationType,
                     IsPrimaryContact = item.IsPrimary,
                 }, cancellationToken);
+
+                if (item.Guardian.ParentId is not null && item.Guardian.ParentId != parent.Id)
+                    changedLinks.Add((item.Guardian, parent.Id));
+            }
+
+            // G2: staff chose someone other than the parent picked at registration. Writing the final parent onto the
+            // guardian row makes the audit trail record it automatically (AdmissionGuardians Update: ParentId old -> new,
+            // with the user and time). Two guardians swapping parents would briefly break the "same parent twice"
+            // unique index, so in that one case the old links are cleared (and saved) first.
+            if (changedLinks.Count > 0)
+            {
+                var leaving = changedLinks.Select(c => c.Guardian.ParentId!.Value).ToHashSet();
+                if (changedLinks.Any(c => leaving.Contains(c.ParentId)))
+                {
+                    foreach (var (guardian, _) in changedLinks)
+                        guardian.ParentId = null;
+                    await _admissionRepository.SaveChangesAsync(cancellationToken);
+                }
+                foreach (var (guardian, parentId) in changedLinks)
+                    guardian.ParentId = parentId;
             }
 
             // 4. Admission is now Enrolled.
@@ -383,6 +459,17 @@ public class AdmissionService : IAdmissionService
         if (guardians.Count == 0)
             throw new BusinessRuleException("At least one guardian is required to enrol. Add a guardian to the application first.");
 
+        // G2: a guardian registered as an existing parent whose record has since been deleted. Whatever decision came
+        // with the request, do NOT quietly create a duplicate: staff fix the application first.
+        var removed = new List<string>();
+        foreach (var guardian in guardians.Where(g => g.ParentId is not null))
+            if (await _parentRepository.GetByIdAsync(guardian.ParentId!.Value, cancellationToken) is null)
+                removed.Add(guardian.Name);
+        if (removed.Count > 0)
+            throw new BusinessRuleException(
+                $"The parent record linked to {string.Join(", ", removed)} has been deleted. Open the application, choose "
+                + "'Use a different person' for that guardian (or pick another parent), save, and enrol again.");
+
         // Business decision A: matching depends on the mobile number, and a Parent must have one.
         var withoutMobile = guardians.Where(g => string.IsNullOrWhiteSpace(g.Mobile)).Select(g => g.Name).ToList();
         if (withoutMobile.Count > 0)
@@ -437,17 +524,43 @@ public class AdmissionService : IAdmissionService
         return plan;
     }
 
-    private static List<AdmissionGuardian> MapGuardians(List<AdmissionGuardianRequest>? requests) =>
-        (requests ?? new List<AdmissionGuardianRequest>())
-            .Select(g => new AdmissionGuardian
+    /// <summary>
+    /// Builds the guardian rows. G2: a request naming a ParentId becomes that parent: name, mobile and email are
+    /// COPIED from the parent record and whatever the form sent for them is ignored.
+    /// </summary>
+    /// <param name="alreadyLinked">Parents this application is already linked to (they need no extra permission).</param>
+    private async Task<List<AdmissionGuardian>> MapGuardiansAsync(
+        List<AdmissionGuardianRequest>? requests, ISet<int> alreadyLinked, bool canLinkParents, CancellationToken cancellationToken)
+    {
+        var list = requests ?? new List<AdmissionGuardianRequest>();
+
+        var linkedIds = list.Where(g => g.ParentId is not null).Select(g => g.ParentId!.Value).ToList();
+        if (linkedIds.Count != linkedIds.Distinct().Count())
+            throw new BusinessRuleException("The same parent cannot be added twice to one application.");
+
+        // Permission first, so someone without it learns nothing about which parent ids exist.
+        if (!canLinkParents && linkedIds.Any(i => !alreadyLinked.Contains(i)))
+            throw new ForbiddenException("Choosing an existing parent needs permission to view parents.");
+
+        var parents = new Dictionary<int, Parent>();
+        foreach (var parentId in linkedIds)
+            parents[parentId] = await _parentRepository.GetByIdAsync(parentId, cancellationToken)
+                ?? throw new NotFoundException($"Parent {parentId} does not exist (it may have been deleted).");
+
+        return list.Select(g =>
+        {
+            var parent = g.ParentId is int pid ? parents[pid] : null;
+            return new AdmissionGuardian
             {
                 RelationType = g.RelationType,
-                Name = g.Name.Trim(),
-                Mobile = string.IsNullOrWhiteSpace(g.Mobile) ? null : g.Mobile.Trim(),
-                Email = string.IsNullOrWhiteSpace(g.Email) ? null : g.Email.Trim(),
+                Name = parent?.Name ?? g.Name.Trim(),
+                Mobile = parent is not null ? parent.Mobile : string.IsNullOrWhiteSpace(g.Mobile) ? null : g.Mobile.Trim(),
+                Email = parent is not null ? parent.Email : string.IsNullOrWhiteSpace(g.Email) ? null : g.Email.Trim(),
                 IsPrimaryContact = g.IsPrimaryContact,
-            })
-            .ToList();
+                ParentId = parent?.Id,
+            };
+        }).ToList();
+    }
 
     private async Task<Admission> GetOrThrowAsync(int id, CancellationToken cancellationToken) =>
         await _admissionRepository.GetByIdAsync(id, cancellationToken)
@@ -497,7 +610,7 @@ public class AdmissionService : IAdmissionService
         a.AllottedClassSectionId, a.AllottedClassSection?.DisplayName,
         a.Student?.Id,
         a.Guardians.OrderBy(g => g.Id)
-            .Select(g => new AdmissionGuardianResponse(g.Id, g.RelationType, g.Name, g.Mobile, g.Email, g.IsPrimaryContact))
+            .Select(g => new AdmissionGuardianResponse(g.Id, g.RelationType, g.Name, g.Mobile, g.Email, g.IsPrimaryContact, g.ParentId))
             .ToList(),
         Convert.ToBase64String(a.RowVersion));
 }

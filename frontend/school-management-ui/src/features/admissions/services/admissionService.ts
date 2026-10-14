@@ -7,6 +7,7 @@ import type {
   EnrollAdmissionRequest,
   RejectAdmissionRequest,
   GuardianMatchesResponse,
+  ParentCandidate,
 } from "../types/admission.types";
 
 export const admissionService = {
@@ -37,6 +38,12 @@ export const admissionService = {
   getGuardianMatches: (id: number) =>
     apiClient
       .get<GuardianMatchesResponse>(`/admissions/${id}/guardian-matches`)
+      .then((res) => res.data),
+
+  // G2: "Find an existing parent" on the registration form. Needs Parents.View (the API refuses otherwise).
+  searchParents: (q: string) =>
+    apiClient
+      .get<ParentCandidate[]>("/admissions/parent-search", { params: { q } })
       .then((res) => res.data),
 
   enroll: (id: number, request: EnrollAdmissionRequest) =>
