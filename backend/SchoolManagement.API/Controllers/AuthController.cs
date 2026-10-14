@@ -8,7 +8,6 @@ using SchoolManagement.API.Extensions;
 using SchoolManagement.API.Filters;
 using SchoolManagement.Application.DTOs.Auth;
 using SchoolManagement.Application.Interfaces;
-using SchoolManagement.Domain.Constants;
 
 namespace SchoolManagement.API.Controllers;
 
@@ -170,18 +169,6 @@ public class AuthController : ControllerBase
 
         _refreshCookie.Write(Response, session.RefreshToken);
         return Ok(session.Result);
-    }
-
-    /// <summary>
-    /// Admin-only: unlock a user whose account is locked from failed login attempts.
-    /// Clears LockoutEnd and AccessFailedCount.
-    /// </summary>
-    [HttpPost("unlock/{userId:int}")]
-    [Authorize(Policy = Permissions.UsersChangeStatus)]
-    public async Task<IActionResult> UnlockUser(int userId, CancellationToken cancellationToken)
-    {
-        await _authService.UnlockUserAsync(userId, cancellationToken);
-        return NoContent();
     }
 
     // ─── Private helpers ─────────────────────────────────────────────

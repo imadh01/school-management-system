@@ -23,6 +23,9 @@ import { ClassSectionFormPage } from "../features/class-sections/pages/ClassSect
 import { TeachersPage } from "../features/teachers/pages/TeachersPage";
 import { TeacherDetailPage } from "../features/teachers/pages/TeacherDetailPage";
 import { TeacherFormPage } from "../features/teachers/pages/TeacherFormPage";
+import { UsersPage } from "../features/users/pages/UsersPage";
+import { UserDetailPage } from "../features/users/pages/UserDetailPage";
+import { UserFormPage } from "../features/users/pages/UserFormPage";
 import { SubjectsPage } from "../features/subjects/pages/SubjectsPage";
 import { SubjectFormPage } from "../features/subjects/pages/SubjectFormPage";
 import { CHANGE_PASSWORD_PATH, ProtectedRoute } from "./ProtectedRoute";
@@ -143,17 +146,24 @@ export const router = createBrowserRouter(
             },
           )}
           {recordRoutes(
-            "/teachers",
+            "/users-staff",
             {
-              list: <TeachersPage />,
-              detail: <TeacherDetailPage />,
-              form: <TeacherFormPage />,
+              list: <UsersPage />,
+              detail: <UserDetailPage />,
+              form: <UserFormPage />,
             },
-            {
-              create: Permission.TeachersCreate,
-              edit: Permission.TeachersEdit,
-            },
+            { create: Permission.UsersCreate, edit: Permission.UsersEdit },
           )}
+          {/* E3a: teachers are added on the Users page; this form only edits the teaching profile. */}
+          {guarded("/teachers", <TeachersPage />)}
+          <Route
+            path="/teachers/new"
+            element={<Navigate to="/users-staff/new?role=Teacher" replace />}
+          />
+          {guarded("/teachers/:id", <TeacherDetailPage />, PAGE_PERMISSIONS["/teachers"])}
+          {guarded("/teachers/:id/edit", <TeacherFormPage />, [
+            Permission.TeachersEdit,
+          ])}
           {guarded("/attendance", <AttendancePage />)}
           {guarded("/documents", <DocumentsPage />)}
           {/* Modules from the prototype that are not built yet. */}

@@ -61,7 +61,6 @@ public class AccessMatrixTests
         // Countries for address forms (G1a): reference data, any signed-in user
         new("GET",    "/api/countries", SignedIn),
         new("POST",   "/api/auth/change-password", SignedIn, HasBody: true),
-        new("POST",   $"/api/auth/unlock/{Missing}", P(Permissions.UsersChangeStatus)),
 
         // Users (E2)
         new("GET",    "/api/users", P(Permissions.UsersView)),
@@ -111,9 +110,7 @@ public class AccessMatrixTests
         new("GET",    "/api/teachers", P(Permissions.TeachersView)),
         new("GET",    $"/api/teachers/{Missing}", P(Permissions.TeachersView)),
         new("GET",    $"/api/teachers/{Missing}/assignments", P(Permissions.TeachersView)),
-        new("POST",   "/api/teachers", P(Permissions.TeachersCreate), HasBody: true),
         new("PUT",    $"/api/teachers/{Missing}", P(Permissions.TeachersEdit), HasBody: true),
-        new("PATCH",  $"/api/teachers/{Missing}/status", P(Permissions.TeachersEdit), HasBody: true),
         new("DELETE", $"/api/teachers/{Missing}", P(Permissions.TeachersDelete)),
         new("POST",   $"/api/teachers/{Missing}/subjects", P(Permissions.TeachersAssign), HasBody: true),
         new("DELETE", $"/api/teachers/{Missing}/subjects/{Missing}", P(Permissions.TeachersAssign)),

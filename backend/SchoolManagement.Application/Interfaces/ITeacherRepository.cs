@@ -18,10 +18,6 @@ public interface ITeacherRepository
     Task<Subject?> GetSubjectAsync(int id, CancellationToken cancellationToken);
     Task<ClassSection?> GetClassSectionAsync(int id, CancellationToken cancellationToken);
     Task<int> CountSubjectsInClassAsync(int teacherId, int classSectionId, CancellationToken cancellationToken);
-    Task<bool> UsernameExistsAsync(string username, int? excludeUserId, CancellationToken cancellationToken);
-    Task<bool> EmailExistsAsync(string email, int? excludeUserId, CancellationToken cancellationToken);
-    Task AddAsync(Teacher teacher, CancellationToken cancellationToken);
-
     /// <summary>E2: tracks a new teacher record without saving (it is saved with the account change around it).</summary>
     void Add(Teacher teacher);
     Task SaveChangesAsync(CancellationToken cancellationToken);

@@ -290,10 +290,10 @@ export const NAV_SECTIONS: NavSection[] = [
     items: [
       {
         key: "users-staff",
-        label: "Users & Roles",
+        label: "Users / Staff",
         path: "/users-staff",
         icon: UserCog,
-        built: false,
+        built: true,
       },
     ],
   },

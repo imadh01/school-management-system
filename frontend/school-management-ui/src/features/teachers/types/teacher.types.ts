@@ -15,24 +15,11 @@ export interface TeacherResponse {
   classTeacherOfCount: number;
 }
 
-export interface CreateTeacherRequest {
-  name: string;
-  username: string;
-  email: string;
-  password: string;
-  phone: string | null;
-  specialization: string | null;
-  status: TeacherStatus;
-}
-
+/** E3a: only the teaching profile is edited here; the login lives on the Users page. */
 export interface UpdateTeacherRequest {
   name: string;
-  username: string;
-  email: string;
   phone: string | null;
   specialization: string | null;
-  status: TeacherStatus;
-  newPassword: string | null;
 }
 
 export interface TeacherSubject {

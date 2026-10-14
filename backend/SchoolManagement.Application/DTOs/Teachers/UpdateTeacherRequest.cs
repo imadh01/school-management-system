@@ -1,6 +1,7 @@
 ﻿namespace SchoolManagement.Application.DTOs.Teachers;
 
-/// <param name="NewPassword">Blank/null = keep the current password.</param>
-public record UpdateTeacherRequest(
-    string Name, string Username, string Email,
-    string? Phone, string? Specialization, string Status, string? NewPassword);
+/// <summary>
+/// E3a: the teaching profile only. Username, e-mail, status and password belong to the login and are
+/// changed on the Users page (decision 7). Name and phone are also written to the staff profile.
+/// </summary>
+public record UpdateTeacherRequest(string Name, string? Phone, string? Specialization);

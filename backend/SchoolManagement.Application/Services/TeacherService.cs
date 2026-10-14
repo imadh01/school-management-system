@@ -8,19 +8,11 @@ namespace SchoolManagement.Application.Services;
 public class TeacherService : ITeacherService
 {
     private readonly ITeacherRepository _teachers;
-    private readonly IRoleRepository _roles;
-    private readonly IPasswordHasher _passwordHasher;
     private readonly IUserAccountService _accounts;
 
-    public TeacherService(
-        ITeacherRepository teachers,
-        IRoleRepository roles,
-        IPasswordHasher passwordHasher,
-        IUserAccountService accounts)
+    public TeacherService(ITeacherRepository teachers, IUserAccountService accounts)
     {
         _teachers = teachers;
-        _roles = roles;
-        _passwordHasher = passwordHasher;
         _accounts = accounts;
     }
 
@@ -39,98 +31,26 @@ public class TeacherService : ITeacherService
         return ToResponse(teacher, await GetStatsForAsync(id, cancellationToken));
     }
 
-    public async Task<TeacherResponse> CreateAsync(CreateTeacherRequest request, CancellationToken cancellationToken)
-    {
-        var username = request.Username.Trim();
-        var email = request.Email.Trim();
-
-        if (await _teachers.UsernameExistsAsync(username, null, cancellationToken))
-            throw new ConflictException($"Username '{username}' is already taken.");
-        if (await _teachers.EmailExistsAsync(email, null, cancellationToken))
-            throw new ConflictException($"Email '{email}' is already registered.");
-
-        var role = await _roles.GetByNameAsync("Teacher", cancellationToken)
-            ?? throw new NotFoundException("Role 'Teacher' does not exist.");
-
-        var now = DateTime.UtcNow;
-        var user = new User
-        {
-            Username = username,
-            Email = email,
-            PasswordHash = _passwordHasher.HashPassword(request.Password),
-            Status = request.Status,
-            // The password was chosen by whoever created the account: the teacher sets their own at first sign-in.
-            MustChangePassword = true,
-        };
-        user.UserRoles.Add(new UserRole { Role = role, AssignedAt = now });
-
-        // E2: every staff login has a profile. The teacher's name and phone are written to both places
-        // until E2c drops them from Teachers. Joining date: the day the account was created.
-        var name = request.Name.Trim();
-        var phone = Clean(request.Phone);
-        user.StaffProfile = new StaffProfile
-        {
-            FullName = name,
-            Mobile = phone,
-            JoiningDate = DateOnly.FromDateTime(now),
-        };
-
-        var teacher = new Teacher
-        {
-            User = user,
-            Name = name,
-            Phone = phone,
-            Specialization = Clean(request.Specialization),
-            CreatedAt = now,
-            UpdatedAt = now,
-        };
-
-        await _teachers.AddAsync(teacher, cancellationToken);
-        return ToResponse(teacher, null);
-    }
-
+    /// <summary>
+    /// E3a: name, phone and specialization. The login (username, e-mail, status, password) is changed on
+    /// the Users page, through the account service.
+    /// </summary>
     public async Task<TeacherResponse> UpdateAsync(int id, UpdateTeacherRequest request, CancellationToken cancellationToken)
     {
         var teacher = await GetOrThrowAsync(id, cancellationToken);
-        var username = request.Username.Trim();
-        var email = request.Email.Trim();
-
-        if (await _teachers.UsernameExistsAsync(username, teacher.UserId, cancellationToken))
-            throw new ConflictException($"Username '{username}' is already taken.");
-        if (await _teachers.EmailExistsAsync(email, teacher.UserId, cancellationToken))
-            throw new ConflictException($"Email '{email}' is already registered.");
 
         teacher.Name = request.Name.Trim();
         teacher.Phone = Clean(request.Phone);
         teacher.Specialization = Clean(request.Specialization);
         teacher.UpdatedAt = DateTime.UtcNow;
 
-        // E2: kept in step with the profile until E2c (the Users page edits the profile, this page both).
+        // Kept in step with the staff profile until E2c drops Teachers.Name/Phone.
         teacher.User.StaffProfile ??= new StaffProfile { FullName = teacher.Name };
         teacher.User.StaffProfile.FullName = teacher.Name;
         teacher.User.StaffProfile.Mobile = teacher.Phone;
-
-        teacher.User.Username = username;
-        teacher.User.Email = email;
         teacher.User.NewVersion(); // the Users page's edit form for this account is now stale
+
         await _teachers.SaveChangesAsync(cancellationToken);
-
-        // Status and password are account security: they go through the account service, which ends the
-        // teacher's sessions at once (E2 security fix). E2 moves these two fields to the Users page.
-        if (teacher.User.Status != request.Status)
-            await _accounts.ChangeStatusAsync(teacher.UserId, request.Status, null, cancellationToken);
-        if (!string.IsNullOrWhiteSpace(request.NewPassword))
-            await _accounts.SetTemporaryPasswordAsync(teacher.UserId, request.NewPassword, cancellationToken);
-
-        return ToResponse(teacher, await GetStatsForAsync(id, cancellationToken));
-    }
-
-    public async Task<TeacherResponse> ChangeStatusAsync(int id, string status, CancellationToken cancellationToken)
-    {
-        var teacher = await GetOrThrowAsync(id, cancellationToken);
-        teacher.UpdatedAt = DateTime.UtcNow;
-        // Saves the teacher row too, and ends the teacher's sessions when the status is not Active.
-        await _accounts.ChangeStatusAsync(teacher.UserId, status, null, cancellationToken);
         return ToResponse(teacher, await GetStatsForAsync(id, cancellationToken));
     }
 

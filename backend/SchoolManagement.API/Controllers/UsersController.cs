@@ -116,7 +116,7 @@ public class UsersController : ControllerBase
         return NoContent();
     }
 
-    /// <summary>Ends a lockout after too many failed sign-ins (same as the older POST /api/auth/unlock/{id}).</summary>
+    /// <summary>Ends a lockout after too many failed sign-ins (replaces the old POST /api/auth/unlock/{id}).</summary>
     [HttpPost("{id:int}/unlock")]
     [Authorize(Policy = Permissions.UsersChangeStatus)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]

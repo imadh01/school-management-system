@@ -42,3 +42,18 @@ export function formatUtcDate(iso: string | null | undefined): string | null {
     year: "numeric",
   });
 }
+
+/** A moment from the API as local date and time: "13 Oct 2026, 09:05". Null/blank → null. */
+export function formatUtcDateTime(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const hasZone = /Z$|[+-]\d{2}:\d{2}$/.test(iso);
+  const d = new Date(hasZone ? iso : `${iso}Z`);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}

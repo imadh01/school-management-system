@@ -39,7 +39,8 @@ const STATUS_FILTERS = ["All", ...TEACHER_STATUSES] as const;
  */
 export function TeachersPage() {
   const can = useCan();
-  const canCreate = can(Permission.TeachersCreate);
+  // A teacher is a user with the role Teacher: new teachers are added on the Users page.
+  const canCreate = can(Permission.UsersCreate);
   const canEdit = can(Permission.TeachersEdit);
   const canDelete = can(Permission.TeachersDelete);
 
@@ -124,7 +125,7 @@ export function TeachersPage() {
     );
 
   const newLink = canCreate ? (
-    <NewRecordLink to="/teachers/new" label="Add teacher" />
+    <NewRecordLink to="/users-staff/new?role=Teacher" label="Add teacher" />
   ) : undefined;
 
   const columns: Column<TeacherResponse>[] = [

@@ -1,79 +1,49 @@
 import { useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { teacherService } from "../services/teacherService";
-import {
-  TEACHER_STATUSES,
-  type TeacherResponse,
-  type TeacherStatus,
-} from "../types/teacher.types";
+import type { TeacherResponse } from "../types/teacher.types";
 import { FormPage } from "@/components/form/FormPage";
 import { FormSection } from "@/components/form/FormSection";
-import { SelectField, TextField } from "@/components/form/Inputs";
-import { PasswordRules } from "@/components/form/PasswordRules";
+import { TextField } from "@/components/form/Inputs";
 import { PageLoadError, PageLoading } from "@/components/PageState";
 import { useAsyncData } from "@/hooks/useAsyncData";
 import { useRecordForm } from "@/hooks/useRecordForm";
 import { fieldBinder, type FormSectionDef } from "@/utils/form";
-import { meetsPasswordRules } from "@/utils/password";
 
 interface FormState {
   name: string;
   specialization: string;
   phone: string;
-  status: TeacherStatus;
-  username: string;
-  email: string;
-  /** New teacher: the first password (required). Edit: a new password, blank = unchanged. */
-  password: string;
 }
 
 const SECTIONS: readonly FormSectionDef[] = [
   {
     id: "profile",
-    title: "Profile",
-    fields: ["name", "specialization", "phone", "status"],
-  },
-  {
-    id: "login",
-    title: "Login account",
-    fields: ["username", "email", "password", "newPassword"],
+    title: "Teaching profile",
+    fields: ["name", "specialization", "phone"],
   },
 ];
 
-const EMPTY_FORM: FormState = {
-  name: "",
-  specialization: "",
-  phone: "",
-  status: "Active",
-  username: "",
-  email: "",
-  password: "",
-};
+const EMPTY_FORM: FormState = { name: "", specialization: "", phone: "" };
 
 const formFrom = (t: TeacherResponse): FormState => ({
   name: t.name,
   specialization: t.specialization ?? "",
   phone: t.phone ?? "",
-  status: t.status as TeacherStatus,
-  username: t.username,
-  email: t.email,
-  password: "",
 });
 
 /**
- * U2: adding a teacher (/teachers/new) and editing one (/teachers/:id/edit) on a full page. A
- * teacher is a staff member with a login, so the page has two parts: the profile, and the login
- * account (username, email, password). Class and subject assignments are made on the teacher's page.
+ * E3a: edit a teacher's teaching profile (/teachers/:id/edit): name, phone and specialization.
+ * The login (username, e-mail, status, password, role) belongs to the Users page, and so does
+ * adding a teacher: /teachers/new sends you to the Users form with the role Teacher.
  */
 export function TeacherFormPage() {
-  const { id } = useParams();
-  const isNew = id === undefined;
-  const teacherId = Number(id);
+  const teacherId = Number(useParams().id);
   const navigate = useNavigate();
 
   const loaded = useAsyncData(
-    () => (isNew ? Promise.resolve(null) : teacherService.getById(teacherId)),
-    [isNew, teacherId],
+    () => teacherService.getById(teacherId),
+    [teacherId],
     "Could not load this teacher.",
   );
   const record = useRecordForm<FormState>({
@@ -98,85 +68,48 @@ export function TeacherFormPage() {
       />
     );
   }
-  if (loaded.isLoading || (teacher && record.form === EMPTY_FORM))
-    return <PageLoading />;
+  if (!teacher || record.form === EMPTY_FORM) return <PageLoading />;
 
   const form = record.form;
   const bind = fieldBinder(form, record.patch, record.fieldErrors, "teacher");
+  const backTo = `/teachers/${teacher.id}`;
 
   const validate = () => {
     const e: Record<string, string> = {};
     if (!form.name.trim()) e.name = "Full name is required.";
-    if (!form.username.trim()) e.username = "Username is required.";
-    if (!form.email.trim()) e.email = "Email is required.";
-    else if (!/^\S+@\S+\.\S+$/.test(form.email.trim()))
-      e.email = "Enter a valid email address.";
-    if (!teacher && !form.password)
-      e.password = "A password is required for the new login.";
-    else if (form.password && !meetsPasswordRules(form.password))
-      e.password = "The password does not meet all the rules below.";
     return e;
   };
 
-  const handleSave = () => {
-    const common = {
-      name: form.name.trim(),
-      username: form.username.trim(),
-      email: form.email.trim(),
-      phone: form.phone.trim() || null,
-      specialization: form.specialization.trim() || null,
-      status: form.status,
-    };
+  const handleSave = () =>
     void record.save({
       validate,
       submit: () =>
-        teacher
-          ? teacherService.update(teacher.id, {
-              ...common,
-              newPassword: form.password || null,
-            })
-          : teacherService.create({ ...common, password: form.password }),
+        teacherService.update(teacher.id, {
+          name: form.name.trim(),
+          phone: form.phone.trim() || null,
+          specialization: form.specialization.trim() || null,
+        }),
       fallback: "Could not save this teacher.",
-      // The API calls the edit-page password "newPassword"; it is the same box.
-      remap: (fields) =>
-        Object.fromEntries(
-          Object.entries(fields).map(([k, m]) => [
-            k === "newPassword" ? "password" : k,
-            m,
-          ]),
-        ),
       onSaved: (saved) => ({
         form: formFrom(saved),
-        message: teacher
-          ? `${saved.name} was saved.`
-          : `${saved.name} was added.`,
-        goTo: `/teachers/${saved.id}`,
+        message: `${saved.name} was saved.`,
+        goTo: backTo,
       }),
     });
-  };
-
-  const backTo = teacher ? `/teachers/${teacher.id}` : "/teachers";
 
   return (
     <>
       {record.guard}
       <FormPage
         {...record.pageProps}
-        title={teacher ? `Edit ${teacher.name}` : "Add teacher"}
-        subtitle={
-          teacher
-            ? teacher.username
-            : "Classes and subjects are assigned on the teacher's page after saving."
-        }
-        back={{
-          to: backTo,
-          label: teacher ? "Back to teacher" : "Back to teachers",
-        }}
+        title={`Edit ${teacher.name}`}
+        subtitle={`${teacher.username} · the login is managed on the Users page`}
+        back={{ to: backTo, label: "Back to teacher" }}
         onSubmit={handleSave}
-        saveLabel={teacher ? "Save changes" : "Save teacher"}
+        saveLabel="Save changes"
         onCancel={() => navigate(backTo)}
       >
-        <FormSection id="profile" title="Profile">
+        <FormSection id="profile" title="Teaching profile">
           <TextField {...bind("name")} label="Full name" required />
           <TextField
             {...bind("specialization")}
@@ -184,45 +117,6 @@ export function TeacherFormPage() {
             placeholder="e.g. Mathematics"
           />
           <TextField {...bind("phone")} label="Phone" type="tel" />
-          <SelectField
-            {...bind("status")}
-            label="Status"
-            options={TEACHER_STATUSES}
-            hint="Inactive and suspended teachers cannot sign in."
-          />
-        </FormSection>
-
-        <FormSection
-          id="login"
-          title="Login account"
-          description="The teacher signs in with this username or email."
-        >
-          <TextField
-            {...bind("username")}
-            label="Username"
-            required
-            autoComplete="off"
-          />
-          <TextField
-            {...bind("email")}
-            label="Email"
-            type="email"
-            required
-            autoComplete="off"
-          />
-          <TextField
-            {...bind("password")}
-            label={teacher ? "New password" : "Password"}
-            type="password"
-            required={!teacher}
-            autoComplete="new-password"
-            hint={
-              teacher ? "Leave blank to keep the current password." : undefined
-            }
-          />
-          <div className="field">
-            <PasswordRules password={form.password} />
-          </div>
         </FormSection>
       </FormPage>
     </>

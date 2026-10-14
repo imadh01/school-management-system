@@ -6,9 +6,7 @@ public interface ITeacherService
 {
     Task<List<TeacherResponse>> GetAllAsync(CancellationToken cancellationToken);
     Task<TeacherResponse> GetByIdAsync(int id, CancellationToken cancellationToken);
-    Task<TeacherResponse> CreateAsync(CreateTeacherRequest request, CancellationToken cancellationToken);
     Task<TeacherResponse> UpdateAsync(int id, UpdateTeacherRequest request, CancellationToken cancellationToken);
-    Task<TeacherResponse> ChangeStatusAsync(int id, string status, CancellationToken cancellationToken);
     Task DeleteAsync(int id, CancellationToken cancellationToken);
 
     Task<List<TeacherAssignmentResponse>> GetAssignmentsAsync(int id, CancellationToken cancellationToken);

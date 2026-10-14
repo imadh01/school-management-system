@@ -15,24 +15,18 @@ namespace SchoolManagement.API.Controllers;
 public class TeachersController : ControllerBase
 {
     private readonly ITeacherService _teacherService;
-    private readonly IValidator<CreateTeacherRequest> _createValidator;
     private readonly IValidator<UpdateTeacherRequest> _updateValidator;
-    private readonly IValidator<ChangeTeacherStatusRequest> _statusValidator;
     private readonly IValidator<AssignSubjectsRequest> _assignValidator;
     private readonly IValidator<SetClassTeacherRequest> _classTeacherValidator;
 
     public TeachersController(
         ITeacherService teacherService,
-        IValidator<CreateTeacherRequest> createValidator,
         IValidator<UpdateTeacherRequest> updateValidator,
-        IValidator<ChangeTeacherStatusRequest> statusValidator,
         IValidator<AssignSubjectsRequest> assignValidator,
         IValidator<SetClassTeacherRequest> classTeacherValidator)
     {
         _teacherService = teacherService;
-        _createValidator = createValidator;
         _updateValidator = updateValidator;
-        _statusValidator = statusValidator;
         _assignValidator = assignValidator;
         _classTeacherValidator = classTeacherValidator;
     }
@@ -50,19 +44,9 @@ public class TeachersController : ControllerBase
     public async Task<IActionResult> GetById(int id, CancellationToken ct) =>
         Ok(await _teacherService.GetByIdAsync(id, ct));
 
-    [HttpPost]
-    [Authorize(Policy = Permissions.TeachersCreate)]
-    [ProducesResponseType(typeof(TeacherResponse), StatusCodes.Status201Created)]
-    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> Create(CreateTeacherRequest request, CancellationToken ct)
-    {
-        var result = await _createValidator.ValidateAsync(request, ct);
-        if (!result.IsValid) return ValidationFailed(result);
-
-        var created = await _teacherService.CreateAsync(request, ct);
-        return Created($"api/teachers/{created.Id}", created);
-    }
+    // E3a: a teacher is created on the Users page (POST /api/users with role Teacher), and the login's
+    // username, e-mail, status and password are changed there too (decision 7). This page edits the
+    // teaching profile: name, phone, specialization, and the assignments below.
 
     [HttpPut("{id:int}")]
     [Authorize(Policy = Permissions.TeachersEdit)]
@@ -78,19 +62,7 @@ public class TeachersController : ControllerBase
         return Ok(await _teacherService.UpdateAsync(id, request, ct));
     }
 
-    [HttpPatch("{id:int}/status")]
-    [Authorize(Policy = Permissions.TeachersEdit)]
-    [ProducesResponseType(typeof(TeacherResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> ChangeStatus(int id, ChangeTeacherStatusRequest request, CancellationToken ct)
-    {
-        var result = await _statusValidator.ValidateAsync(request, ct);
-        if (!result.IsValid) return ValidationFailed(result);
-
-        return Ok(await _teacherService.ChangeStatusAsync(id, request.Status, ct));
-    }
-
+    /// <summary>Deletes the teacher and their login (refused while they teach). Ends the teacher's sessions.</summary>
     [HttpDelete("{id:int}")]
     [Authorize(Policy = Permissions.TeachersDelete)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]

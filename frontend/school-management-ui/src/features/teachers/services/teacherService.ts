@@ -1,10 +1,8 @@
 import { apiClient } from "@/services/apiClient";
 import type {
   AssignSubjectsRequest,
-  CreateTeacherRequest,
   TeacherAssignment,
   TeacherResponse,
-  TeacherStatus,
   UpdateTeacherRequest,
 } from "../types/teacher.types";
 
@@ -15,19 +13,9 @@ export const teacherService = {
   getById: (id: number) =>
     apiClient.get<TeacherResponse>(`/teachers/${id}`).then((res) => res.data),
 
-  create: (request: CreateTeacherRequest) =>
-    apiClient
-      .post<TeacherResponse>("/teachers", request)
-      .then((res) => res.data),
-
   update: (id: number, request: UpdateTeacherRequest) =>
     apiClient
       .put<TeacherResponse>(`/teachers/${id}`, request)
-      .then((res) => res.data),
-
-  changeStatus: (id: number, status: TeacherStatus) =>
-    apiClient
-      .patch<TeacherResponse>(`/teachers/${id}/status`, { status })
       .then((res) => res.data),
 
   delete: (id: number) => apiClient.delete(`/teachers/${id}`),

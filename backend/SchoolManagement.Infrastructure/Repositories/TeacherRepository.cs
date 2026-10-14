@@ -91,20 +91,6 @@ public class TeacherRepository : ITeacherRepository
         _context.Subjects.CountAsync(
             s => s.TeacherId == teacherId && s.ClassSectionId == classSectionId, cancellationToken);
 
-    public Task<bool> UsernameExistsAsync(string username, int? excludeUserId, CancellationToken cancellationToken) =>
-        _context.Users.AnyAsync(u => u.Username == username && u.Id != (excludeUserId ?? 0), cancellationToken);
-
-    public Task<bool> EmailExistsAsync(string email, int? excludeUserId, CancellationToken cancellationToken) =>
-        _context.Users.AnyAsync(u => u.Email == email && u.Id != (excludeUserId ?? 0), cancellationToken);
-
-    // Teacher + its new User + UserRole are one object graph → one SaveChanges,
-    // which EF runs in a single transaction. No explicit transaction needed.
-    public async Task AddAsync(Teacher teacher, CancellationToken cancellationToken)
-    {
-        await _context.Teachers.AddAsync(teacher, cancellationToken);
-        await _context.SaveChangesAsync(cancellationToken);
-    }
-
     public void Add(Teacher teacher) => _context.Teachers.Add(teacher);
 
     public Task SaveChangesAsync(CancellationToken cancellationToken) =>

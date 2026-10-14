@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { BookOpen, BookPlus, UserRound } from "lucide-react";
 import { teacherService } from "../services/teacherService";
 import type {
@@ -23,7 +23,7 @@ import { useAsyncData } from "@/hooks/useAsyncData";
 import { useCan } from "@/hooks/useCan";
 import { useConfirmAction } from "@/hooks/useConfirmAction";
 import { useTabParam } from "@/hooks/useTabParam";
-import { Permission } from "@/routes/permissions";
+import { PAGE_PERMISSIONS, Permission } from "@/routes/permissions";
 
 const TAB_IDS = ["overview", "assignments"] as const;
 
@@ -45,6 +45,7 @@ export function TeacherDetailPage() {
   const canEdit = can(Permission.TeachersEdit);
   const canDelete = can(Permission.TeachersDelete);
   const canAssign = can(Permission.TeachersAssign);
+  const canOpenUsers = can(...PAGE_PERMISSIONS["/users-staff"]);
 
   const { data: teacher, error } = useAsyncData(
     () => teacherService.getById(teacherId),
@@ -206,6 +207,13 @@ export function TeacherDetailPage() {
                   },
                 ]}
               />
+              {canOpenUsers && (
+                <p style={{ margin: "12px 0 0" }}>
+                  <Link to={`/users-staff/${teacher.userId}`}>
+                    Manage the login (status, password, role)
+                  </Link>
+                </p>
+              )}
             </DetailCard>
           </div>
         </TabPanel>

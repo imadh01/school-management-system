@@ -147,9 +147,7 @@ builder.Services.AddScoped<IValidator<UpdateClassSectionRequest>, UpdateClassSec
 
 builder.Services.AddScoped<ITeacherRepository, TeacherRepository>();
 builder.Services.AddScoped<ITeacherService, TeacherService>();
-builder.Services.AddScoped<IValidator<CreateTeacherRequest>, CreateTeacherRequestValidator>();
 builder.Services.AddScoped<IValidator<UpdateTeacherRequest>, UpdateTeacherRequestValidator>();
-builder.Services.AddScoped<IValidator<ChangeTeacherStatusRequest>, ChangeTeacherStatusRequestValidator>();
 builder.Services.AddScoped<IValidator<AssignSubjectsRequest>, AssignSubjectsRequestValidator>();
 builder.Services.AddScoped<IValidator<SetClassTeacherRequest>, SetClassTeacherRequestValidator>();
 builder.Services.AddSingleton(TimeProvider.System);

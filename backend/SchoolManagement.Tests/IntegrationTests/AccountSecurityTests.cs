@@ -1,8 +1,9 @@
 ﻿// E2 security fixes, end-to-end through the real API:
 //
-//   Problem 1 - a teacher who is deactivated, suspended or deleted on the Teachers page, or whose password
-//               an admin sets, is refused on their very next request (before the fix their current access
-//               token kept working, because the permission cache still said "Active").
+//   Problem 1 - a teacher who is deactivated, suspended or deleted, or whose password an admin sets, is
+//               refused on their very next request (before the fix their current access token kept
+//               working, because the permission cache still said "Active"). Since E3a the status and the
+//               password are changed on the Users endpoints; delete is still on the Teachers page too.
 //   Problem 3 - password hashes and security stamps never reach the audit log, on any path (create, edit,
 //               change password, delete), and a sign-in writes no audit row at all.
 //
@@ -14,7 +15,7 @@ using System.Net.Http.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using SchoolManagement.Application.DTOs.Auth;
-using SchoolManagement.Application.DTOs.Teachers;
+using SchoolManagement.Application.DTOs.Users;
 using SchoolManagement.Application.Interfaces;
 using SchoolManagement.Domain.Constants;
 using SchoolManagement.Domain.Entities;
@@ -64,23 +65,9 @@ public class AccountSecurityTests
         var token = (await LoginAsync(teacher.Username, TeacherPassword)).Token;
         Assert.Equal(HttpStatusCode.OK, (await SendAsync(token, HttpMethod.Get, "/api/auth/me")).StatusCode);
 
-        var change = await SendAsync(admin, HttpMethod.Patch, $"/api/teachers/{teacher.Id}/status",
-            new ChangeTeacherStatusRequest(status));
+        var change = await SendAsync(admin, HttpMethod.Patch, $"/api/users/{teacher.UserId}/status",
+            new ChangeUserStatusRequest(status, await RowVersionOfAsync(admin, teacher.UserId)));
         Assert.Equal(HttpStatusCode.OK, change.StatusCode);
-
-        Assert.Equal(HttpStatusCode.Unauthorized, (await SendAsync(token, HttpMethod.Get, "/api/auth/me")).StatusCode);
-    }
-
-    [Fact]
-    public async Task A_teacher_deactivated_through_the_edit_form_is_refused_on_the_next_request()
-    {
-        var admin = await AdminTokenAsync();
-        var teacher = await CreateTeacherAsync(admin);
-        var token = (await LoginAsync(teacher.Username, TeacherPassword)).Token;
-
-        var update = await SendAsync(admin, HttpMethod.Put, $"/api/teachers/{teacher.Id}",
-            new UpdateTeacherRequest(teacher.Name, teacher.Username, teacher.Email, null, null, "Inactive", null));
-        Assert.Equal(HttpStatusCode.OK, update.StatusCode);
 
         Assert.Equal(HttpStatusCode.Unauthorized, (await SendAsync(token, HttpMethod.Get, "/api/auth/me")).StatusCode);
     }
@@ -105,9 +92,9 @@ public class AccountSecurityTests
         var teacher = await CreateTeacherAsync(admin);
         var token = (await LoginAsync(teacher.Username, TeacherPassword)).Token;
 
-        var update = await SendAsync(admin, HttpMethod.Put, $"/api/teachers/{teacher.Id}",
-            new UpdateTeacherRequest(teacher.Name, teacher.Username, teacher.Email, null, null, "Active", "Reset@12345"));
-        Assert.Equal(HttpStatusCode.OK, update.StatusCode);
+        var reset = await SendAsync(admin, HttpMethod.Post, $"/api/users/{teacher.UserId}/reset-password",
+            new ResetUserPasswordRequest("Reset@12345"));
+        Assert.Equal(HttpStatusCode.NoContent, reset.StatusCode);
 
         Assert.Equal(HttpStatusCode.Unauthorized, (await SendAsync(token, HttpMethod.Get, "/api/auth/me")).StatusCode);
         Assert.True((await LoginAsync(teacher.Username, "Reset@12345")).MustChangePassword);
@@ -135,9 +122,9 @@ public class AccountSecurityTests
         secrets.AddRange(await SecretsOfAsync(teacher.UserId));
 
         // Path 3: a password set by an admin (account service).
-        var update = await SendAsync(admin, HttpMethod.Put, $"/api/teachers/{teacher.Id}",
-            new UpdateTeacherRequest(teacher.Name, teacher.Username, teacher.Email, null, null, "Active", "Reset@12345"));
-        Assert.Equal(HttpStatusCode.OK, update.StatusCode);
+        var reset = await SendAsync(admin, HttpMethod.Post, $"/api/users/{teacher.UserId}/reset-password",
+            new ResetUserPasswordRequest("Reset@12345"));
+        Assert.Equal(HttpStatusCode.NoContent, reset.StatusCode);
         secrets.AddRange(await SecretsOfAsync(teacher.UserId));
 
         // Path 4: delete (soft delete; the stamp rotates).
@@ -225,13 +212,25 @@ public class AccountSecurityTests
         return (await LoginAsync(name, AdminPassword)).Token;
     }
 
-    private async Task<TeacherResponse> CreateTeacherAsync(string adminToken)
+    /// <summary>A teacher account as the tests need it: login id, teacher record id, username.</summary>
+    private sealed record CreatedTeacher(int UserId, int Id, string Username);
+
+    /// <summary>E3a: teachers are created on the Users endpoint, with role Teacher.</summary>
+    private async Task<CreatedTeacher> CreateTeacherAsync(string adminToken)
     {
         var name = "sect_" + TestData.Unique();
-        var response = await SendAsync(adminToken, HttpMethod.Post, "/api/teachers",
-            new CreateTeacherRequest("Teacher " + name, name, $"{name}@test.local", TeacherPassword, null, null));
+        var response = await SendAsync(adminToken, HttpMethod.Post, "/api/users",
+            TestData.NewUserRequest(name, $"{name}@test.local", TeacherPassword, RoleNames.Teacher));
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-        return (await response.Content.ReadFromJsonAsync<TeacherResponse>())!;
+        var user = (await response.Content.ReadFromJsonAsync<UserResponse>())!;
+        return new CreatedTeacher(user.Id, user.TeacherId!.Value, user.Username);
+    }
+
+    private async Task<string> RowVersionOfAsync(string adminToken, int userId)
+    {
+        var response = await SendAsync(adminToken, HttpMethod.Get, $"/api/users/{userId}");
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<UserResponse>())!.RowVersion;
     }
 
     private async Task<AuthResult> LoginAsync(string username, string password)

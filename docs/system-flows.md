@@ -181,7 +181,7 @@ flowchart LR
 ```
 
 - Subject types: `Theory` / `Practical` need Max + Pass marks; `Both` needs Theory and Practical max + pass.
-- Teacher status: Active / Inactive / Suspended (`PATCH /teachers/{id}/status`). A non-Active user cannot log in.
+- Teacher status: Active / Inactive / Suspended (changed on the Users page: `PATCH /users/{id}/status`). A non-Active user cannot log in.
 
 ### 3.7 Attendance
 

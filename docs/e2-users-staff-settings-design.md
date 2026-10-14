@@ -219,7 +219,7 @@ Settings: `Settings.View` reads, `Settings.Edit` saves (with rowVersion). The sc
 | PUT | /api/users/{id} | Users.Edit | username, email, role, profile, addresses (null = keep), rowVersion |
 | PATCH | /api/users/{id}/status | Users.ChangeStatus | Active / Inactive / Suspended, rowVersion |
 | POST | /api/users/{id}/reset-password | Users.ResetPassword | temporary password |
-| POST | /api/users/{id}/unlock | Users.ChangeStatus | moved from /api/auth/unlock/{id} (old route kept until E3, then removed) |
+| POST | /api/users/{id}/unlock | Users.ChangeStatus | moved from /api/auth/unlock/{id} (old route removed in E3a) |
 | DELETE | /api/users/{id} | Users.Delete | soft |
 | GET | /api/me/profile | signed in | own profile |
 | PUT | /api/me/profile | signed in | own profile + e-mail, rowVersion |
@@ -347,7 +347,7 @@ Existing users get a random starting value in the migration.
 - `GET /api/settings/basics` — any signed-in user: school name, short name, country id (top bar; address
   forms pre-select the country, decision 6). Served from `ISchoolSettingsProvider`, a singleton cache cleared
   after each settings save (single server, like the permission cache).
-- `POST /api/auth/unlock/{id}` still exists next to `POST /api/users/{id}/unlock`; it goes in E3.
+- `POST /api/auth/unlock/{id}` was removed in E3a; `POST /api/users/{id}/unlock` is the only unlock.
 - Teacher accounts: role **Teacher** on the Users page creates the Teachers row (name and phone from the
   profile, specialization from the request). Moving a teacher to another role, or deleting the account, is
   refused (422) while the teacher still teaches a subject or is a class teacher; otherwise the Teachers row is
@@ -368,3 +368,26 @@ staff address owner, one settings row and its checks, the migration's copy and g
 role change ends sessions, teacher with assignments, status/password/unlock/delete, needs-name flag,
 My Account, settings and time zones), validator and UserService unit tests, and the new rows in
 `AccessMatrixTests`. Manual: `backend/SchoolManagement.API/E2-Users-Settings.http`.
+
+
+## E3a as built (Users / Staff pages and Teachers clean-up)
+
+**Frontend** (`features/users/`): `UsersPage` (list with status pills, role/gender filters, search, "Needs name"
+and "Locked" badges; reset password and delete as pop-ups), `UserDetailPage` (login, profile, addresses;
+Edit, Change status, Reset password, Unlock, Delete), `UserFormPage` (add and edit; `?role=Teacher` pre-selects
+the role; specialization only for a new Teacher), `AccountActionDialogs`.
+
+**Rules the pages follow**
+- Student and Parent never appear in the role filter or the form (decision 1).
+- Status change, password reset, role change and delete each say that they sign the user out everywhere.
+  The API's refusals (own account, last active Admin, teacher who still teaches, someone else saved first)
+  stay visible inside the pop-up.
+- The temporary password exists only while typed (add form, reset pop-up). It is never shown again, stored
+  or put in a message.
+- Your own row/page has no status, role, reset or delete actions (the API refuses them anyway).
+
+**Teachers clean-up (decision 7):** the Teachers form edits only name, phone and specialization. "Add teacher"
+goes to `/users-staff/new?role=Teacher`, and `/teachers/new` redirects there. Removed from the API:
+`POST /api/teachers`, `PATCH /api/teachers/{id}/status`, `POST /api/auth/unlock/{id}`, and the username,
+e-mail, status and password fields of `PUT /api/teachers/{id}` (it now takes `name`, `phone`,
+`specialization`). Not in E3a: school-country default for addresses (E3b), CSV/PDF/Print on Users.
