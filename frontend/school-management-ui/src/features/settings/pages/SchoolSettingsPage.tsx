@@ -98,10 +98,32 @@ const offsetLabel = (minutes: number) => {
   return `UTC${sign}${hh}:${mm}`;
 };
 
-const optionOf = (z: TimeZoneOption) => ({
-  value: z.id,
-  label: `${z.displayName} (${offsetLabel(z.utcOffsetMinutes)})`,
-});
+/** "India Standard Time" for Asia/Kolkata, from the browser; undefined when it only has "GMT+5:30". */
+const regionName = (id: string): string | undefined => {
+  try {
+    const name = new Intl.DateTimeFormat("en", { timeZone: id, timeZoneName: "long" })
+      .formatToParts(new Date())
+      .find((p) => p.type === "timeZoneName")?.value;
+    return name && !name.startsWith("GMT") ? name : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+/**
+ * Starts with the region's name ("India Standard Time"), so typing "India" on the closed list jumps to
+ * it; the IANA id and the offset follow: "India Standard Time — Asia/Kolkata (UTC+05:30)".
+ */
+const optionOf = (z: TimeZoneOption) => {
+  const region = regionName(z.id);
+  const where = z.id.replace(/_/g, " ");
+  return {
+    value: z.id,
+    label: region
+      ? `${region} — ${where} (${offsetLabel(z.utcOffsetMinutes)})`
+      : `${where} (${offsetLabel(z.utcOffsetMinutes)})`,
+  };
+};
 
 /**
  * E3b: Settings → School settings (/settings). The school's own record: name, contact details,

@@ -17,6 +17,17 @@ public static class SchoolTimeZones
         && TimeZoneInfo.TryFindSystemTimeZoneById(id, out var zone)
         && zone.HasIanaId;
 
+    /// <summary>Windows' conversion table (and old tzdata) gives some zones by their former IANA names.
+    /// The list offers the current name when the server knows it, so India is "Asia/Kolkata", not "Asia/Calcutta".</summary>
+    private static readonly Dictionary<string, string> CurrentNames = new(StringComparer.Ordinal)
+    {
+        ["Asia/Calcutta"] = "Asia/Kolkata",
+        ["Asia/Katmandu"] = "Asia/Kathmandu",
+        ["Asia/Rangoon"] = "Asia/Yangon",
+        ["Asia/Saigon"] = "Asia/Ho_Chi_Minh",
+        ["Atlantic/Faeroe"] = "Atlantic/Faroe",
+    };
+
     /// <summary>Every zone the server knows, by IANA id, sorted by today's offset then id.</summary>
     public static List<TimeZoneOption> All(DateTime utcNow)
     {
@@ -27,6 +38,8 @@ public static class SchoolTimeZones
             var id = zone.HasIanaId
                 ? zone.Id
                 : TimeZoneInfo.TryConvertWindowsIdToIanaId(zone.Id, out var iana) ? iana : null;
+            if (id is not null && CurrentNames.TryGetValue(id, out var current) && IsValidIanaId(current))
+                id = current;
             if (id is null || options.ContainsKey(id)) continue;
 
             var offset = (int)zone.GetUtcOffset(utcNow).TotalMinutes;
