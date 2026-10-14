@@ -17,6 +17,8 @@ export const Permission = {
   UsersChangeStatus: "Users.ChangeStatus",
   UsersResetPassword: "Users.ResetPassword",
   RolesView: "Roles.View",
+  RolesCreate: "Roles.Create",
+  RolesEdit: "Roles.Edit",
   SettingsView: "Settings.View",
   SettingsEdit: "Settings.Edit",
 
@@ -83,5 +85,6 @@ export const PAGE_PERMISSIONS: Readonly<Record<string, readonly string[]>> = {
   "/attendance": [Permission.AttendanceView, Permission.AttendanceViewScoped],
   "/documents": [Permission.DocumentsView],
   "/users-staff": [Permission.UsersView],
+  "/roles-permissions": [Permission.RolesView],
   "/settings": [Permission.SettingsView],
 };

@@ -27,6 +27,8 @@ interface Props {
   onSubmit: () => void;
   isSaving: boolean;
   isDirty: boolean;
+  /** Shown in the save bar as "N changes" when the page can count them (the roles matrix). */
+  changeCount?: number;
   saveLabel?: string;
   onCancel: () => void;
   children: ReactNode;
@@ -49,6 +51,7 @@ export function FormPage({
   onSubmit,
   isSaving,
   isDirty,
+  changeCount,
   saveLabel = "Save changes",
   onCancel,
   children,
@@ -179,7 +182,9 @@ export function FormPage({
               {isSaving
                 ? "Saving…"
                 : isDirty
-                  ? "You have unsaved changes"
+                  ? changeCount
+                  ? `You have unsaved changes (${changeCount} ${changeCount === 1 ? "change" : "changes"})`
+                  : "You have unsaved changes"
                   : "No changes yet"}
             </span>
             <div className="save-bar__actions">

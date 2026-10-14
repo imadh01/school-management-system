@@ -365,3 +365,238 @@
   white-space: nowrap;
   border: 0;
 }
+
+/* E3c: the permission matrix (Roles & Permissions). Colours come from theme.css tokens only. */
+.perm-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  margin-bottom: 12px;
+}
+.perm-summary {
+  margin: 0;
+  margin-right: auto;
+  font-size: 14px;
+}
+.perm-toolbar .field--checkbox {
+  margin: 0;
+}
+.perm-toolbar__buttons {
+  display: flex;
+  gap: 8px;
+}
+.perm-matrix-wrap {
+  position: relative; /* contains the visually-hidden labels so they cannot widen the page */
+  overflow: auto;
+  max-height: min(72vh, 760px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+.perm-matrix {
+  width: 100%;
+  min-width: 880px;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 14px;
+}
+.perm-matrix th,
+.perm-matrix td {
+  height: 46px;
+  padding: 2px 10px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: middle;
+}
+.perm-matrix thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: var(--thead-bg);
+  color: var(--thead-text);
+  font-size: 13px;
+  font-weight: 700;
+  height: 40px;
+}
+.perm-sticky {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  min-width: 250px;
+  background: var(--surface);
+  box-shadow: 1px 0 0 var(--border);
+}
+.perm-matrix thead .perm-sticky {
+  z-index: 4;
+  background: var(--thead-bg);
+}
+.perm-col {
+  width: 84px;
+  text-align: center !important;
+}
+.perm-group th,
+.perm-group td {
+  background: var(--surface-3);
+  font-weight: 700;
+}
+.perm-group .perm-sticky {
+  background: var(--surface-3);
+}
+.perm-row:hover th,
+.perm-row:hover td {
+  background: var(--row-hover);
+}
+.perm-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: inherit;
+}
+.perm-row .perm-name {
+  font-weight: 600;
+}
+.perm-count {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.perm-toggle {
+  display: inline-grid;
+  place-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+.perm-toggle:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.perm-toggle:focus-visible {
+  outline: 2px solid var(--accent-solid);
+  outline-offset: 1px;
+}
+.perm-info {
+  display: inline-grid;
+  place-content: center;
+  color: var(--text-muted);
+  cursor: help;
+}
+.perm-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  cursor: pointer;
+}
+.perm-lock {
+  color: var(--text-muted);
+}
+.perm-na {
+  color: var(--text-muted);
+}
+.perm-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 4px 0;
+}
+.perm-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px 2px 6px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-2);
+  font-size: 13px;
+}
+.perm-view {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  box-sizing: border-box;
+}
+.perm-view--yes {
+  background: var(--accent-solid);
+  color: var(--text-on-solid);
+}
+.perm-view--no > span[aria-hidden="true"] {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--border);
+}
+.perm-chip--off {
+  color: var(--text-muted);
+}
+.perm-chip--on {
+  font-weight: 700;
+}
+.perm-empty {
+  padding: 24px 10px !important;
+  text-align: center !important;
+  color: var(--text-muted);
+}
+/* The box: a filled square with a tick, a dash for "some", a dashed outline when it cannot be changed
+   (shape, not only colour, tells the states apart). */
+.perm-check {
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-grid;
+  place-content: center;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  border: 2px solid var(--text-muted);
+  border-radius: 5px;
+  background: var(--surface);
+  cursor: pointer;
+}
+.perm-check::before {
+  content: "";
+  width: 12px;
+  height: 12px;
+  background: var(--text-on-solid);
+  clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0, 43% 62%);
+  transform: scale(0);
+}
+.perm-check:checked,
+.perm-check:indeterminate {
+  border-color: var(--accent-solid);
+  background: var(--accent-solid);
+}
+.perm-check:checked::before,
+.perm-check:indeterminate::before {
+  transform: scale(1);
+}
+.perm-check:indeterminate::before {
+  clip-path: polygon(0 38%, 100% 38%, 100% 62%, 0 62%);
+}
+.perm-check[aria-disabled="true"] {
+  border-style: dashed;
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.perm-check:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+}
+@media (forced-colors: active) {
+  .perm-check:checked,
+  .perm-check:indeterminate {
+    forced-color-adjust: none;
+    background: Highlight;
+    border-color: Highlight;
+  }
+}

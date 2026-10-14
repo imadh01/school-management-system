@@ -26,6 +26,9 @@ import { TeacherFormPage } from "../features/teachers/pages/TeacherFormPage";
 import { UsersPage } from "../features/users/pages/UsersPage";
 import { UserDetailPage } from "../features/users/pages/UserDetailPage";
 import { UserFormPage } from "../features/users/pages/UserFormPage";
+import { RolesPage } from "../features/roles/pages/RolesPage";
+import { RoleDetailPage } from "../features/roles/pages/RoleDetailPage";
+import { RoleFormPage } from "../features/roles/pages/RoleFormPage";
 import { MyAccountPage } from "../features/account/pages/MyAccountPage";
 import { SchoolSettingsPage } from "../features/settings/pages/SchoolSettingsPage";
 import { SubjectsPage } from "../features/subjects/pages/SubjectsPage";
@@ -155,6 +158,11 @@ export const router = createBrowserRouter(
               form: <UserFormPage />,
             },
             { create: Permission.UsersCreate, edit: Permission.UsersEdit },
+          )}
+          {recordRoutes(
+            "/roles-permissions",
+            { list: <RolesPage />, detail: <RoleDetailPage />, form: <RoleFormPage /> },
+            { create: Permission.RolesCreate, edit: Permission.RolesEdit },
           )}
           {/* E3a: teachers are added on the Users page; this form only edits the teaching profile. */}
           {guarded("/teachers", <TeachersPage />)}

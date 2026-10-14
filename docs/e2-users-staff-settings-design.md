@@ -410,3 +410,21 @@ tabs are not built (theme is per user since U1).
 name in the top bar and for the country a *new* address starts with in the Users form and My Account (other forms
 still start with no country). Saving the school settings clears that cache, so the top bar updates at once.
 Profile form helpers shared by Users and My Account: `features/users/utils/profileForm.ts`.
+
+
+## E3c as built (Roles & Permissions)
+
+`/roles-permissions` (`Roles.View`; `features/roles/`), in the sidebar under Administration. It uses the E1 API
+(`/api/roles`, `/api/permissions`); no backend change.
+
+- **List:** name and description, "System" badge, users, permission count ("All" for Admin), status; status pills and
+  search. Edit is hidden for Admin and for a role you hold yourself.
+- **Detail:** role facts and the permissions it grants, grouped by module. Edit and Activate/Deactivate (a pop-up
+  that keeps the API's refusal on screen).
+- **Add/edit form:** name, description and the permission picker. Ticking a permission also ticks what it needs;
+  unticking also unticks what then loses what it needs, and a line says what moved (same rule as the API's
+  `PermissionDependencies`, which stays the authority). Permissions you do not hold yourself are shown but locked
+  (no escalation). A system role's name is locked; Admin's permissions are not editable.
+- **Saving an existing role** sends up to two requests (name/description, then the permission list). The second uses
+  the row version the first returned, so a half-finished save can be retried.
+- A change applies to everyone holding the role at their next request; nobody is signed out.
