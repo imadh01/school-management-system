@@ -10,15 +10,18 @@ public class TeacherService : ITeacherService
     private readonly ITeacherRepository _teachers;
     private readonly IRoleRepository _roles;
     private readonly IPasswordHasher _passwordHasher;
+    private readonly IUserAccountService _accounts;
 
     public TeacherService(
         ITeacherRepository teachers,
         IRoleRepository roles,
-        IPasswordHasher passwordHasher)
+        IPasswordHasher passwordHasher,
+        IUserAccountService accounts)
     {
         _teachers = teachers;
         _roles = roles;
         _passwordHasher = passwordHasher;
+        _accounts = accounts;
     }
 
     // ---------- Teacher CRUD ----------
@@ -56,6 +59,8 @@ public class TeacherService : ITeacherService
             Email = email,
             PasswordHash = _passwordHasher.HashPassword(request.Password),
             Status = request.Status,
+            // The password was chosen by whoever created the account: the teacher sets their own at first sign-in.
+            MustChangePassword = true,
         };
         user.UserRoles.Add(new UserRole { Role = role, AssignedAt = now });
 
@@ -91,20 +96,24 @@ public class TeacherService : ITeacherService
 
         teacher.User.Username = username;
         teacher.User.Email = email;
-        teacher.User.Status = request.Status;
-        if (!string.IsNullOrWhiteSpace(request.NewPassword))
-            teacher.User.PasswordHash = _passwordHasher.HashPassword(request.NewPassword);
-
         await _teachers.SaveChangesAsync(cancellationToken);
+
+        // Status and password are account security: they go through the account service, which ends the
+        // teacher's sessions at once (E2 security fix). E2 moves these two fields to the Users page.
+        if (teacher.User.Status != request.Status)
+            await _accounts.ChangeStatusAsync(teacher.UserId, request.Status, cancellationToken);
+        if (!string.IsNullOrWhiteSpace(request.NewPassword))
+            await _accounts.SetTemporaryPasswordAsync(teacher.UserId, request.NewPassword, cancellationToken);
+
         return ToResponse(teacher, await GetStatsForAsync(id, cancellationToken));
     }
 
     public async Task<TeacherResponse> ChangeStatusAsync(int id, string status, CancellationToken cancellationToken)
     {
         var teacher = await GetOrThrowAsync(id, cancellationToken);
-        teacher.User.Status = status;
         teacher.UpdatedAt = DateTime.UtcNow;
-        await _teachers.SaveChangesAsync(cancellationToken);
+        // Saves the teacher row too, and ends the teacher's sessions when the status is not Active.
+        await _accounts.ChangeStatusAsync(teacher.UserId, status, cancellationToken);
         return ToResponse(teacher, await GetStatsForAsync(id, cancellationToken));
     }
 
@@ -118,14 +127,11 @@ public class TeacherService : ITeacherService
                 $"Cannot delete '{teacher.Name}' — still assigned to {stats.Subjects} subject(s) " +
                 $"and class teacher of {stats.ClassTeacherOf} class(es). Remove the assignments first.");
 
-        var now = DateTime.UtcNow;
         teacher.IsDeleted = true;
-        teacher.DeletedAt = now;
-        // The login goes with the profile.
-        teacher.User.IsDeleted = true;
-        teacher.User.DeletedAt = now;
-
-        await _teachers.SaveChangesAsync(cancellationToken);
+        teacher.DeletedAt = DateTime.UtcNow;
+        // The login goes with the profile: the account service saves both, in one transaction,
+        // and ends the teacher's sessions.
+        await _accounts.DeleteAsync(teacher.UserId, cancellationToken);
     }
 
     // ---------- Assignments ----------

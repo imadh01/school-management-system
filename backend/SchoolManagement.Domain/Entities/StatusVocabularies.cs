@@ -82,6 +82,21 @@ public static class StudentStatuses
     public static bool IsValid(string? value) => value is not null && All.Contains(value);
 }
 
+/// <summary>
+/// Login account status (CK_Users_Status). Anything but Active blocks sign-in and ends every session:
+/// Inactive = left the school, Suspended = temporarily blocked.
+/// </summary>
+public static class UserStatuses
+{
+    public const string Active = "Active";
+    public const string Inactive = "Inactive";
+    public const string Suspended = "Suspended";
+
+    public static readonly string[] All = { Active, Inactive, Suspended };
+
+    public static bool IsValid(string? value) => value is not null && All.Contains(value);
+}
+
 /// <summary>Simple on/off status used by class sections, subjects and parents.</summary>
 public static class ActiveStatuses
 {

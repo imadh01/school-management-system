@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using SchoolManagement.Application.Interfaces;
 using SchoolManagement.Domain.Entities;
 using SchoolManagement.Infrastructure.Persistence;
+using SchoolManagement.Infrastructure.Migrations;
 using SchoolManagement.Infrastructure.Persistence.Interceptors;
 using SchoolManagement.Tests.Support;
 using Xunit;
@@ -125,6 +126,44 @@ public class AuditTrailTests
         Assert.Equal(7, log.UserId);
         Assert.Equal("imadh", log.UserName);
         Assert.Equal("trace-123", log.TraceId);
+    }
+
+    [Fact]
+    public async Task The_E2s_migration_masks_hashes_and_stamps_already_in_the_log_and_keeps_the_rest()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        // Rows as the old code wrote them: plain hash and stamp next to an ordinary field.
+        var recordId = "scrub-" + TestData.Unique();
+        db.AuditLogs.AddRange(
+            new AuditLog
+            {
+                OccurredAt = DateTime.UtcNow, Action = AuditActions.Update, TableName = "Users", RecordId = recordId,
+                Changes = "{\"PasswordHash\":{\"old\":\"AQAAAAold\",\"new\":\"AQAAAAnew\"}," +
+                          "\"SecurityStamp\":{\"old\":\"11111111-1111-1111-1111-111111111111\",\"new\":\"22222222-2222-2222-2222-222222222222\"}," +
+                          "\"MustChangePassword\":{\"old\":true,\"new\":false}}",
+            },
+            new AuditLog
+            {
+                OccurredAt = DateTime.UtcNow, Action = AuditActions.Insert, TableName = "Users", RecordId = recordId,
+                Changes = "{\"Username\":{\"new\":\"x\"},\"PasswordHash\":{\"new\":\"AQAAAAinsert\"}}",
+            });
+        await db.SaveChangesAsync();
+
+        foreach (var statement in E2s_MaskUserSecretsInAuditLog.ScrubStatements())
+            await db.Database.ExecuteSqlRawAsync(statement);
+
+        var rows = await db.AuditLogs.AsNoTracking().Where(l => l.RecordId == recordId).ToListAsync();
+        var update = rows.Single(r => r.Action == AuditActions.Update).Changes!;
+        var insert = rows.Single(r => r.Action == AuditActions.Insert).Changes!;
+
+        Assert.DoesNotContain("AQAAAA", update + insert);
+        Assert.DoesNotContain("1111", update);
+        Assert.DoesNotContain("2222", update);
+        Assert.Contains("\"MustChangePassword\":{\"old\":true,\"new\":false}", update); // the rest is untouched
+        Assert.Contains("\"Username\":{\"new\":\"x\"}", insert);
+        Assert.DoesNotContain("\"old\"", insert); // a side that was not there is not added
     }
 
     private sealed class FakeCurrentUser : ICurrentUser

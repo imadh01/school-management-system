@@ -1,6 +1,8 @@
-﻿using Microsoft.Data.SqlClient;
+﻿using System.Data;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using SchoolManagement.Application.Interfaces;
+using SchoolManagement.Domain.Constants;
 using SchoolManagement.Domain.Entities;
 using SchoolManagement.Domain.Exceptions;
 using SchoolManagement.Infrastructure.Persistence;
@@ -71,8 +73,45 @@ public class UserRepository : IUserRepository
             .ToListAsync(cancellationToken)
             .ContinueWith(t => (IReadOnlyList<string>)t.Result, cancellationToken);
 
+    public async Task<T> ExecuteInTransactionAsync<T>(Func<Task<T>> operation, CancellationToken cancellationToken)
+    {
+        var strategy = _context.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
+        {
+            await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+            var result = await operation();
+            await transaction.CommitAsync(cancellationToken);
+            return result;
+        });
+    }
+
+    // sp_getapplock locks a NAME, released automatically at COMMIT or ROLLBACK (Owner = Transaction).
+    // One name for all account changes: they are rare, and one lock makes "is there another active
+    // Admin?" safe whatever the change is (status, role or delete).
+    public async Task LockAccountChangesAsync(CancellationToken cancellationToken)
+    {
+        if (_context.Database.CurrentTransaction is null)
+            throw new InvalidOperationException("LockAccountChangesAsync must be called inside a transaction.");
+
+        var result = new SqlParameter("@result", SqlDbType.Int) { Direction = ParameterDirection.Output };
+        await _context.Database.ExecuteSqlRawAsync(
+            "EXEC @result = sp_getapplock @Resource = @resource, @LockMode = 'Exclusive', " +
+            "@LockOwner = 'Transaction', @LockTimeout = 10000;",
+            new object[] { result, new SqlParameter("@resource", "UserAccountChanges") },
+            cancellationToken);
+
+        // 0 / 1 = granted. Negative = timeout (-1), cancelled (-2), deadlock victim (-3), error (-999).
+        if ((int)result.Value < 0)
+            throw new ConflictException("Another account change is being saved right now. Please try again.");
+    }
+
+    public Task<int> CountActiveAdminsAsync(int? excludeUserId, CancellationToken cancellationToken) =>
+        _context.Users // the query filter already leaves out deleted users
+            .Where(u => u.Status == "Active" && u.Id != (excludeUserId ?? 0))
+            .CountAsync(u => u.UserRoles.Any(ur => ur.Role.Name == RoleNames.Admin), cancellationToken);
+
     public async Task SaveChangesAsync(CancellationToken cancellationToken)
     {
         await _context.SaveChangesAsync(cancellationToken);
     }
-}
+}

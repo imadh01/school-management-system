@@ -91,6 +91,8 @@ builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
 builder.Services.AddScoped<IRefreshTokenService, RefreshTokenService>();
 builder.Services.AddHostedService<RefreshTokenCleanupJob>();
 builder.Services.AddScoped<IUserService, UserService>();
+// E2 security fix: every status / password / role / delete change of a login goes through here.
+builder.Services.AddScoped<IUserAccountService, UserAccountService>();
 builder.Services.AddScoped<ISubjectRepository, SubjectRepository>();
 builder.Services.AddScoped<ISubjectService, SubjectService>();
 

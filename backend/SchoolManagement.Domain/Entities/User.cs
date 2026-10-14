@@ -1,3 +1,5 @@
+using SchoolManagement.Domain.Auditing;
+
 namespace SchoolManagement.Domain.Entities;
 
 /// <summary>
@@ -11,11 +13,15 @@ public class User
 
     public string Username { get; set; } = string.Empty;
     public string Email { get; set; } = string.Empty;
+    /// <summary>Masked in the audit log (E2 security fix): the log shows that it changed, never the hash.</summary>
+    [AuditMasked]
     public string PasswordHash { get; set; } = string.Empty;
 
     /// <summary>Active / Inactive / Suspended — enforced by a DB check constraint.</summary>
     public string Status { get; set; } = "Active";
 
+    /// <summary>Left out of the audit log: it changes at every sign-in (noise). UpdatedAt still moves.</summary>
+    [AuditIgnore]
     public DateTime? LastLoginAt { get; set; }
 
     // ── D1: Security infrastructure ────────────────────────────────────
@@ -24,15 +30,21 @@ public class User
     /// The JWT carries this value; OnTokenValidated compares it against
     /// the cached copy to give immediate revocation.
     /// </summary>
+    [AuditMasked]
     public Guid SecurityStamp { get; set; } = Guid.NewGuid();
 
     /// <summary>When true, every endpoint except change-password and /auth/me is blocked.</summary>
     public bool MustChangePassword { get; set; }
 
     /// <summary>UTC instant until which the account is locked. Null = not locked.</summary>
+    // Audited on purpose: a lockout (and an admin's unlock) is a security event worth a log row.
     public DateTime? LockoutEnd { get; set; }
 
-    /// <summary>Consecutive failed login attempts. Reset to 0 on success.</summary>
+    /// <summary>
+    /// Consecutive failed login attempts. Reset to 0 on success. Left out of the audit log: it changes at
+    /// every failed sign-in; the lockout itself is logged.
+    /// </summary>
+    [AuditIgnore]
     public int AccessFailedCount { get; set; }
 
     // ── Audit (UTC, set by SaveChanges interceptor) ────────────────────
