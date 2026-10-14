@@ -89,7 +89,6 @@ public class DocumentsController : ControllerBase
 
     [HttpPost("students/{studentId:int}/documents")]
     [Authorize(Policy = Permissions.DocumentsUpload)]
-    [Consumes("multipart/form-data")]
     [DocumentUploadLimit]
     public async Task<IActionResult> UploadForStudent(
         int studentId, [FromForm] UploadDocumentForm form, CancellationToken cancellationToken)
@@ -104,7 +103,6 @@ public class DocumentsController : ControllerBase
 
     [HttpPost("admissions/{admissionId:int}/documents")]
     [Authorize(Policy = Permissions.DocumentsUpload)]
-    [Consumes("multipart/form-data")]
     [DocumentUploadLimit]
     public async Task<IActionResult> UploadForAdmission(
         int admissionId, [FromForm] UploadDocumentForm form, CancellationToken cancellationToken)

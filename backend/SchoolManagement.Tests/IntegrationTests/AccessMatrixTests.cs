@@ -145,7 +145,8 @@ public class AccessMatrixTests
         new("GET",    $"/api/attendance/students/{Missing}", AttendanceRead),
         new("GET",    $"/api/attendance/summary?classSectionId={Missing}&from=2026-01-05&to=2026-01-06", AttendanceRead),
 
-        // Documents (G1b). Uploads get a JSON body here, so an allowed caller stops at 415 (not multipart).
+        // Documents (G1b). Uploads get a JSON body here, so an allowed caller stops at 400 ("Choose a file").
+        // A refused caller must get 403, never 415: authorization comes before any content-type check.
         new("GET",    "/api/documents/options", P(Permissions.DocumentsView)),
         new("GET",    "/api/documents", P(Permissions.DocumentsView)),
         new("GET",    $"/api/students/{Missing}/documents", P(Permissions.DocumentsView)),
