@@ -305,14 +305,14 @@ export const FOOTER_NAV: NavItem[] = [
     label: "My Account",
     path: "/my-account",
     icon: Contact,
-    built: false,
+    built: true,
   },
   {
     key: "settings",
     label: "Settings",
     path: "/settings",
     icon: Settings,
-    built: false,
+    built: true,
   },
   {
     key: "about-app",

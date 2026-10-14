@@ -26,6 +26,8 @@ import { TeacherFormPage } from "../features/teachers/pages/TeacherFormPage";
 import { UsersPage } from "../features/users/pages/UsersPage";
 import { UserDetailPage } from "../features/users/pages/UserDetailPage";
 import { UserFormPage } from "../features/users/pages/UserFormPage";
+import { MyAccountPage } from "../features/account/pages/MyAccountPage";
+import { SchoolSettingsPage } from "../features/settings/pages/SchoolSettingsPage";
 import { SubjectsPage } from "../features/subjects/pages/SubjectsPage";
 import { SubjectFormPage } from "../features/subjects/pages/SubjectFormPage";
 import { CHANGE_PASSWORD_PATH, ProtectedRoute } from "./ProtectedRoute";
@@ -164,6 +166,9 @@ export const router = createBrowserRouter(
           {guarded("/teachers/:id/edit", <TeacherFormPage />, [
             Permission.TeachersEdit,
           ])}
+          {/* E3b: every signed-in user has an account page; Settings needs Settings.View. */}
+          <Route path="/my-account" element={<MyAccountPage />} />
+          {guarded("/settings", <SchoolSettingsPage />)}
           {guarded("/attendance", <AttendancePage />)}
           {guarded("/documents", <DocumentsPage />)}
           {/* Modules from the prototype that are not built yet. */}

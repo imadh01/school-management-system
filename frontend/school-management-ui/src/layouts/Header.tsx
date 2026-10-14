@@ -5,6 +5,7 @@ import { useAuth } from "../store/AuthContext";
 import { useTheme } from "../store/ThemeContext";
 import { IconButton } from "../components/IconButton";
 import { initialsOf } from "@/utils/initials";
+import { useSchoolBasics } from "@/hooks/useSchoolBasics";
 
 interface Props {
   onOpenMenu: () => void;
@@ -15,6 +16,7 @@ export function Header({ onOpenMenu }: Props) {
   const location = useLocation();
   const { user } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const school = useSchoolBasics();
   const entry = findNavEntry(location.pathname);
   const isNested = entry !== null && location.pathname !== entry.item.path;
 
@@ -54,6 +56,12 @@ export function Header({ onOpenMenu }: Props) {
           )}
         </ol>
       </nav>
+
+      {school && (
+        <span className="topbar__school" title={school.schoolName}>
+          {school.shortName || school.schoolName}
+        </span>
+      )}
 
       <IconButton
         icon={theme === "dark" ? Sun : Moon}

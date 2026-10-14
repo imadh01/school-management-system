@@ -13,6 +13,8 @@ interface Props {
   errors: Record<string, string>;
   /** True while the country list is loading. */
   countriesLoading?: boolean;
+  /** Country a new address starts with (the school's). Omit for none. */
+  defaultCountryId?: string;
 }
 
 /**
@@ -28,6 +30,7 @@ export function AddressListEditor({
   countries,
   errors,
   countriesLoading,
+  defaultCountryId,
 }: Props) {
   const update = (index: number, changes: Partial<AddressFormRow>) =>
     onChange(rows.map((r, i) => (i === index ? { ...r, ...changes } : r)));
@@ -43,7 +46,7 @@ export function AddressListEditor({
     onChange(next);
   };
   const add = () => {
-    const row = newAddressRow(rows);
+    const row = newAddressRow(rows, defaultCountryId);
     if (row) onChange([...rows, row]);
   };
 

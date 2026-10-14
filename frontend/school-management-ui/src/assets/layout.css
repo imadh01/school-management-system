@@ -255,6 +255,20 @@
   color: var(--text);
   font-weight: 700;
 }
+.topbar__school {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-muted);
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media (max-width: 640px) {
+  .topbar__school {
+    display: none;
+  }
+}
 .topbar__user {
   display: flex;
   align-items: center;

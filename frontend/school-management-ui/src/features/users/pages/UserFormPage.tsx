@@ -31,6 +31,14 @@ import {
 } from "@/utils/address";
 import { fieldBinder, type FormSectionDef } from "@/utils/form";
 import { meetsPasswordRules } from "@/utils/password";
+import { useSchoolBasics } from "@/hooks/useSchoolBasics";
+import {
+  blank,
+  EMAIL_PATTERN,
+  PHONE_MESSAGE,
+  PHONE_PATTERN,
+  remapProfileErrors,
+} from "../utils/profileForm";
 
 /** The built-in staff roles, offered when the user may not read the roles list (Roles.View). */
 const BUILT_IN_ROLES = ["Admin", "Supervisor", "Clerk", TEACHER_ROLE];
@@ -118,8 +126,6 @@ const formFrom = (u: UserResponse): FormState => ({
   addresses: toAddressRows(u.addresses),
 });
 
-const blank = (v: string) => v.trim() || null;
-
 const profileOf = (f: FormState): StaffProfileRequest => ({
   fullName: f.fullName.trim(),
   gender: blank(f.gender),
@@ -132,14 +138,6 @@ const profileOf = (f: FormState): StaffProfileRequest => ({
   emergencyContactName: blank(f.emergencyContactName),
   emergencyContactPhone: blank(f.emergencyContactPhone),
 });
-
-/** The API reports profile problems as "Profile.Gender"; the form's fields are flat ("gender"). */
-const remapProfileErrors = (fields: Record<string, string>) =>
-  Object.fromEntries(
-    Object.entries(fields).map(([k, m]) => [k.replace(/^profile\./, ""), m]),
-  );
-
-const PHONE = /^\+?[0-9\s\-().]{5,20}$/; // same rule as the API's PhoneNumberRules
 
 /**
  * E3a: adding a staff account (/users-staff/new) and editing one (/users-staff/:id/edit).
@@ -175,6 +173,7 @@ export function UserFormPage() {
     "Could not load the roles.",
   );
   const countries = useCountries();
+  const school = useSchoolBasics();
   const record = useRecordForm<FormState>({
     sections: SECTIONS,
     initial: EMPTY_FORM,
@@ -231,7 +230,7 @@ export function UserFormPage() {
       e.username =
         "Username can only contain letters, digits, dots, underscores and hyphens.";
     if (!form.email.trim()) e.email = "Email is required.";
-    else if (!/^\S+@\S+\.\S+$/.test(form.email.trim()))
+    else if (!EMAIL_PATTERN.test(form.email.trim()))
       e.email = "Enter a valid email address.";
     if (!user && !meetsPasswordRules(form.password))
       e.password = "The password does not meet all the rules below.";
@@ -239,14 +238,14 @@ export function UserFormPage() {
     if (!form.fullName.trim()) e.fullName = "Full name is required.";
     if (!form.gender) e.gender = "Gender is required.";
     if (!form.mobile.trim()) e.mobile = "Mobile is required.";
-    else if (!PHONE.test(form.mobile.trim()))
-      e.mobile = "Mobile is invalid (digits, spaces, + - ( ) only).";
+    else if (!PHONE_PATTERN.test(form.mobile.trim()))
+      e.mobile = PHONE_MESSAGE;
     if (!form.joiningDate) e.joiningDate = "Joining date is required.";
     if (
       form.emergencyContactPhone.trim() &&
-      !PHONE.test(form.emergencyContactPhone.trim())
+      !PHONE_PATTERN.test(form.emergencyContactPhone.trim())
     )
-      e.emergencyContactPhone = "Phone is invalid (digits, spaces, + - ( ) only).";
+      e.emergencyContactPhone = PHONE_MESSAGE;
     return { ...e, ...validateAddresses(form.addresses, countries.data ?? []) };
   };
 
@@ -448,6 +447,9 @@ export function UserFormPage() {
             onChange={(addresses) => patch({ addresses })}
             countries={countries.data ?? []}
             countriesLoading={countries.isLoading}
+            defaultCountryId={
+              school?.countryId ? String(school.countryId) : undefined
+            }
             errors={record.fieldErrors}
           />
         </FormSection>

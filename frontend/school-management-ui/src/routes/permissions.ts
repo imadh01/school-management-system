@@ -18,6 +18,7 @@ export const Permission = {
   UsersResetPassword: "Users.ResetPassword",
   RolesView: "Roles.View",
   SettingsView: "Settings.View",
+  SettingsEdit: "Settings.Edit",
 
   ClassSectionsView: "ClassSections.View",
   ClassSectionsCreate: "ClassSections.Create",

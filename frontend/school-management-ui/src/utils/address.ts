@@ -37,7 +37,10 @@ export const toAddressRequests = (rows: AddressFormRow[]): AddressRequest[] =>
   }));
 
 /** A new row of the first type not used yet; the first address of a person is the primary one. */
-export function newAddressRow(rows: AddressFormRow[]): AddressFormRow | null {
+export function newAddressRow(
+  rows: AddressFormRow[],
+  defaultCountryId = "",
+): AddressFormRow | null {
   const type = ADDRESS_TYPES.find(
     (t) => !rows.some((r) => r.addressType === t),
   );
@@ -48,7 +51,8 @@ export function newAddressRow(rows: AddressFormRow[]): AddressFormRow | null {
     line1: "",
     line2: "",
     city: "",
-    countryId: "", // no default country (decision 2)
+    // Empty unless the form passes the school's country (Users and My Account do; decision 2).
+    countryId: defaultCountryId,
     regionId: "",
     postalCode: "",
   };

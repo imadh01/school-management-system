@@ -391,3 +391,22 @@ goes to `/users-staff/new?role=Teacher`, and `/teachers/new` redirects there. Re
 `POST /api/teachers`, `PATCH /api/teachers/{id}/status`, `POST /api/auth/unlock/{id}`, and the username,
 e-mail, status and password fields of `PUT /api/teachers/{id}` (it now takes `name`, `phone`,
 `specialization`). Not in E3a: school-country default for addresses (E3b), CSV/PDF/Print on Users.
+
+
+## E3b as built (My Account and School settings)
+
+**My Account** (`/my-account`, every signed-in user; `features/account/`): your e-mail, full name, gender, date of
+birth, mobile, qualification, blood group, emergency contact and addresses (`GET/PUT /api/me/profile`, with the
+row version, so a save over someone else's edit gets the usual "Reload latest version"). Username, role, joining
+date and employee number are shown, not editable. Changing the password is its own page, linked from here.
+
+**Settings** (`/settings`, `Settings.View`; `features/settings/`): only the *School settings* tab of the prototype
+is built: name, short name, e-mail, phone, website, address, country, IANA time zone (picked from
+`GET /api/settings/time-zones`), currency code (three capitals), working days (saved Monday first) and the About
+tagline. Fields are read-only without `Settings.Edit`. The prototype's Personal, Theme & colours and Maintenance
+tabs are not built (theme is per user since U1).
+
+**Shared:** `GET /api/settings/basics` is read once per page load (`schoolService`, cached) and used for the school
+name in the top bar and for the country a *new* address starts with in the Users form and My Account (other forms
+still start with no country). Saving the school settings clears that cache, so the top bar updates at once.
+Profile form helpers shared by Users and My Account: `features/users/utils/profileForm.ts`.
