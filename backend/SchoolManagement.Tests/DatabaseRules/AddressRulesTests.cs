@@ -131,6 +131,20 @@ public class AddressRulesTests
         Assert.False(uae.PostalCodeRequired);
     }
 
+    [Fact]
+    public async Task G1c_dropped_the_old_address_columns()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var left = await db.Database.SqlQueryRaw<string>(
+            "SELECT TABLE_NAME + '.' + COLUMN_NAME AS [Value] FROM INFORMATION_SCHEMA.COLUMNS " +
+            "WHERE TABLE_NAME IN ('Students', 'Parents', 'Admissions') " +
+            "AND COLUMN_NAME IN ('AddressLine', 'City', 'State', 'Pincode')").ToListAsync();
+
+        Assert.Empty(left); // addresses live only in [Addresses] now
+    }
+
     // ------------------------------------------------------------------ service rules (need the Countries table)
 
     [Theory]

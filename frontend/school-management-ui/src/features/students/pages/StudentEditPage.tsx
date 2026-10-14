@@ -432,7 +432,6 @@ export function StudentEditPage() {
             countries={countries.data ?? []}
             countriesLoading={countries.isLoading}
             errors={errors}
-            legacyAddress={student.legacyAddress}
           />
         </FormSection>
 

@@ -43,7 +43,7 @@ Two deliberate departures from the prototype's exact shape:
 | NotifyAttendance / NotifyExams / NotifyFees / NotifyNotices / NotifyDiscipline | bit | N |  | Individual typed columns, not a JSON blob — small fixed set |
 | Employer / JobTitle / WorkEmail / WorkPhone | nvarchar | Y |  |  |
 | BillingContact | bit | N |  | Default false |
-| AddressLine / City / State / Pincode | nvarchar | Y |  |  |
+| AddressLine / City / State / Pincode | nvarchar | Y |  | Replaced by the `Addresses` table in G1a; columns dropped in G1c (see g1-addresses-documents-database-design.md) |
 | CreatedAt / UpdatedAt / CreatedBy / UpdatedBy / IsDeleted / DeletedAt / DeletedBy | — |  |  | Full audit + soft delete |
 
 ### StudentGuardians

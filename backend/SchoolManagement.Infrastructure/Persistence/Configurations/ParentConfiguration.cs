@@ -43,11 +43,6 @@ public class ParentConfiguration : IEntityTypeConfiguration<Parent>
         builder.Property(p => p.WorkEmail).HasMaxLength(100);
         builder.Property(p => p.WorkPhone).HasMaxLength(20);
 
-        builder.Property(p => p.AddressLine).HasMaxLength(200);
-        builder.Property(p => p.City).HasMaxLength(50);
-        builder.Property(p => p.State).HasMaxLength(50);
-        builder.Property(p => p.Pincode).HasMaxLength(10);
-
         // One login per parent.
         builder.HasIndex(p => p.UserId)
             .IsUnique()

@@ -482,7 +482,6 @@ export function AdmissionFormPage() {
             countries={countries.data ?? []}
             countriesLoading={countries.isLoading}
             errors={errors}
-            legacyAddress={admission?.legacyAddress}
           />
         </FormSection>
 

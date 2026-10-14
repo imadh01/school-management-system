@@ -1,7 +1,5 @@
-import { Info } from "lucide-react";
 import type { AddressFormRow, CountryResponse } from "@/types/address";
 import { newAddressRow, unusedTypes } from "@/utils/address";
-import { Notice } from "../Notice";
 import { SelectField, TextField } from "./Inputs";
 import { AddRowButton, RepeatRow } from "./RepeatRow";
 
@@ -13,8 +11,6 @@ interface Props {
   countries: CountryResponse[];
   /** Field errors keyed "addresses.0.city" (client checks and API errors alike). */
   errors: Record<string, string>;
-  /** The old one-line address that could not be copied in G1a, shown as a hint until G1c. */
-  legacyAddress?: string | null;
   /** True while the country list is loading. */
   countriesLoading?: boolean;
 }
@@ -31,7 +27,6 @@ export function AddressListEditor({
   onChange,
   countries,
   errors,
-  legacyAddress,
   countriesLoading,
 }: Props) {
   const update = (index: number, changes: Partial<AddressFormRow>) =>
@@ -54,13 +49,6 @@ export function AddressListEditor({
 
   return (
     <div>
-      {legacyAddress && (
-        <Notice icon={Info} style={{ marginBottom: 12 }}>
-          Address on file from before the address update:{" "}
-          <strong>{legacyAddress}</strong>. It could not be copied
-          automatically. Enter it below with its country and save.
-        </Notice>
-      )}
       {errors.addresses && (
         <p className="field__error" style={{ marginBottom: 12 }}>
           {errors.addresses}

@@ -440,7 +440,6 @@ public class StudentService : IStudentService
             s.FirstName, s.MiddleName, s.LastName, s.Gender, s.DateOfBirth,
             s.Mobile, s.Email,
             AddressMapping.ToResponses(s.Addresses),
-            AddressMapping.LegacyText(s.Addresses, s.AddressLine, s.City, s.State, s.Pincode),
             s.Category, s.Religion, s.PreviousSchool,
             s.TransportRequired, s.TransportRoute,
             s.Nationality, s.SecondNationality, s.CountryOfBirth, s.PreferredName,

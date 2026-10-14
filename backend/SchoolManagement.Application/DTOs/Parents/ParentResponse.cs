@@ -8,5 +8,5 @@ public record ParentResponse(
     string? PreferredLanguage, string? PreferredContactMethod, string? Whatsapp, bool EmergencyOnly,
     bool NotifyAttendance, bool NotifyExams, bool NotifyFees, bool NotifyNotices, bool NotifyDiscipline,
     string? Employer, string? JobTitle, string? WorkEmail, string? WorkPhone, bool BillingContact,
-    List<AddressResponse> Addresses, string? LegacyAddress,
+    List<AddressResponse> Addresses,
     string RowVersion);

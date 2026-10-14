@@ -1,5 +1,7 @@
 -- G1a: check the copy of the old address columns into [Addresses]. Run it after the migration
 -- and again BEFORE G1c (which drops the old columns). Read-only: it changes nothing.
+-- After G1c this script no longer runs (the old columns are gone); G1c's migration repeats the
+-- "not copied" test itself and refuses to drop anything while an old address is still missing.
 --
 -- 1. Counts per owner table. "Copied" + "NotCopied" = "HadOldAddress". Expect NotCopied = 0 before G1c,
 --    or a short list you have re-entered by hand (the forms show the old address as a hint).

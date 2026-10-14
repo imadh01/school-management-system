@@ -135,6 +135,5 @@ public class ParentService : IParentService
         p.NotifyAttendance, p.NotifyExams, p.NotifyFees, p.NotifyNotices, p.NotifyDiscipline,
         p.Employer, p.JobTitle, p.WorkEmail, p.WorkPhone, p.BillingContact,
         AddressMapping.ToResponses(p.Addresses),
-        AddressMapping.LegacyText(p.Addresses, p.AddressLine, p.City, p.State, p.Pincode),
         Convert.ToBase64String(p.RowVersion));
 }

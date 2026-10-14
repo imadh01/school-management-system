@@ -43,10 +43,6 @@ public class StudentConfiguration : IEntityTypeConfiguration<Student>
 
         builder.Property(s => s.Mobile).HasMaxLength(20);
         builder.Property(s => s.Email).HasMaxLength(100);
-        builder.Property(s => s.AddressLine).HasMaxLength(200);
-        builder.Property(s => s.City).HasMaxLength(50);
-        builder.Property(s => s.State).HasMaxLength(50);
-        builder.Property(s => s.Pincode).HasMaxLength(10);
 
         builder.Property(s => s.Category).HasMaxLength(FieldLimits.Category).IsRequired().HasDefaultValue("General");
         builder.Property(s => s.Religion).HasMaxLength(50);

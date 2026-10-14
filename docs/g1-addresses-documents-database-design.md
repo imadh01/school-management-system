@@ -1,6 +1,6 @@
 # G1 — Addresses & Documents — Database Design
 
-Status: **approved with changes 2026-10-13** (decisions recorded in the last sections). G1a (Addresses) and G1b (Documents) are built; G1c (drop the old address columns) follows. The G1a copy check passed on 2026-10-13 (2 applications and 1 student copied, nothing left over), so G1c is unblocked.
+Status: **approved with changes 2026-10-13** (decisions recorded in the last sections). G1a (Addresses), G1b (Documents) and G1c (drop the old address columns) are built. The G1a copy check passed on 2026-10-13 (2 applications and 1 student copied, nothing left over) before G1c was written.
 
 ## Purpose & scope
 
@@ -208,13 +208,13 @@ Why the file bytes are **not** in the database: a `varbinary(max)` column would 
 
 1. **G1a — Addresses (expand).** Back up first (`database/scripts/g1a-backup-before-migration.sql`). Create `Countries`, `CountryRegions` (seeded) and `Addresses`; copy each old address as `AddressType='Home', IsPrimary=1`. Since there is no default country, the country is **recognised, never assumed**: from the state/emirate name, else a valid 6-digit PIN (India), else a city that is an emirate (UAE). Rows without an address line, a city or a recognisable country are not copied; their old text is returned by the API as `legacyAddress` and shown on the edit form so staff can enter it properly. `database/scripts/g1a-address-copy-check.sql` gives the counts (had an address / copied / not copied) and the list, to run before G1c. From G1a on the API reads and writes only `Addresses`; the old columns stay untouched.
 2. **G1b — Documents.** Create `DocumentTypes` (seeded) and `Documents`; `IFileStorage` + local implementation; permissions `Documents.View/Upload/Verify/Delete` added to the catalog (Admin gets them automatically; other roles via the Roles API).
-3. **G1c — contract.** After you confirm the copied addresses look right, a separate migration drops `AddressLine/City/State/Pincode` from `Students`, `Parents`, `Admissions`.
+3. **G1c — contract (built 2026-10-14).** Migration `G1c_DropOldAddressColumns` drops `AddressLine/City/State/Pincode` from `Students`, `Parents`, `Admissions`, and the API drops `legacyAddress`. Its Up first refuses to run if any old address is still missing from `Addresses` (the copy-check test, so no address can be lost in any environment); its Down re-creates the columns and fills them from each owner's primary address. After G1c the copy-check script cannot run any more (the columns are gone); it has done its job.
 
-Both G1a and G1b migrations are hand-checked (data copy SQL, seed SQL, CHECKs written by name), like E1/F1.
+The G1a, G1b and G1c migrations are hand-checked (data copy SQL, seed SQL, CHECKs written by name), like E1/F1.
 
 ## API shape (for orientation; built after approval)
 
-- Addresses: no endpoints of their own. Student / parent / admission requests gain `addresses: [{ addressType, isPrimary, line1, line2, city, countryId, regionId, postalCode }]` (null = keep); responses gain `addresses` (with country and region names) and `legacyAddress`. `GET /api/countries` returns the countries with regions and postcode rules.
+- Addresses: no endpoints of their own. Student / parent / admission requests gain `addresses: [{ addressType, isPrimary, line1, line2, city, countryId, regionId, postalCode }]` (null = keep); responses gain `addresses` (with country and region names); `legacyAddress` (the old text, shown while it was not copied) existed from G1a until G1c. `GET /api/countries` returns the countries with regions and postcode rules.
 - Documents (as built in G1b): `GET /api/documents/options` (types + size limit for the upload form), `GET /api/students/{id}/documents`, `GET /api/admissions/{id}/documents`, `POST` the same URLs (multipart, one file per request), `GET /api/documents?status=&documentTypeId=&expiry=Expired|ExpiringSoon` (Documents page; not paged yet, like the other lists, see "Open points"), `GET /api/documents/{id}/file` (download), `POST /api/documents/{id}/verify`, `POST /api/documents/{id}/reject`, `POST /api/documents/{id}/unverify`, `DELETE /api/documents/{id}`.
 
 ## Decisions (approved 2026-10-13)
@@ -235,14 +235,15 @@ Both G1a and G1b migrations are hand-checked (data copy SQL, seed SQL, CHECKs wr
 3. **Repeated upload:** the same file is attached to the same student or application once (409, unique index above).
 4. **No self-review:** the uploader cannot verify or reject their own upload (422 from the service, `CK_Documents_NoSelfVerify` in the database).
 5. **Unverify before delete:** deleting a verified document answers 409 "Unverify it first". Unverify applies to Verified only; a Rejected document is not reopened (it is replaced by a new upload, decision 5).
-6. **Grants:** the four Documents permissions are in the catalog; no seeded role gets them (Admin holds them in code). Office roles get them on the Roles page.
+6. **Grants:** the four Documents permissions are in the catalog; no seeded role gets them (Admin holds them in code). Confirmed 2026-10-14: Admin only for now; other roles get them through user/role management (E2/E3).
 
 ## Open points
 
-- **Deleting an application does not touch its documents.** The application is soft-deleted and its documents simply disappear with it (they are hidden, not deleted), so their files are never purged. BUSINESS DECISION REQUIRED: should deleting an application also soft-delete its documents, so the retention period and the purge apply to them?
+- **Deleting an application does not touch its documents** (decided 2026-10-14: keep it so for now). The documents are hidden with the application, not deleted, so their files stay and are never purged. Revisit when retention rules for applicant data are set.
 - **Paging:** `GET /api/documents` returns every matching document (metadata only), like the other lists. Server paging comes with the DataTable "server mode" for all lists together.
 
 ## Operations notes
 
-- **G1a:** back up the database before applying the migration (script above); keep the old address columns until G1c; run the copy check before G1c.
+- **G1a:** back up the database before applying the migration (script above); keep the old address columns until G1c; run the copy check before G1c. (Done; G1c applied after a clean check.)
+- **G1c:** back up first (`g1a-backup-before-migration.sql` with `@label = 'G1c'`). If the migration stops with "G1c stopped: some … rows have an old address that is not in [Addresses]", nothing was changed: run the copy check, enter those addresses on their forms, and apply it again.
 - **G1b:** from G1b on, a backup is the database **and** the uploaded-files folder (`Documents:StorageRoot`), taken together; one without the other cannot be restored to a consistent state. Written up in `docs/deployment.md` (routine, settings, folder permissions).

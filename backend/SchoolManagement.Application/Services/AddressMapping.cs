@@ -32,15 +32,4 @@ public static class AddressMapping
             CountryId = a.CountryId,
             RegionId = a.RegionId,
         }).ToList();
-
-    /// <summary>
-    /// The old single address (columns kept until G1c) as one line, shown only when it was not
-    /// copied into Addresses (no address line, city or recognisable country), so staff can enter it again.
-    /// </summary>
-    public static string? LegacyText(ICollection<Address> addresses, string? line, string? city, string? state, string? pincode)
-    {
-        if (addresses.Count > 0) return null;
-        var parts = new[] { line, city, state, pincode }.Where(p => !string.IsNullOrWhiteSpace(p)).Select(p => p!.Trim()).ToList();
-        return parts.Count == 0 ? null : string.Join(", ", parts);
-    }
 }

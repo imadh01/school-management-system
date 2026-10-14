@@ -133,7 +133,7 @@ public class DataScopeTests
         using var json = await JsonAsync(response);
         var root = json.RootElement;
 
-        foreach (var hidden in new[] { "identity", "addressLine", "religion", "category", "custodyArrangement",
+        foreach (var hidden in new[] { "identity", "addresses", "religion", "category", "custodyArrangement",
                                        "feeConcessionPercent", "pickupPersons", "email", "mobile", "rowVersion" })
             Assert.False(root.TryGetProperty(hidden, out _), $"scoped detail must not contain '{hidden}'");
 
@@ -289,7 +289,7 @@ public class DataScopeTests
 
         using var json = await JsonAsync(await GetAsync(w.StudentUser, $"/api/parents/{w.PA}"));
         Assert.False(json.RootElement.TryGetProperty("employer", out _), "a student must not see a parent's employer");
-        Assert.False(json.RootElement.TryGetProperty("addressLine", out _), "a student must not see a parent's address");
+        Assert.False(json.RootElement.TryGetProperty("addresses", out _), "a student must not see a parent's address");
     }
 
     // ─────────────────────────────────────────────────────────────────
@@ -508,7 +508,7 @@ public class DataScopeTests
                 {
                     Name = name, UserId = userId, Status = "Active",
                     Mobile = "9" + Random.Shared.NextInt64(100_000_000, 999_999_999),
-                    Email = $"{name.ToLowerInvariant()}@test.local", Employer = "Acme", AddressLine = "1 Secret Lane",
+                    Email = $"{name.ToLowerInvariant()}@test.local", Employer = "Acme",
                 };
                 var pA = NewParent("PA" + TestData.Unique()[..4], null);
                 var pB = NewParent("PB" + TestData.Unique()[..4], parentUser);

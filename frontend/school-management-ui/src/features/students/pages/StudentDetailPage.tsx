@@ -255,10 +255,7 @@ export function StudentDetailPage() {
                   />
                 </DetailCard>
                 <DetailCard title="Addresses">
-                  <AddressList
-                    addresses={full.addresses}
-                    legacyAddress={full.legacyAddress}
-                  />
+                  <AddressList addresses={full.addresses} />
                 </DetailCard>
               </>
             )}

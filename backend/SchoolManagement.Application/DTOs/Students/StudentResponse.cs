@@ -12,7 +12,7 @@ public record StudentResponse(
     DateOnly AdmissionDate, string Status, string? PhotoUrl,
     string FirstName, string? MiddleName, string LastName, string Gender, DateOnly DateOfBirth,
     string? Mobile, string? Email,
-    List<AddressResponse> Addresses, string? LegacyAddress,
+    List<AddressResponse> Addresses,
     string Category, string? Religion, string? PreviousSchool,
     bool TransportRequired, string? TransportRoute,
     string? Nationality, string? SecondNationality, string? CountryOfBirth, string? PreferredName,

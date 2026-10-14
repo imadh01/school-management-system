@@ -37,13 +37,7 @@ public class Student : IHasRowVersion
 
     public string? Mobile { get; set; }
     public string? Email { get; set; }
-    public string? AddressLine { get; set; }
-    public string? City { get; set; }
-    public string? State { get; set; }
-    public string? Pincode { get; set; }
-
-    /// <summary>G1a: the addresses. AddressLine/City/State/Pincode above are the old single address,
-    /// kept read-only until G1c drops them; nothing writes them any more.</summary>
+    /// <summary>The addresses (G1a). The old single-address columns were dropped in G1c.</summary>
     public ICollection<Address> Addresses { get; set; } = new List<Address>();
 
     [AuditMasked]

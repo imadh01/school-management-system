@@ -11,7 +11,7 @@ public record AdmissionResponse(
     string AdmissionType, string? PreviousSchool,
     string Phone, string? Email, DateOnly RegistrationDate,
     string Status, string? RejectionReason,
-    List<AddressResponse> Addresses, string? LegacyAddress,
+    List<AddressResponse> Addresses,
     decimal? AdmissionFee, string? AdmissionFeeReference,
     string? BloodGroup, string? Religion, string? Category,
     string? MedicalNotes, string? Remarks,

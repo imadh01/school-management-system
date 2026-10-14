@@ -40,11 +40,6 @@ public class AdmissionConfiguration : IEntityTypeConfiguration<Admission>
         builder.Property(a => a.Status).HasMaxLength(20).IsRequired().HasDefaultValue("Registered");
         builder.Property(a => a.RejectionReason).HasMaxLength(300);
 
-        builder.Property(a => a.AddressLine).HasMaxLength(200);
-        builder.Property(a => a.City).HasMaxLength(50);
-        builder.Property(a => a.State).HasMaxLength(50);
-        builder.Property(a => a.Pincode).HasMaxLength(10);
-
         builder.Property(a => a.AdmissionFee).HasColumnType("decimal(10,2)");
         builder.Property(a => a.AdmissionFeeReference).HasMaxLength(30);
         builder.Property(a => a.BloodGroup).HasMaxLength(10);

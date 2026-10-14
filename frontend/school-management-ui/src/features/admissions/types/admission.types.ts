@@ -47,8 +47,6 @@ export interface AdmissionResponse {
   rejectionReason: string | null;
   /** G1a: Home / Permanent / Mailing, primary first. */
   addresses: AddressResponse[];
-  /** The old one-line address, only when it could not be copied into addresses (until G1c). */
-  legacyAddress: string | null;
   admissionFee: number | null;
   admissionFeeReference: string | null;
   bloodGroup: string | null;

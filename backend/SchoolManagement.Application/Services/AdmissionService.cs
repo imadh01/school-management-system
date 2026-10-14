@@ -491,7 +491,6 @@ public class AdmissionService : IAdmissionService
         a.AdmissionType, a.PreviousSchool, a.Phone, a.Email, a.RegistrationDate,
         a.Status, a.RejectionReason,
         AddressMapping.ToResponses(a.Addresses),
-        AddressMapping.LegacyText(a.Addresses, a.AddressLine, a.City, a.State, a.Pincode),
         a.AdmissionFee, a.AdmissionFeeReference, a.BloodGroup, a.Religion, a.Category,
         a.MedicalNotes, a.Remarks,
         a.RollNumber, a.AdmissionNumber, a.AdmissionDate, a.EntryPoint, a.TransportRequired,

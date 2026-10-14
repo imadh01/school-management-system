@@ -25,8 +25,6 @@ export interface ParentResponse {
   billingContact: boolean;
   /** G1a: Home / Permanent / Mailing, primary first. */
   addresses: AddressResponse[];
-  /** The old one-line address, only when it could not be copied into addresses (until G1c). */
-  legacyAddress: string | null;
   /** Version stamp. Send it back unchanged when saving, so a concurrent edit is detected (409). */
   rowVersion: string;
 }

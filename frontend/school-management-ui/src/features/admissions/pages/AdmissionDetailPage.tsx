@@ -325,10 +325,7 @@ export function AdmissionDetailPage() {
               />
             </DetailCard>
             <DetailCard title="Addresses">
-              <AddressList
-                addresses={a.addresses}
-                legacyAddress={a.legacyAddress}
-              />
+              <AddressList addresses={a.addresses} />
             </DetailCard>
             <DetailCard title="Admission">
               <KeyValueGrid

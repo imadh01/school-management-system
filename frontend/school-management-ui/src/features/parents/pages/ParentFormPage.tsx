@@ -119,13 +119,7 @@ const EMPTY_FORM: FormState = {
 
 function formFrom(p: ParentResponse): FormState {
   // Every editable field of the response, without id and rowVersion.
-  const {
-    id: _id,
-    rowVersion: _rowVersion,
-    addresses,
-    legacyAddress: _legacyAddress,
-    ...fields
-  } = p;
+  const { id: _id, rowVersion: _rowVersion, addresses, ...fields } = p;
   return { ...fields, addresses: toAddressRows(addresses) };
 }
 
@@ -349,7 +343,6 @@ export function ParentFormPage() {
             countries={countries.data ?? []}
             countriesLoading={countries.isLoading}
             errors={record.fieldErrors}
-            legacyAddress={parent?.legacyAddress}
           />
         </FormSection>
       </FormPage>
