@@ -39,15 +39,14 @@ public class TeacherService : ITeacherService
     {
         var teacher = await GetOrThrowAsync(id, cancellationToken);
 
-        teacher.Name = request.Name.Trim();
-        teacher.Phone = Clean(request.Phone);
         teacher.Specialization = Clean(request.Specialization);
         teacher.UpdatedAt = DateTime.UtcNow;
 
-        // Kept in step with the staff profile until E2c drops Teachers.Name/Phone.
-        teacher.User.StaffProfile ??= new StaffProfile { FullName = teacher.Name };
-        teacher.User.StaffProfile.FullName = teacher.Name;
-        teacher.User.StaffProfile.Mobile = teacher.Phone;
+        // E2c: the name and phone are the staff profile's (the Teachers table no longer has them).
+        var name = request.Name.Trim();
+        teacher.User.StaffProfile ??= new StaffProfile { FullName = name };
+        teacher.User.StaffProfile.FullName = name;
+        teacher.User.StaffProfile.Mobile = Clean(request.Phone);
         teacher.User.NewVersion(); // the Users page's edit form for this account is now stale
 
         await _teachers.SaveChangesAsync(cancellationToken);

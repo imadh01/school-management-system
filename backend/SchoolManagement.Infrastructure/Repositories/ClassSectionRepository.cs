@@ -21,7 +21,7 @@ public class ClassSectionRepository : IClassSectionRepository
     public Task<List<ClassSection>> GetAllAsync(CancellationToken cancellationToken) =>
         _context.ClassSections
             .Include(c => c.AcademicYear)
-            .Include(c => c.ClassTeacher)
+            .Include(c => c.ClassTeacher).ThenInclude(t => t!.User).ThenInclude(u => u.StaffProfile)
             .OrderByDescending(c => c.AcademicYear.StartDate)
             .ThenBy(c => c.Grade ?? 0)
             .ThenBy(c => c.Name)
@@ -30,7 +30,8 @@ public class ClassSectionRepository : IClassSectionRepository
 
     public Task<ClassSection?> GetByIdAsync(int id, CancellationToken cancellationToken) =>
         _context.ClassSections
-            .Include(c => c.AcademicYear).Include(c => c.ClassTeacher)
+            .Include(c => c.AcademicYear)
+            .Include(c => c.ClassTeacher).ThenInclude(t => t!.User).ThenInclude(u => u.StaffProfile)
             .FirstOrDefaultAsync(c => c.Id == id, cancellationToken);
 
     public Task<bool> ExistsAsync(int academicYearId, string name, string section, int? excludeId, CancellationToken cancellationToken) =>

@@ -11,8 +11,6 @@ public class TeacherConfiguration : IEntityTypeConfiguration<Teacher>
         builder.ToTable("Teachers");
         builder.HasKey(t => t.Id);
 
-        builder.Property(t => t.Name).HasMaxLength(150).IsRequired();
-        builder.Property(t => t.Phone).HasMaxLength(30);
         builder.Property(t => t.Specialization).HasMaxLength(100);
 
         // One login per teacher profile.

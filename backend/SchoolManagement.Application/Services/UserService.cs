@@ -110,7 +110,6 @@ public class UserService : IUserService
         user.Email = email;
         var profile = user.StaffProfile ??= new StaffProfile();
         Apply(profile, request.Profile);
-        await MirrorToTeacherAsync(user, cancellationToken);
         user.NewVersion(); // also for a profile-only edit: the version covers the account and its profile
 
         var roleChanged = await _users.ExecuteInTransactionAsync(async () =>
@@ -171,7 +170,6 @@ public class UserService : IUserService
         profile.BloodGroup = Clean(request.BloodGroup);
         profile.EmergencyContactName = Clean(request.EmergencyContactName);
         profile.EmergencyContactPhone = Clean(request.EmergencyContactPhone);
-        await MirrorToTeacherAsync(user, cancellationToken);
         user.NewVersion();
 
         await _users.ExecuteInTransactionAsync(async () =>
@@ -226,15 +224,6 @@ public class UserService : IUserService
         profile.BloodGroup = Clean(request.BloodGroup);
         profile.EmergencyContactName = Clean(request.EmergencyContactName);
         profile.EmergencyContactPhone = Clean(request.EmergencyContactPhone);
-    }
-
-    /// <summary>Until E2c the Teachers row keeps its own copy of the name and phone (decision 2).</summary>
-    private async Task MirrorToTeacherAsync(User user, CancellationToken cancellationToken)
-    {
-        var teacher = await _teachers.GetByUserIdAsync(user.Id, cancellationToken);
-        if (teacher is null || user.StaffProfile is null) return;
-        teacher.Name = user.StaffProfile.FullName;
-        teacher.Phone = user.StaffProfile.Mobile;
     }
 
     private async Task<UserResponse> ToResponseAsync(User user, CancellationToken cancellationToken)

@@ -465,9 +465,9 @@ public class DataScopeTests
                 parentUser = await CreateUserAsync(db, hasher, parentScopeRole.Id, "par");
                 studentUser = await CreateUserAsync(db, hasher, studentScopeRole.Id, "stu");
 
-                var t1 = new Teacher { UserId = t1User, Name = "Teacher One" };
-                var t2 = new Teacher { UserId = t2User, Name = "Teacher Two" };
-                var t3 = new Teacher { UserId = t3User, Name = "Teacher Three" };
+                var t1 = new Teacher { UserId = t1User };
+                var t2 = new Teacher { UserId = t2User };
+                var t3 = new Teacher { UserId = t3User };
                 db.Teachers.AddRange(t1, t2, t3);
                 await db.SaveChangesAsync();
 

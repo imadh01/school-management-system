@@ -15,11 +15,11 @@ public class TeacherRepository : ITeacherRepository
     }
 
     public Task<List<Teacher>> GetAllAsync(CancellationToken cancellationToken) =>
-        _context.Teachers.Include(t => t.User)
-            .OrderBy(t => t.Name)
+        _context.Teachers.Include(t => t.User).ThenInclude(u => u.StaffProfile)
+            .OrderBy(t => t.User.StaffProfile!.FullName)
             .ToListAsync(cancellationToken);
 
-    // E2: with the staff profile, which the teacher's name and phone are mirrored to until E2c.
+    // With the staff profile: the teacher's name and phone are its FullName and Mobile.
     public Task<Teacher?> GetByIdAsync(int id, CancellationToken cancellationToken) =>
         _context.Teachers.Include(t => t.User).ThenInclude(u => u.StaffProfile)
             .FirstOrDefaultAsync(t => t.Id == id, cancellationToken);
@@ -74,7 +74,7 @@ public class TeacherRepository : ITeacherRepository
     public Task<List<Subject>> GetSubjectsByIdsAsync(IReadOnlyCollection<int> ids, CancellationToken cancellationToken) =>
         _context.Subjects
             .Include(s => s.ClassSection)
-            .Include(s => s.Teacher)
+            .Include(s => s.Teacher).ThenInclude(t => t!.User).ThenInclude(u => u.StaffProfile)
             .Where(s => ids.Contains(s.Id))
             .ToListAsync(cancellationToken);
 
@@ -84,7 +84,7 @@ public class TeacherRepository : ITeacherRepository
     public Task<ClassSection?> GetClassSectionAsync(int id, CancellationToken cancellationToken) =>
         _context.ClassSections
             .Include(c => c.AcademicYear)
-            .Include(c => c.ClassTeacher)
+            .Include(c => c.ClassTeacher).ThenInclude(t => t!.User).ThenInclude(u => u.StaffProfile)
             .FirstOrDefaultAsync(c => c.Id == id, cancellationToken);
 
     public Task<int> CountSubjectsInClassAsync(int teacherId, int classSectionId, CancellationToken cancellationToken) =>

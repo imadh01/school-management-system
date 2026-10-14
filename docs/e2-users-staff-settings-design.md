@@ -428,3 +428,13 @@ Profile form helpers shared by Users and My Account: `features/users/utils/profi
 - **Saving an existing role** sends up to two requests (name/description, then the permission list). The second uses
   the row version the first returned, so a half-finished save can be retried.
 - A change applies to everyone holding the role at their next request; nobody is signed out.
+
+## E2c as built: Teachers.Name and Teachers.Phone dropped
+
+- The staff profile (`FullName`, `Mobile`) is the only copy. `Teacher.Name` / `Teacher.Phone` are now read-only properties that read the profile (falling back to the username), so they are not columns.
+- Everything that loads a teacher for display includes `User.StaffProfile` (Teacher, Subject and ClassSection repositories); the teachers list sorts by `StaffProfile.FullName`.
+- `PUT /api/teachers/{id}` still takes name and phone; it now writes them to the profile. The user service no longer mirrors anything.
+- Migration `E2c_DropTeacherNameAndPhone`: a guard stops it (changing nothing) if a teacher has no profile or the teacher's copy differs from the profile; `Down` puts the columns back and refills them from the profiles.
+- Run order: `g1a-backup-before-migration.sql` (`@label = 'E2c'`) → `e2c-precheck.sql` (all three counts 0) → migration.
+- Tests: the two tests of the E2a copy SQL were removed (that SQL reads the dropped columns; the E2a migration itself is unchanged and runs before E2c).
+

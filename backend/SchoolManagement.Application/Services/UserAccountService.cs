@@ -245,12 +245,10 @@ public class UserAccountService : IUserAccountService
 
         if (becomesTeacher && teacher is null)
         {
-            // The teacher's name and phone come from the profile (kept in step until E2c drops them).
+            // The teacher's name and phone are the profile's (E2c: no copy on the Teachers row).
             _teachers.Add(new Teacher
             {
                 User = user, // also works for a user created in the same save
-                Name = user.StaffProfile?.FullName ?? user.Username,
-                Phone = user.StaffProfile?.Mobile,
                 Specialization = newTeacherSpecialization,
             });
         }

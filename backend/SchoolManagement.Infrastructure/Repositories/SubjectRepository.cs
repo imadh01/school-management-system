@@ -17,7 +17,7 @@ public class SubjectRepository : ISubjectRepository
     public Task<List<Subject>> GetAllAsync(CancellationToken cancellationToken) =>
            _context.Subjects
                .Include(s => s.ClassSection).ThenInclude(c => c.AcademicYear)
-               .Include(s => s.Teacher)
+               .Include(s => s.Teacher).ThenInclude(t => t!.User).ThenInclude(u => u.StaffProfile)
                .OrderByDescending(s => s.ClassSection.AcademicYear.StartDate)
                .ThenBy(s => s.ClassSection.Grade ?? 0)
                .ThenBy(s => s.ClassSection.Name)
@@ -27,7 +27,8 @@ public class SubjectRepository : ISubjectRepository
 
     public Task<Subject?> GetByIdAsync(int id, CancellationToken cancellationToken) =>
         _context.Subjects
-            .Include(s => s.ClassSection).ThenInclude(c => c.AcademicYear).Include(s => s.Teacher)
+            .Include(s => s.ClassSection).ThenInclude(c => c.AcademicYear)
+            .Include(s => s.Teacher).ThenInclude(t => t!.User).ThenInclude(u => u.StaffProfile)
             .FirstOrDefaultAsync(s => s.Id == id, cancellationToken);
 
     public Task<bool> ExistsWithCodeAsync(string code, int classSectionId, int? excludeId, CancellationToken cancellationToken) =>

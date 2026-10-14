@@ -155,7 +155,7 @@ public class UsersApiTests
         Assert.Equal("Renamed Teacher", edited.Profile!.FullName);
         Assert.NotEqual(user.RowVersion, edited.RowVersion);
         var teacher = await ReadAsync<TeacherResponse>(await SendAsync(admin, HttpMethod.Get, $"/api/teachers/{user.TeacherId}"));
-        Assert.Equal("Renamed Teacher", teacher.Name); // kept in step until E2c
+        Assert.Equal("Renamed Teacher", teacher.Name); // the teacher page reads the profile
         Assert.Equal("+971 55 999 0000", teacher.Phone);
 
         // The first version again: somebody saved after it was loaded.

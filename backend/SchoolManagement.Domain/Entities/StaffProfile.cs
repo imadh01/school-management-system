@@ -7,8 +7,8 @@ namespace SchoolManagement.Domain.Entities;
 /// The login itself (username, password, status, role) stays on <see cref="User"/>: that row is read on
 /// every request and is about signing in; this one is about the person.
 ///
-/// Teaching data (specialization, assignments) stays on <see cref="Teacher"/>. Until E2c the teacher's
-/// Name/Phone columns are kept in step with FullName/Mobile here (written together), then dropped.
+/// Teaching data (specialization, assignments) stays on <see cref="Teacher"/>. Since E2c the teacher has no
+/// name/phone of its own: Teacher.Name and Teacher.Phone read FullName and Mobile from here.
 /// Edits are protected by the user's version: every profile save calls User.NewVersion().
 /// </summary>
 public class StaffProfile

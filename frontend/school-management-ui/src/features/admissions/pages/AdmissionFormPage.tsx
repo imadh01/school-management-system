@@ -1,7 +1,13 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { FileUp, Lock } from "lucide-react";
+import { Lock } from "lucide-react";
 import { admissionService } from "../services/admissionService";
+import { documentService } from "@/features/documents/services/documentService";
+import {
+  PendingDocumentsEditor,
+} from "@/features/documents/components/PendingDocumentsEditor";
+import { DocumentUploadResults } from "@/features/documents/components/DocumentUploadResults";
+import type { PendingDocument } from "@/features/documents/types/pendingDocument";
 import { classSectionService } from "@/features/class-sections/services/classSectionService";
 import {
   isAdmissionEditable,
@@ -23,7 +29,11 @@ import { EmptyState } from "@/components/EmptyState";
 import { Notice } from "@/components/Notice";
 import { PageLoadError, PageLoading } from "@/components/PageState";
 import { useAsyncData } from "@/hooks/useAsyncData";
+import { useCan } from "@/hooks/useCan";
 import { useCountries } from "@/hooks/useCountries";
+import { Permission } from "@/routes/permissions";
+import { useToast } from "@/components/Toast";
+import { getApiErrors } from "@/utils/apiError";
 import { useRecordForm } from "@/hooks/useRecordForm";
 import type { AddressFormRow } from "@/types/address";
 import {
@@ -41,7 +51,7 @@ import {
 
 const MAX_GUARDIANS = 5;
 
-/** The sections in the same order as the old registration dialog, plus Documents (off until G1). */
+/** The sections in the same order as the old registration dialog, plus Documents. */
 const SECTIONS: readonly FormSectionDef[] = [
   {
     id: "applicant",
@@ -60,12 +70,14 @@ const SECTIONS: readonly FormSectionDef[] = [
     fields: ["phone", "email", "addresses"],
   },
   { id: "remarks", title: "Remarks", fields: ["remarks"] },
-  { id: "documents", title: "Documents", fields: [] },
+  { id: "documents", title: "Documents", fields: ["documents"] },
 ];
 
 /** The form holds addresses as editable rows; everything else is the request itself. */
 type FormState = Omit<CreateAdmissionRequest, "addresses"> & {
   addresses: AddressFormRow[];
+  /** Files picked on the New form: uploaded after the application is saved (never sent with it). */
+  documents: PendingDocument[];
 };
 
 const EMPTY_FORM: FormState = {
@@ -82,6 +94,7 @@ const EMPTY_FORM: FormState = {
   addresses: [],
   remarks: null,
   guardians: [],
+  documents: [],
 };
 
 function formFrom(a: AdmissionResponse): FormState {
@@ -105,6 +118,7 @@ function formFrom(a: AdmissionResponse): FormState {
       email: g.email,
       isPrimaryContact: g.isPrimaryContact,
     })),
+    documents: [],
   };
 }
 
@@ -176,6 +190,20 @@ export function AdmissionFormPage() {
     "Could not load this application.",
   );
   const countries = useCountries();
+  const toast = useToast();
+  const canUpload = useCan()(Permission.DocumentsUpload) && isNew;
+  const docOptions = useAsyncData(
+    () => (canUpload ? documentService.getOptions() : Promise.resolve(null)),
+    [canUpload],
+    "Could not load the document types.",
+  );
+  // Set when the application was saved but some files did not upload (see DocumentUploadResults).
+  const [partial, setPartial] = useState<{
+    id: number;
+    regNo: string;
+    uploaded: number;
+    failed: { item: PendingDocument; message: string }[];
+  } | null>(null);
   const record = useRecordForm<FormState>({
     sections: SECTIONS,
     initial: EMPTY_FORM,
@@ -196,6 +224,20 @@ export function AdmissionFormPage() {
         message={loaded.error}
         backTo="/admissions"
         backLabel="Back to admissions"
+      />
+    );
+  }
+  if (partial) {
+    return (
+      <DocumentUploadResults
+        owner={{ type: "admission", id: partial.id }}
+        title={`Application ${partial.regNo} was registered`}
+        uploadedCount={partial.uploaded}
+        failed={partial.failed}
+        onFinished={() => {
+          toast.success("All documents were uploaded.");
+          navigate(`/admissions/${partial.id}`);
+        }}
       />
     );
   }
@@ -264,6 +306,14 @@ export function AdmissionFormPage() {
             `Only one ${g.relationType.toLowerCase()} can be added.`;
       }
     });
+    const options = docOptions.data;
+    form.documents.forEach((d, i) => {
+      const type = options?.types.find((t) => String(t.id) === d.typeId);
+      if (d.fileError) e[`documents.${i}.file`] = d.fileError;
+      if (!type) e[`documents.${i}.documentTypeId`] = "Choose a document type.";
+      else if (type.hasExpiry && !d.expiryDate)
+        e[`documents.${i}.expiryDate`] = `${type.name} needs an expiry date.`;
+    });
     return { ...e, ...validateAddresses(form.addresses, countries.data ?? []) };
   };
 
@@ -274,8 +324,9 @@ export function AdmissionFormPage() {
       .map((g, index) => ({ g, index }))
       .filter(({ g }) => !isBlankGuardian(g));
     const anyPrimary = sent.some(({ g }) => g.isPrimaryContact);
+    const { documents, ...fields } = form;
     const request: CreateAdmissionRequest = {
-      ...blankToNull(form),
+      ...blankToNull(fields),
       firstName: form.firstName.trim(),
       lastName: form.lastName.trim(),
       phone: form.phone.trim(),
@@ -290,30 +341,95 @@ export function AdmissionFormPage() {
       })),
     };
 
-    void record.save({
-      validate,
-      submit: () =>
-        admission
-          ? admissionService.update(admission.id, {
-              ...request,
-              rowVersion: admission.rowVersion,
-            })
-          : admissionService.create(request),
-      fallback: "Could not save this application.",
-      remap: (f) =>
-        remapRowErrors(
-          f,
-          "guardians",
-          sent.map((r) => r.index),
-        ),
-      onSaved: (saved) => ({
-        form: formFrom(saved),
-        message: admission
-          ? `${saved.firstName} ${saved.lastName}'s application was saved.`
-          : `Application ${saved.regNo} was registered.`,
-        goTo: `/admissions/${saved.id}`,
-      }),
-    });
+    if (documents.length === 0 || admission) {
+      void record.save({
+        validate,
+        submit: () =>
+          admission
+            ? admissionService.update(admission.id, {
+                ...request,
+                rowVersion: admission.rowVersion,
+              })
+            : admissionService.create(request),
+        fallback: "Could not save this application.",
+        remap: (f) =>
+          remapRowErrors(
+            f,
+            "guardians",
+            sent.map((r) => r.index),
+          ),
+        onSaved: (saved) => ({
+          form: formFrom(saved),
+          message: admission
+            ? `${saved.firstName} ${saved.lastName}'s application was saved.`
+            : `Application ${saved.regNo} was registered.`,
+          goTo: `/admissions/${saved.id}`,
+        }),
+      });
+      return;
+    }
+
+    // New application with files: save it first, then upload one request per file. If some
+    // uploads fail the application stays saved and DocumentUploadResults offers a Retry.
+    void (async () => {
+      const problems = validate();
+      if (Object.keys(problems).length > 0) {
+        record.showProblems(problems);
+        return;
+      }
+      record.setIsSaving(true);
+      try {
+        const saved = await admissionService.create(request);
+        const failed: { item: PendingDocument; message: string }[] = [];
+        for (const item of documents) {
+          try {
+            await documentService.upload(
+              { type: "admission", id: saved.id },
+              {
+                documentTypeId: Number(item.typeId),
+                title: item.title,
+                expiryDate: item.expiryDate,
+                file: item.file,
+              },
+            );
+          } catch (err) {
+            failed.push({
+              item,
+              message: getApiErrors(err, "Could not upload this file.")[0],
+            });
+          }
+        }
+        if (failed.length === 0) {
+          record.finishSaved(
+            formFrom(saved),
+            `Application ${saved.regNo} was registered with ${documents.length} document${documents.length === 1 ? "" : "s"}.`,
+            `/admissions/${saved.id}`,
+          );
+        } else {
+          record.reset(formFrom(saved)); // nothing left unsaved: no leave-page warning
+          toast.error(
+            `Application ${saved.regNo} was registered, but ${failed.length} document${failed.length === 1 ? "" : "s"} did not upload.`,
+          );
+          setPartial({
+            id: saved.id,
+            regNo: saved.regNo,
+            uploaded: documents.length - failed.length,
+            failed,
+          });
+        }
+      } catch (err) {
+        record.showApiError(err, "Could not save this application.", {
+          remap: (f) =>
+            remapRowErrors(
+              f,
+              "guardians",
+              sent.map((r) => r.index),
+            ),
+        });
+      } finally {
+        record.setIsSaving(false);
+      }
+    })();
   };
 
   const backTo = admission ? `/admissions/${admission.id}` : "/admissions";
@@ -495,24 +611,38 @@ export function AdmissionFormPage() {
           />
         </FormSection>
 
-        {/* 6. Documents: in the layout now, switched on with G1 */}
+        {/* 6. Documents: held in the browser, uploaded after the application is saved */}
         <FormSection
           id="documents"
           title="Documents"
           grid={false}
-          description="Birth certificate, previous school records, photos. PDF, JPG or PNG, up to 5 MB each."
+          description="Birth certificate, previous school records, photos. PDF, JPG or PNG."
         >
-          <div className="dropzone dropzone--disabled" aria-disabled="true">
-            <FileUp size={28} aria-hidden="true" />
-            <strong>Document upload is not switched on yet</strong>
-            <span>
-              It arrives with the documents module (G1). Files picked here will
-              be uploaded right after the application is saved.
-            </span>
-          </div>
-          <Notice style={{ marginTop: 12 }}>
-            Until then, keep paper copies with the application.
-          </Notice>
+          {!isNew ? (
+            <Notice>
+              Documents are added, verified and removed on the application's
+              page.{" "}
+              <Link to={`/admissions/${admissionId}?tab=documents`}>
+                Open the Documents tab
+              </Link>
+              .
+            </Notice>
+          ) : !canUpload || docOptions.error ? (
+            <Notice tone={docOptions.error ? "warn" : "info"}>
+              {docOptions.error ??
+                "You can't upload documents. Someone with upload access can add them from the application's page after it is saved."}
+            </Notice>
+          ) : docOptions.data ? (
+            <PendingDocumentsEditor
+              items={form.documents}
+              onChange={(documents) => record.patch({ documents })}
+              options={docOptions.data}
+              disabled={record.isSaving}
+              errors={errors}
+            />
+          ) : (
+            <p className="cell-muted">Loading…</p>
+          )}
         </FormSection>
       </FormPage>
     </>

@@ -153,68 +153,6 @@ public class StaffProfileRulesTests
         Assert.Equal(new[] { DayOfWeek.Monday, DayOfWeek.Thursday, DayOfWeek.Sunday }, WorkingDays.ToDays(mask)); // Monday first
     }
 
-    // ------------------------------------------------------------------ the migration's copy
-
-    [Fact]
-    public async Task The_copy_gives_teachers_their_name_and_phone_and_other_staff_their_username()
-    {
-        using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-
-        var clerk = await NewUserAsync(db, RoleNames.Clerk);
-        var teacherUser = await NewUserAsync(db, RoleNames.Teacher);
-        db.Teachers.Add(new Teacher { UserId = teacherUser.Id, Name = "  Asha Rao ", Phone = "+971 50 000 0000" });
-        var parentUser = await NewUserAsync(db, RoleNames.Parent);
-        var deleted = await NewUserAsync(db, RoleNames.Clerk);
-        deleted.IsDeleted = true;
-        deleted.DeletedAt = DateTime.UtcNow;
-        await db.SaveChangesAsync();
-
-        await db.Database.ExecuteSqlRawAsync(E2a_StaffProfilesAndSchoolSettings.CopyProfilesSql);
-        await db.Database.ExecuteSqlRawAsync(E2a_StaffProfilesAndSchoolSettings.CopyProfilesSql); // runs twice: no duplicates
-        await db.Database.ExecuteSqlRawAsync(E2a_StaffProfilesAndSchoolSettings.GuardTeachersHaveProfilesSql);
-
-        var profiles = await db.StaffProfiles.AsNoTracking().IgnoreQueryFilters()
-            .Where(p => new[] { clerk.Id, teacherUser.Id, parentUser.Id, deleted.Id }.Contains(p.UserId))
-            .ToListAsync();
-
-        var clerkProfile = Assert.Single(profiles, p => p.UserId == clerk.Id);
-        Assert.Equal(clerk.Username, clerkProfile.FullName); // decision 3: flagged "needs name" in the list
-        Assert.Null(clerkProfile.Mobile);
-        Assert.Equal(DateOnly.FromDateTime(clerk.CreatedAt), clerkProfile.JoiningDate);
-
-        var teacherProfile = Assert.Single(profiles, p => p.UserId == teacherUser.Id);
-        Assert.Equal("Asha Rao", teacherProfile.FullName);
-        Assert.Equal("+971 50 000 0000", teacherProfile.Mobile);
-
-        Assert.DoesNotContain(profiles, p => p.UserId == parentUser.Id); // decision 1: no parent/student profiles
-        Assert.DoesNotContain(profiles, p => p.UserId == deleted.Id);
-    }
-
-    [Fact]
-    public async Task The_guard_stops_when_a_teacher_has_no_profile()
-    {
-        using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        var teacherUser = await NewUserAsync(db, RoleNames.Teacher);
-        var teacher = new Teacher { UserId = teacherUser.Id, Name = "No profile" };
-        db.Teachers.Add(teacher);
-        await db.SaveChangesAsync();
-
-        try
-        {
-            var ex = await Assert.ThrowsAsync<SqlException>(
-                () => db.Database.ExecuteSqlRawAsync(E2a_StaffProfilesAndSchoolSettings.GuardTeachersHaveProfilesSql));
-            Assert.Equal(50002, ex.Number);
-        }
-        finally
-        {
-            // Leave the shared database as the copy would: other tests run the guard too.
-            db.StaffProfiles.Add(new StaffProfile { UserId = teacherUser.Id, FullName = teacher.Name });
-            await db.SaveChangesAsync();
-        }
-    }
-
     // ------------------------------------------------------------------ helpers
 
     private static async Task<User> NewUserAsync(ApplicationDbContext db, string? roleName = null)

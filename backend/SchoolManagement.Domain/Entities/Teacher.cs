@@ -11,8 +11,10 @@ public class Teacher
     public int UserId { get; set; }
     public User User { get; set; } = null!;
 
-    public string Name { get; set; } = string.Empty;
-    public string? Phone { get; set; }
+    /// <summary>E2c: the name and phone live on the staff profile (one copy). These read it, so the
+    /// repositories that load a teacher for display must include User.StaffProfile. Read-only, so not mapped.</summary>
+    public string Name => User?.StaffProfile?.FullName ?? User?.Username ?? string.Empty;
+    public string? Phone => User?.StaffProfile?.Mobile;
     public string? Specialization { get; set; }
 
     public DateTime CreatedAt { get; set; }
