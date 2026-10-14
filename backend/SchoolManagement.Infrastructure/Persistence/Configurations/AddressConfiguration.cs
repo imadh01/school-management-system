@@ -13,8 +13,8 @@ namespace SchoolManagement.Infrastructure.Persistence.Configurations;
 /// </summary>
 public class AddressConfiguration : IEntityTypeConfiguration<Address>
 {
-    /// <summary>The owner columns. E2 adds StaffProfileId here and in the CHECK below.</summary>
-    internal static readonly string[] OwnerColumns = { "StudentId", "ParentId", "AdmissionId" };
+    /// <summary>The owner columns (E2 added StaffProfileId). The CHECK below is built from this list.</summary>
+    internal static readonly string[] OwnerColumns = { "StudentId", "ParentId", "AdmissionId", "StaffProfileId" };
 
     public void Configure(EntityTypeBuilder<Address> builder)
     {
@@ -47,6 +47,8 @@ public class AddressConfiguration : IEntityTypeConfiguration<Address>
             .HasForeignKey(a => a.ParentId).OnDelete(DeleteBehavior.Cascade);
         builder.HasOne(a => a.Admission).WithMany(ad => ad.Addresses)
             .HasForeignKey(a => a.AdmissionId).OnDelete(DeleteBehavior.Cascade);
+        builder.HasOne(a => a.StaffProfile).WithMany(s => s.Addresses)
+            .HasForeignKey(a => a.StaffProfileId).OnDelete(DeleteBehavior.Cascade);
 
         builder.HasOne(a => a.Country).WithMany()
             .HasForeignKey(a => a.CountryId).OnDelete(DeleteBehavior.Restrict);
@@ -64,6 +66,7 @@ public class AddressConfiguration : IEntityTypeConfiguration<Address>
         AddOwnerIndexes(builder, "StudentId", "Student");
         AddOwnerIndexes(builder, "ParentId", "Parent");
         AddOwnerIndexes(builder, "AdmissionId", "Admission");
+        AddOwnerIndexes(builder, "StaffProfileId", "Staff");
     }
 
     private static void AddOwnerIndexes(EntityTypeBuilder<Address> builder, string column, string owner)

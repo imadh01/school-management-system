@@ -121,7 +121,7 @@ Specialization stays on `Teachers` (it is teaching data). Addresses come from th
 
 ### Users (changed)
 
-Add `RowVersion` (rowversion). Nothing else changes; `LastLoginAt` already exists for the list's
+Add `RowVersion` (binary(8), set by the application — see "E2a as built"). Nothing else changes; `LastLoginAt` already exists for the list's
 "Last login" column.
 
 ### Teachers (changed, expand/contract)
@@ -326,3 +326,45 @@ Back up first with `g1a-backup-before-migration.sql` (`@label = 'E2'`).
   must change the password at first sign-in.
 - `User`: `[AuditMasked]` PasswordHash and SecurityStamp, `[AuditIgnore]` LastLoginAt and AccessFailedCount.
 - Tests: `DatabaseRules/UserAccountRulesTests`, `IntegrationTests/AccountSecurityTests`, a scrub test in `AuditTrailTests`.
+
+### E2a as built
+
+**Schema (migration `20261014075122_E2a_StaffProfilesAndSchoolSettings`, hand-edited):**
+`StaffProfiles` (one per user, filtered unique `UserId`; optional `EmployeeNumber`, unique when present;
+blood group and emergency contact masked in the audit log), `SchoolSettings` (one row, `CHECK Id = 1`, seeded
+with the placeholders of decision 5), `Addresses.StaffProfileId` (fourth owner in the one-owner CHECK),
+`Users.RowVersion`. The copy (decision 2/3) and its guard run at the end of Up; Down deletes staff addresses first.
+
+**One change from the design: `Users.RowVersion` is `binary(8)` set by the application, not a SQL `rowversion`.**
+Signing in writes `LastLoginAt` (and failed attempts write `AccessFailedCount`) to the same row. With a SQL
+rowversion, every sign-in would change the version, so an administrator who opened a user's edit form and
+saved after that user signed in would get a 409 "someone else saved" although nobody edited anything. Now the
+version changes only when the account or its profile is edited: every such save calls `User.NewVersion()`
+(UserService edit and My Account, the account service for status/role/password/delete, the Teachers edit form).
+Existing users get a random starting value in the migration.
+
+**API** (as in the table above, plus):
+- `GET /api/settings/basics` — any signed-in user: school name, short name, country id (top bar; address
+  forms pre-select the country, decision 6). Served from `ISchoolSettingsProvider`, a singleton cache cleared
+  after each settings save (single server, like the permission cache).
+- `POST /api/auth/unlock/{id}` still exists next to `POST /api/users/{id}/unlock`; it goes in E3.
+- Teacher accounts: role **Teacher** on the Users page creates the Teachers row (name and phone from the
+  profile, specialization from the request). Moving a teacher to another role, or deleting the account, is
+  refused (422) while the teacher still teaches a subject or is a class teacher; otherwise the Teachers row is
+  soft-deleted with it. Until E2c, `Teachers.Name/Phone` are written together with the profile's
+  `FullName/Mobile` (Users edit, My Account and the Teachers page all keep them in step).
+- A role change in the edit form runs inside the same transaction as the profile and addresses, with the same
+  guards as the account service (not your own account, never the last active Admin, only roles whose
+  permissions you hold, no Student/Parent).
+- The Users form requires full name, gender, mobile and joining date; rows copied by the migration may lack
+  them until someone edits the user. My Account cannot change username, role, status, joining date or
+  employee number.
+- Time zones are stored and listed as **IANA ids** ("Asia/Dubai"); a Windows id is refused so the value does
+  not depend on the server's operating system.
+
+**Tests:** `DatabaseRules/StaffProfileRulesTests` (one profile per user, employee number, gender/name checks,
+staff address owner, one settings row and its checks, the migration's copy and guard),
+`IntegrationTests/UsersApiTests` (create, teacher record, Student/Parent refused, duplicates, edit + 409,
+role change ends sessions, teacher with assignments, status/password/unlock/delete, needs-name flag,
+My Account, settings and time zones), validator and UserService unit tests, and the new rows in
+`AccessMatrixTests`. Manual: `backend/SchoolManagement.API/E2-Users-Settings.http`.

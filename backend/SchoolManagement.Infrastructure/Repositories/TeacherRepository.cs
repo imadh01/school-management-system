@@ -19,9 +19,13 @@ public class TeacherRepository : ITeacherRepository
             .OrderBy(t => t.Name)
             .ToListAsync(cancellationToken);
 
+    // E2: with the staff profile, which the teacher's name and phone are mirrored to until E2c.
     public Task<Teacher?> GetByIdAsync(int id, CancellationToken cancellationToken) =>
-        _context.Teachers.Include(t => t.User)
+        _context.Teachers.Include(t => t.User).ThenInclude(u => u.StaffProfile)
             .FirstOrDefaultAsync(t => t.Id == id, cancellationToken);
+
+    public Task<Teacher?> GetByUserIdAsync(int userId, CancellationToken cancellationToken) =>
+        _context.Teachers.FirstOrDefaultAsync(t => t.UserId == userId, cancellationToken);
 
     // Two grouped queries instead of loading every subject/class per teacher.
     public async Task<Dictionary<int, TeacherStats>> GetStatsAsync(CancellationToken cancellationToken)
@@ -100,6 +104,8 @@ public class TeacherRepository : ITeacherRepository
         await _context.Teachers.AddAsync(teacher, cancellationToken);
         await _context.SaveChangesAsync(cancellationToken);
     }
+
+    public void Add(Teacher teacher) => _context.Teachers.Add(teacher);
 
     public Task SaveChangesAsync(CancellationToken cancellationToken) =>
         _context.SaveChangesAsync(cancellationToken);

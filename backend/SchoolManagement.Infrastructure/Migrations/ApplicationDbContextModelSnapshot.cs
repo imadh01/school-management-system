@@ -147,6 +147,9 @@ namespace SchoolManagement.Infrastructure.Migrations
                     b.Property<int?>("RegionId")
                         .HasColumnType("int");
 
+                    b.Property<int?>("StaffProfileId")
+                        .HasColumnType("int");
+
                     b.Property<int?>("StudentId")
                         .HasColumnType("int");
 
@@ -170,6 +173,11 @@ namespace SchoolManagement.Infrastructure.Migrations
                         .HasDatabaseName("UX_Addresses_Parent_Primary")
                         .HasFilter("[ParentId] IS NOT NULL AND [IsPrimary] = 1");
 
+                    b.HasIndex("StaffProfileId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Addresses_Staff_Primary")
+                        .HasFilter("[StaffProfileId] IS NOT NULL AND [IsPrimary] = 1");
+
                     b.HasIndex("StudentId")
                         .IsUnique()
                         .HasDatabaseName("UX_Addresses_Student_Primary")
@@ -187,6 +195,11 @@ namespace SchoolManagement.Infrastructure.Migrations
                         .HasDatabaseName("UX_Addresses_Parent_Type")
                         .HasFilter("[ParentId] IS NOT NULL");
 
+                    b.HasIndex("StaffProfileId", "AddressType")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Addresses_Staff_Type")
+                        .HasFilter("[StaffProfileId] IS NOT NULL");
+
                     b.HasIndex("StudentId", "AddressType")
                         .IsUnique()
                         .HasDatabaseName("UX_Addresses_Student_Type")
@@ -198,7 +211,7 @@ namespace SchoolManagement.Infrastructure.Migrations
 
                             t.HasCheckConstraint("CK_Addresses_CityNotBlank", "LEN(LTRIM(RTRIM([City]))) > 0");
 
-                            t.HasCheckConstraint("CK_Addresses_ExactlyOneOwner", "(CASE WHEN [StudentId] IS NULL THEN 0 ELSE 1 END) + (CASE WHEN [ParentId] IS NULL THEN 0 ELSE 1 END) + (CASE WHEN [AdmissionId] IS NULL THEN 0 ELSE 1 END) = 1");
+                            t.HasCheckConstraint("CK_Addresses_ExactlyOneOwner", "(CASE WHEN [StudentId] IS NULL THEN 0 ELSE 1 END) + (CASE WHEN [ParentId] IS NULL THEN 0 ELSE 1 END) + (CASE WHEN [AdmissionId] IS NULL THEN 0 ELSE 1 END) + (CASE WHEN [StaffProfileId] IS NULL THEN 0 ELSE 1 END) = 1");
 
                             t.HasCheckConstraint("CK_Addresses_Line1NotBlank", "LEN(LTRIM(RTRIM([Line1]))) > 0");
                         });
@@ -1389,6 +1402,196 @@ namespace SchoolManagement.Infrastructure.Migrations
                     b.ToTable("RolePermissions", (string)null);
                 });
 
+            modelBuilder.Entity("SchoolManagement.Domain.Entities.SchoolSettings", b =>
+                {
+                    b.Property<int>("Id")
+                        .HasColumnType("int");
+
+                    b.Property<string>("AboutTagline")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<string>("AddressText")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<int?>("CountryId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("SYSUTCDATETIME()");
+
+                    b.Property<int?>("CreatedBy")
+                        .HasColumnType("int");
+
+                    b.Property<string>("CurrencyCode")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("nchar(3)")
+                        .IsFixedLength();
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Phone")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("SchoolName")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<string>("ShortName")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<string>("TimeZoneId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("SYSUTCDATETIME()");
+
+                    b.Property<int?>("UpdatedBy")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Website")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<byte>("WorkingDays")
+                        .HasColumnType("tinyint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CountryId");
+
+                    b.ToTable("SchoolSettings", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_SchoolSettings_CurrencyCode", "LEN([CurrencyCode]) = 3 AND [CurrencyCode] COLLATE Latin1_General_BIN2 NOT LIKE '%[^A-Z]%'");
+
+                            t.HasCheckConstraint("CK_SchoolSettings_SchoolNameNotBlank", "LEN(LTRIM(RTRIM([SchoolName]))) > 0");
+
+                            t.HasCheckConstraint("CK_SchoolSettings_SingleRow", "[Id] = 1");
+
+                            t.HasCheckConstraint("CK_SchoolSettings_TimeZoneNotBlank", "LEN(LTRIM(RTRIM([TimeZoneId]))) > 0");
+
+                            t.HasCheckConstraint("CK_SchoolSettings_WorkingDays", "[WorkingDays] BETWEEN 1 AND 127");
+                        });
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Entities.StaffProfile", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("BloodGroup")
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("SYSUTCDATETIME()");
+
+                    b.Property<int?>("CreatedBy")
+                        .HasColumnType("int");
+
+                    b.Property<DateOnly?>("DateOfBirth")
+                        .HasColumnType("date");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("DeletedBy")
+                        .HasColumnType("int");
+
+                    b.Property<string>("EmergencyContactName")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<string>("EmergencyContactPhone")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("EmployeeNumber")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<string>("FullName")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<string>("Gender")
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<DateOnly?>("JoiningDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Mobile")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<string>("Qualification")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("SYSUTCDATETIME()");
+
+                    b.Property<int?>("UpdatedBy")
+                        .HasColumnType("int");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EmployeeNumber")
+                        .IsUnique()
+                        .HasDatabaseName("UX_StaffProfiles_EmployeeNumber")
+                        .HasFilter("[EmployeeNumber] IS NOT NULL AND [IsDeleted] = 0");
+
+                    b.HasIndex("UserId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_StaffProfiles_UserId")
+                        .HasFilter("[IsDeleted] = 0");
+
+                    b.ToTable("StaffProfiles", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_StaffProfiles_EmployeeNumberNotBlank", "[EmployeeNumber] IS NULL OR LEN(LTRIM(RTRIM([EmployeeNumber]))) > 0");
+
+                            t.HasCheckConstraint("CK_StaffProfiles_FullNameNotBlank", "LEN(LTRIM(RTRIM([FullName]))) > 0");
+
+                            t.HasCheckConstraint("CK_StaffProfiles_Gender", "[Gender] IS NULL OR [Gender] IN ('Male','Female')");
+                        });
+                });
+
             modelBuilder.Entity("SchoolManagement.Domain.Entities.Student", b =>
                 {
                     b.Property<int>("Id")
@@ -2091,6 +2294,11 @@ namespace SchoolManagement.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .HasColumnType("binary(8)");
+
                     b.Property<Guid>("SecurityStamp")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier")
@@ -2174,6 +2382,11 @@ namespace SchoolManagement.Infrastructure.Migrations
                         .HasForeignKey("ParentId")
                         .OnDelete(DeleteBehavior.Cascade);
 
+                    b.HasOne("SchoolManagement.Domain.Entities.StaffProfile", "StaffProfile")
+                        .WithMany("Addresses")
+                        .HasForeignKey("StaffProfileId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
                     b.HasOne("SchoolManagement.Domain.Entities.Student", "Student")
                         .WithMany("Addresses")
                         .HasForeignKey("StudentId")
@@ -2193,6 +2406,8 @@ namespace SchoolManagement.Infrastructure.Migrations
                     b.Navigation("Parent");
 
                     b.Navigation("Region");
+
+                    b.Navigation("StaffProfile");
 
                     b.Navigation("Student");
                 });
@@ -2379,6 +2594,27 @@ namespace SchoolManagement.Infrastructure.Migrations
                     b.Navigation("Permission");
 
                     b.Navigation("Role");
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Entities.SchoolSettings", b =>
+                {
+                    b.HasOne("SchoolManagement.Domain.Entities.Country", "Country")
+                        .WithMany()
+                        .HasForeignKey("CountryId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Country");
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Entities.StaffProfile", b =>
+                {
+                    b.HasOne("SchoolManagement.Domain.Entities.User", "User")
+                        .WithOne("StaffProfile")
+                        .HasForeignKey("SchoolManagement.Domain.Entities.StaffProfile", "UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("SchoolManagement.Domain.Entities.Student", b =>
@@ -2594,6 +2830,11 @@ namespace SchoolManagement.Infrastructure.Migrations
                     b.Navigation("UserRoles");
                 });
 
+            modelBuilder.Entity("SchoolManagement.Domain.Entities.StaffProfile", b =>
+                {
+                    b.Navigation("Addresses");
+                });
+
             modelBuilder.Entity("SchoolManagement.Domain.Entities.Student", b =>
                 {
                     b.Navigation("Addresses");
@@ -2609,6 +2850,8 @@ namespace SchoolManagement.Infrastructure.Migrations
 
             modelBuilder.Entity("SchoolManagement.Domain.Entities.User", b =>
                 {
+                    b.Navigation("StaffProfile");
+
                     b.Navigation("UserRoles");
                 });
 #pragma warning restore 612, 618

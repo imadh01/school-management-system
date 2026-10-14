@@ -18,6 +18,10 @@ public class Address
     public int? ParentId { get; set; }
     public Parent? Parent { get; set; }
 
+    /// <summary>E2: a staff member's address.</summary>
+    public int? StaffProfileId { get; set; }
+    public StaffProfile? StaffProfile { get; set; }
+
     /// <summary>The applicant's address while the application is in progress.</summary>
     public int? AdmissionId { get; set; }
     public Admission? Admission { get; set; }

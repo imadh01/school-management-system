@@ -1,0 +1,240 @@
+# E2a: Users, My Account and School settings.
+# Run with Visual Studio 2022 (17.12 or later) or the VS Code "REST Client" extension.
+# Start the API first (http profile, port 5100). Send the requests from top to bottom: later ones
+# reuse ids and versions from earlier responses (# @name ... then {{name.response.body.$.field}}).
+# Change the usernames/emails/employee number before a second run (they must be unique).
+
+@baseUrl = http://localhost:5100
+@adminUser = admin
+@adminPassword = Admin@123
+
+### 1. Sign in as an administrator
+# @name login
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{ "usernameOrEmail": "{{adminUser}}", "password": "{{adminPassword}}" }
+
+@token = {{login.response.body.$.token}}
+
+### 2. The Users list ("needs name" = profile name is still the username)
+GET {{baseUrl}}/api/users
+Authorization: Bearer {{token}}
+
+### 3. Create a clerk with a profile (201; the password is temporary)
+# @name createClerk
+POST {{baseUrl}}/api/users
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "username": "clerk.demo1",
+  "email": "clerk.demo1@school.local",
+  "password": "Temp@12345",
+  "roleName": "Clerk",
+  "profile": {
+    "fullName": "Demo Clerk",
+    "gender": "Female",
+    "dateOfBirth": "1992-03-14",
+    "mobile": "+971 50 123 4567",
+    "joiningDate": "2026-09-01",
+    "qualification": "B.Com",
+    "employeeNumber": "EMP-DEMO-1",
+    "bloodGroup": "O+",
+    "emergencyContactName": "Demo Contact",
+    "emergencyContactPhone": "+971 50 765 4321"
+  },
+  "addresses": null
+}
+
+@clerkId = {{createClerk.response.body.$.id}}
+@clerkVersion = {{createClerk.response.body.$.rowVersion}}
+
+### 4. Create a teacher (also creates the Teachers row; see teacherId in the response)
+# @name createTeacher
+POST {{baseUrl}}/api/users
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "username": "teacher.demo1",
+  "email": "teacher.demo1@school.local",
+  "password": "Temp@12345",
+  "roleName": "Teacher",
+  "specialization": "Mathematics",
+  "profile": {
+    "fullName": "Demo Teacher",
+    "gender": "Male",
+    "mobile": "+971 55 111 2222",
+    "joiningDate": "2026-09-01"
+  }
+}
+
+@teacherUserId = {{createTeacher.response.body.$.id}}
+
+### 5. Refused: Parent (and Student) logins come with the portal (422)
+POST {{baseUrl}}/api/users
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "username": "parent.demo1", "email": "parent.demo1@school.local", "password": "Temp@12345", "roleName": "Parent",
+  "profile": { "fullName": "Demo Parent", "gender": "Female", "mobile": "+971 50 000 0001", "joiningDate": "2026-09-01" }
+}
+
+### 6. Refused: missing profile fields (400, keys like "Profile.Gender")
+POST {{baseUrl}}/api/users
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "username": "nobody.demo", "email": "nobody.demo@school.local", "password": "Temp@12345", "roleName": "Clerk",
+  "profile": { "fullName": "No Gender" }
+}
+
+### 7. One user (detail page / edit form)
+GET {{baseUrl}}/api/users/{{clerkId}}
+Authorization: Bearer {{token}}
+
+### 8. Edit the clerk: profile + role in one save (a different role ends the clerk's sessions)
+# @name editClerk
+PUT {{baseUrl}}/api/users/{{clerkId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "username": "clerk.demo1",
+  "email": "clerk.demo1@school.local",
+  "roleName": "Supervisor",
+  "profile": {
+    "fullName": "Demo Clerk Renamed",
+    "gender": "Female",
+    "mobile": "+971 50 123 4567",
+    "joiningDate": "2026-09-01",
+    "employeeNumber": "EMP-DEMO-1"
+  },
+  "addresses": null,
+  "rowVersion": "{{clerkVersion}}"
+}
+
+@clerkVersion2 = {{editClerk.response.body.$.rowVersion}}
+
+### 9. The same edit again with the OLD version: 409 (someone saved after you loaded it)
+PUT {{baseUrl}}/api/users/{{clerkId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "username": "clerk.demo1", "email": "clerk.demo1@school.local", "roleName": "Supervisor",
+  "profile": { "fullName": "Too Late", "gender": "Female", "mobile": "+971 50 123 4567", "joiningDate": "2026-09-01" },
+  "rowVersion": "{{clerkVersion}}"
+}
+
+### 10. Suspend (ends every session of that user)
+# @name suspend
+PATCH {{baseUrl}}/api/users/{{clerkId}}/status
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "status": "Suspended", "rowVersion": "{{clerkVersion2}}" }
+
+### 11. Temporary password (204; must be changed at the next sign-in; ends every session)
+POST {{baseUrl}}/api/users/{{teacherUserId}}/reset-password
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "newPassword": "Reset@12345" }
+
+### 12. Unlock after too many failed sign-ins (204)
+POST {{baseUrl}}/api/users/{{teacherUserId}}/unlock
+Authorization: Bearer {{token}}
+
+### 13. Delete (204; 422 for your own account, the last active Admin, or a teacher who still teaches)
+DELETE {{baseUrl}}/api/users/{{clerkId}}
+Authorization: Bearer {{token}}
+
+### ── My Account ──────────────────────────────────────────────────────
+### 14. Sign in as the teacher (temporary password) and choose an own password
+# @name teacherLogin
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{ "usernameOrEmail": "teacher.demo1", "password": "Reset@12345" }
+
+###
+# @name teacherOwnPassword
+POST {{baseUrl}}/api/auth/change-password
+Authorization: Bearer {{teacherLogin.response.body.$.token}}
+Content-Type: application/json
+
+{ "currentPassword": "Reset@12345", "newPassword": "Mine@12345" }
+
+@teacherToken = {{teacherOwnPassword.response.body.$.token}}
+
+### 15. My profile
+# @name myProfile
+GET {{baseUrl}}/api/me/profile
+Authorization: Bearer {{teacherToken}}
+
+### 16. Edit my profile (e-mail and personal details only; username, role, joining date stay)
+PUT {{baseUrl}}/api/me/profile
+Authorization: Bearer {{teacherToken}}
+Content-Type: application/json
+
+{
+  "email": "teacher.demo1@school.local",
+  "fullName": "Demo Teacher (own edit)",
+  "gender": "Male",
+  "dateOfBirth": "1988-11-02",
+  "mobile": "+971 55 111 2222",
+  "qualification": "M.Sc Mathematics",
+  "bloodGroup": "A+",
+  "emergencyContactName": "Demo Spouse",
+  "emergencyContactPhone": "+971 55 333 4444",
+  "addresses": null,
+  "rowVersion": "{{myProfile.response.body.$.rowVersion}}"
+}
+
+### ── School settings ─────────────────────────────────────────────────
+### 17. Settings (Settings.View)
+# @name settings
+GET {{baseUrl}}/api/settings/school
+Authorization: Bearer {{token}}
+
+### 18. Time-zone picker (IANA ids)
+GET {{baseUrl}}/api/settings/time-zones
+Authorization: Bearer {{token}}
+
+### 19. Save settings (Settings.Edit). countryId: an id from GET /api/countries
+PUT {{baseUrl}}/api/settings/school
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "schoolName": "Demo School",
+  "shortName": "DS",
+  "email": "office@demo.school",
+  "phone": "+971 4 123 4567",
+  "website": "https://demo.school",
+  "addressText": "Main Road, Dubai",
+  "countryId": null,
+  "timeZoneId": "Asia/Dubai",
+  "currencyCode": "AED",
+  "workingDays": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+  "aboutTagline": null,
+  "rowVersion": "{{settings.response.body.$.rowVersion}}"
+}
+
+### 20. Refused: a Windows time-zone id and a lower-case currency (400)
+PUT {{baseUrl}}/api/settings/school
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "schoolName": "Demo School", "timeZoneId": "Arabian Standard Time", "currencyCode": "aed",
+  "workingDays": ["Monday"], "rowVersion": "{{settings.response.body.$.rowVersion}}"
+}
+
+### 21. School name and country for any signed-in user (top bar, address forms)
+GET {{baseUrl}}/api/settings/basics
+Authorization: Bearer {{teacherToken}}

@@ -63,8 +63,25 @@ public class AccessMatrixTests
         new("POST",   "/api/auth/change-password", SignedIn, HasBody: true),
         new("POST",   $"/api/auth/unlock/{Missing}", P(Permissions.UsersChangeStatus)),
 
-        // Users
+        // Users (E2)
+        new("GET",    "/api/users", P(Permissions.UsersView)),
+        new("GET",    $"/api/users/{Missing}", P(Permissions.UsersView)),
         new("POST",   "/api/users", P(Permissions.UsersCreate), HasBody: true),
+        new("PUT",    $"/api/users/{Missing}", P(Permissions.UsersEdit), HasBody: true),
+        new("PATCH",  $"/api/users/{Missing}/status", P(Permissions.UsersChangeStatus), HasBody: true),
+        new("POST",   $"/api/users/{Missing}/reset-password", P(Permissions.UsersResetPassword), HasBody: true),
+        new("POST",   $"/api/users/{Missing}/unlock", P(Permissions.UsersChangeStatus)),
+        new("DELETE", $"/api/users/{Missing}", P(Permissions.UsersDelete)),
+
+        // My Account (E2): your own profile, any signed-in user
+        new("GET",    "/api/me/profile", SignedIn),
+        new("PUT",    "/api/me/profile", SignedIn, HasBody: true),
+
+        // School settings (E2)
+        new("GET",    "/api/settings/school", P(Permissions.SettingsView)),
+        new("PUT",    "/api/settings/school", P(Permissions.SettingsEdit), HasBody: true),
+        new("GET",    "/api/settings/time-zones", P(Permissions.SettingsView)),
+        new("GET",    "/api/settings/basics", SignedIn),
 
         // Roles + permission catalog (E1)
         new("GET",    "/api/permissions", P(Permissions.RolesView)),

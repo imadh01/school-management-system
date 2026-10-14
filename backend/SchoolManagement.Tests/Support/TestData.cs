@@ -1,5 +1,6 @@
 ﻿using SchoolManagement.Application.DTOs.Admissions;
 using SchoolManagement.Application.DTOs.Students;
+using SchoolManagement.Application.DTOs.Users;
 using SchoolManagement.Application.Services;
 using SchoolManagement.Domain.Entities;
 using SchoolManagement.Infrastructure.Persistence;
@@ -13,6 +14,16 @@ namespace SchoolManagement.Tests.Support;
 public static class TestData
 {
     public static string Unique() => Guid.NewGuid().ToString("N")[..10];
+
+    /// <summary>E2: a valid profile for the Users form (the four required fields, nothing else).</summary>
+    public static StaffProfileRequest StaffProfile(string fullName = "Test Staff", string? employeeNumber = null) =>
+        new(FullName: fullName, Gender: "Female", DateOfBirth: null, Mobile: "+971 50 123 4567",
+            JoiningDate: new DateOnly(2026, 9, 1), Qualification: null, EmployeeNumber: employeeNumber,
+            BloodGroup: null, EmergencyContactName: null, EmergencyContactPhone: null);
+
+    /// <summary>E2: a valid new staff account with that profile.</summary>
+    public static CreateUserRequest NewUserRequest(string username, string email, string password, string roleName) =>
+        new(username, email, password, roleName, StaffProfile(username + " Name"));
 
     public static async Task<ClassSection> CreateSectionAsync(ApplicationDbContext db, int? capacity = null)
     {

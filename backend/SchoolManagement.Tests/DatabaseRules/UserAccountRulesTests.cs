@@ -43,7 +43,7 @@ public class UserAccountRulesTests
         var clerk = await NewUserAsync(RoleNames.Clerk);
 
         var error = await Assert.ThrowsAsync<BusinessRuleException>(
-            () => ActAsync(clerk, a => a.ChangeStatusAsync(lastAdmin, status, default)));
+            () => ActAsync(clerk, a => a.ChangeStatusAsync(lastAdmin, status, null, default)));
 
         Assert.Contains("last active Admin", error.Message);
         Assert.Equal(UserStatuses.Active, await StatusOfAsync(lastAdmin));
@@ -89,7 +89,7 @@ public class UserAccountRulesTests
         var clerk = await NewUserAsync(RoleNames.Clerk);
 
         await Assert.ThrowsAsync<BusinessRuleException>(
-            () => ActAsync(clerk, a => a.ChangeStatusAsync(lastActive, UserStatuses.Inactive, default)));
+            () => ActAsync(clerk, a => a.ChangeStatusAsync(lastActive, UserStatuses.Inactive, null, default)));
     }
 
     [Fact]
@@ -101,7 +101,7 @@ public class UserAccountRulesTests
         var stampBefore = await StampOfAsync(adminB);
         await IssueRefreshTokenAsync(adminB);
 
-        await ActAsync(adminA, a => a.ChangeStatusAsync(adminB, UserStatuses.Inactive, default));
+        await ActAsync(adminA, a => a.ChangeStatusAsync(adminB, UserStatuses.Inactive, null, default));
 
         Assert.Equal(UserStatuses.Inactive, await StatusOfAsync(adminB));
         Assert.NotEqual(stampBefore, await StampOfAsync(adminB)); // access tokens stop at once
@@ -122,7 +122,7 @@ public class UserAccountRulesTests
             var adminB = await NewUserAsync(RoleNames.Admin);
 
             var results = await Task.WhenAll(
-                Task.Run(() => TryActAsync(adminA, a => a.ChangeStatusAsync(adminB, UserStatuses.Inactive, default))),
+                Task.Run(() => TryActAsync(adminA, a => a.ChangeStatusAsync(adminB, UserStatuses.Inactive, null, default))),
                 Task.Run(() => TryActAsync(adminB, a => a.DeleteAsync(adminA, default))));
 
             Assert.Equal(1, results.Count(r => r is null));                         // one succeeded
@@ -141,7 +141,7 @@ public class UserAccountRulesTests
         await NewUserAsync(RoleNames.Admin); // so "last admin" is not the reason
 
         await Assert.ThrowsAsync<BusinessRuleException>(
-            () => ActAsync(admin, a => a.ChangeStatusAsync(admin, UserStatuses.Inactive, default)));
+            () => ActAsync(admin, a => a.ChangeStatusAsync(admin, UserStatuses.Inactive, null, default)));
         await Assert.ThrowsAsync<BusinessRuleException>(
             () => ActAsync(admin, a => a.ChangeRoleAsync(admin, RoleNames.Clerk, default)));
         await Assert.ThrowsAsync<BusinessRuleException>(

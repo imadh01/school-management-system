@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using SchoolManagement.Application.DTOs.Auth;
 using SchoolManagement.Application.DTOs.Users;
+using SchoolManagement.Tests.Support;
 using Xunit;
 
 namespace SchoolManagement.Tests.IntegrationTests;
@@ -28,7 +29,7 @@ public class UsersControllerTests
     public async Task CreateUser_WithoutToken_Returns401()
     {
         var response = await _client.PostAsJsonAsync("/api/users",
-            new CreateUserRequest("someone", "someone@test.com", "Passw0rd!", "Teacher"));
+            TestData.NewUserRequest("someone", "someone@test.com", "Passw0rd!", "Teacher"));
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -40,7 +41,7 @@ public class UsersControllerTests
         _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         var response = await _client.PostAsJsonAsync("/api/users",
-            new CreateUserRequest("newteacher", "newteacher@test.com", "Passw0rd!", "Teacher"));
+            TestData.NewUserRequest("newteacher", "newteacher@test.com", "Passw0rd!", "Teacher"));
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var user = await response.Content.ReadFromJsonAsync<UserResponse>();
@@ -55,7 +56,7 @@ public class UsersControllerTests
 
         // "admin" already exists via seed data
         var response = await _client.PostAsJsonAsync("/api/users",
-            new CreateUserRequest("admin", "different@test.com", "Passw0rd!", "Teacher"));
+            TestData.NewUserRequest("admin", "different@test.com", "Passw0rd!", "Teacher"));
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
     }

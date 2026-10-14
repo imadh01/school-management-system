@@ -8,6 +8,9 @@ public interface ITeacherRepository
 {
     Task<List<Teacher>> GetAllAsync(CancellationToken cancellationToken);
     Task<Teacher?> GetByIdAsync(int id, CancellationToken cancellationToken);
+
+    /// <summary>E2: the (non-deleted) teacher record of a login, tracked; null when the user is not a teacher.</summary>
+    Task<Teacher?> GetByUserIdAsync(int userId, CancellationToken cancellationToken);
     Task<Dictionary<int, TeacherStats>> GetStatsAsync(CancellationToken cancellationToken);
     Task<List<Subject>> GetAssignedSubjectsAsync(int teacherId, CancellationToken cancellationToken);
     Task<List<int>> GetClassTeacherSectionIdsAsync(int teacherId, CancellationToken cancellationToken);
@@ -18,5 +21,8 @@ public interface ITeacherRepository
     Task<bool> UsernameExistsAsync(string username, int? excludeUserId, CancellationToken cancellationToken);
     Task<bool> EmailExistsAsync(string email, int? excludeUserId, CancellationToken cancellationToken);
     Task AddAsync(Teacher teacher, CancellationToken cancellationToken);
+
+    /// <summary>E2: tracks a new teacher record without saving (it is saved with the account change around it).</summary>
+    void Add(Teacher teacher);
     Task SaveChangesAsync(CancellationToken cancellationToken);
 }

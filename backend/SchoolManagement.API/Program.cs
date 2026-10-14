@@ -19,6 +19,7 @@ using SchoolManagement.Application.DTOs.Students;
 using SchoolManagement.Application.DTOs.Subjects;
 using SchoolManagement.Application.DTOs.Teachers;
 using SchoolManagement.Application.DTOs.Users;
+using SchoolManagement.Application.DTOs.Settings;
 using SchoolManagement.Application.DTOs.Attendance;
 using SchoolManagement.Application.DTOs.Documents;
 using SchoolManagement.Application.Interfaces;
@@ -99,6 +100,15 @@ builder.Services.AddScoped<ISubjectService, SubjectService>();
 builder.Services.AddScoped<IValidator<LoginRequest>, LoginRequestValidator>();
 builder.Services.AddScoped<IValidator<ChangePasswordRequest>, ChangePasswordRequestValidator>();
 builder.Services.AddScoped<IValidator<CreateUserRequest>, CreateUserRequestValidator>();
+builder.Services.AddScoped<IValidator<UpdateUserRequest>, UpdateUserRequestValidator>();
+builder.Services.AddScoped<IValidator<ChangeUserStatusRequest>, ChangeUserStatusRequestValidator>();
+builder.Services.AddScoped<IValidator<ResetUserPasswordRequest>, ResetUserPasswordRequestValidator>();
+builder.Services.AddScoped<IValidator<UpdateMyProfileRequest>, UpdateMyProfileRequestValidator>();
+// E2: school settings. The provider is a singleton cache (like the permission cache).
+builder.Services.AddScoped<ISchoolSettingsRepository, SchoolSettingsRepository>();
+builder.Services.AddScoped<ISchoolSettingsService, SchoolSettingsService>();
+builder.Services.AddSingleton<ISchoolSettingsProvider, SchoolSettingsProvider>();
+builder.Services.AddScoped<IValidator<UpdateSchoolSettingsRequest>, UpdateSchoolSettingsRequestValidator>();
 
 builder.Services.AddScoped<IClassSectionRepository, ClassSectionRepository>();
 builder.Services.AddScoped<IAcademicYearRepository, AcademicYearRepository>();

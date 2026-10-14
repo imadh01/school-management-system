@@ -64,11 +64,22 @@ public class TeacherService : ITeacherService
         };
         user.UserRoles.Add(new UserRole { Role = role, AssignedAt = now });
 
+        // E2: every staff login has a profile. The teacher's name and phone are written to both places
+        // until E2c drops them from Teachers. Joining date: the day the account was created.
+        var name = request.Name.Trim();
+        var phone = Clean(request.Phone);
+        user.StaffProfile = new StaffProfile
+        {
+            FullName = name,
+            Mobile = phone,
+            JoiningDate = DateOnly.FromDateTime(now),
+        };
+
         var teacher = new Teacher
         {
             User = user,
-            Name = request.Name.Trim(),
-            Phone = Clean(request.Phone),
+            Name = name,
+            Phone = phone,
             Specialization = Clean(request.Specialization),
             CreatedAt = now,
             UpdatedAt = now,
@@ -94,14 +105,20 @@ public class TeacherService : ITeacherService
         teacher.Specialization = Clean(request.Specialization);
         teacher.UpdatedAt = DateTime.UtcNow;
 
+        // E2: kept in step with the profile until E2c (the Users page edits the profile, this page both).
+        teacher.User.StaffProfile ??= new StaffProfile { FullName = teacher.Name };
+        teacher.User.StaffProfile.FullName = teacher.Name;
+        teacher.User.StaffProfile.Mobile = teacher.Phone;
+
         teacher.User.Username = username;
         teacher.User.Email = email;
+        teacher.User.NewVersion(); // the Users page's edit form for this account is now stale
         await _teachers.SaveChangesAsync(cancellationToken);
 
         // Status and password are account security: they go through the account service, which ends the
         // teacher's sessions at once (E2 security fix). E2 moves these two fields to the Users page.
         if (teacher.User.Status != request.Status)
-            await _accounts.ChangeStatusAsync(teacher.UserId, request.Status, cancellationToken);
+            await _accounts.ChangeStatusAsync(teacher.UserId, request.Status, null, cancellationToken);
         if (!string.IsNullOrWhiteSpace(request.NewPassword))
             await _accounts.SetTemporaryPasswordAsync(teacher.UserId, request.NewPassword, cancellationToken);
 
@@ -113,7 +130,7 @@ public class TeacherService : ITeacherService
         var teacher = await GetOrThrowAsync(id, cancellationToken);
         teacher.UpdatedAt = DateTime.UtcNow;
         // Saves the teacher row too, and ends the teacher's sessions when the status is not Active.
-        await _accounts.ChangeStatusAsync(teacher.UserId, status, cancellationToken);
+        await _accounts.ChangeStatusAsync(teacher.UserId, status, null, cancellationToken);
         return ToResponse(teacher, await GetStatsForAsync(id, cancellationToken));
     }
 
@@ -127,10 +144,8 @@ public class TeacherService : ITeacherService
                 $"Cannot delete '{teacher.Name}' — still assigned to {stats.Subjects} subject(s) " +
                 $"and class teacher of {stats.ClassTeacherOf} class(es). Remove the assignments first.");
 
-        teacher.IsDeleted = true;
-        teacher.DeletedAt = DateTime.UtcNow;
-        // The login goes with the profile: the account service saves both, in one transaction,
-        // and ends the teacher's sessions.
+        // The account service deletes the login, its staff profile and this teacher record in one
+        // transaction, and ends the teacher's sessions.
         await _accounts.DeleteAsync(teacher.UserId, cancellationToken);
     }
 

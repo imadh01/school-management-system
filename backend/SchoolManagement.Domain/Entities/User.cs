@@ -7,7 +7,7 @@ namespace SchoolManagement.Domain.Entities;
 /// Role-specific profile data (Student/Teacher/Parent) lives in later
 /// modules and links back here via a nullable UserId FK.
 /// </summary>
-public class User
+public class User : IHasRowVersion
 {
     public int Id { get; set; }
 
@@ -59,5 +59,21 @@ public class User
     public int? DeletedBy { get; set; }
 
     public ICollection<UserRole> UserRoles { get; set; } = new List<UserRole>();
+
+    /// <summary>E2: the person behind a staff login (none for student/parent logins).</summary>
+    public StaffProfile? StaffProfile { get; set; }
+
+    /// <summary>
+    /// E2: edits of the account or its profile from two screens at once → 409.
+    /// Set by the application (binary(8)), NOT a SQL Server rowversion: signing in writes LastLoginAt to
+    /// this row, and a sign-in must not make an administrator's open edit form "stale". Every edit of the
+    /// account or its profile calls <see cref="NewVersion"/>.
+    /// </summary>
+    public byte[] RowVersion { get; set; } = NewVersionBytes();
+
+    /// <summary>Marks the account as edited: a form loaded before this save gets a 409.</summary>
+    public void NewVersion() => RowVersion = NewVersionBytes();
+
+    private static byte[] NewVersionBytes() => Guid.NewGuid().ToByteArray()[..8];
 }
 

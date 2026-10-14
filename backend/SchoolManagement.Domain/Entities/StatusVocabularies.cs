@@ -97,6 +97,17 @@ public static class UserStatuses
     public static bool IsValid(string? value) => value is not null && All.Contains(value);
 }
 
+/// <summary>E2: genders a staff profile can have (CK_StaffProfiles_Gender). Same values as the student forms.</summary>
+public static class Genders
+{
+    public const string Male = "Male";
+    public const string Female = "Female";
+
+    public static readonly string[] All = { Male, Female };
+
+    public static bool IsValid(string? value) => value is not null && All.Contains(value);
+}
+
 /// <summary>Simple on/off status used by class sections, subjects and parents.</summary>
 public static class ActiveStatuses
 {

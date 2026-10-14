@@ -17,6 +17,7 @@ using SchoolManagement.Application.Interfaces;
 using SchoolManagement.Domain.Entities;
 using SchoolManagement.Domain.Exceptions;
 using SchoolManagement.Infrastructure.Persistence;
+using SchoolManagement.Tests.Support;
 using Xunit;
 
 namespace SchoolManagement.Tests.IntegrationTests;
@@ -42,13 +43,13 @@ public class UserUniquenessTests
         var email = $"{username}@test.local";
         await AuthenticateAsAdminAsync();
 
-        var first = await _client.PostAsJsonAsync("/api/users", new CreateUserRequest(username, email, Password, "Teacher"));
+        var first = await _client.PostAsJsonAsync("/api/users", TestData.NewUserRequest(username, email, Password, "Teacher"));
         Assert.Equal(HttpStatusCode.Created, first.StatusCode);
         var firstUser = await first.Content.ReadFromJsonAsync<UserResponse>();
 
         await SoftDeleteAsync(firstUser!.Id);
 
-        var second = await _client.PostAsJsonAsync("/api/users", new CreateUserRequest(username, email, Password, "Teacher"));
+        var second = await _client.PostAsJsonAsync("/api/users", TestData.NewUserRequest(username, email, Password, "Teacher"));
         Assert.Equal(HttpStatusCode.Created, second.StatusCode);
         var secondUser = await second.Content.ReadFromJsonAsync<UserResponse>();
         Assert.NotEqual(firstUser.Id, secondUser!.Id);

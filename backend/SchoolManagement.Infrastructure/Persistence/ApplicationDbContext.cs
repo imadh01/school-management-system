@@ -41,6 +41,8 @@ public class ApplicationDbContext : DbContext
     public DbSet<CountryRegion> CountryRegions => Set<CountryRegion>();
     public DbSet<DocumentType> DocumentTypes => Set<DocumentType>();
     public DbSet<Document> Documents => Set<Document>();
+    public DbSet<StaffProfile> StaffProfiles => Set<StaffProfile>();
+    public DbSet<SchoolSettings> SchoolSettings => Set<SchoolSettings>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)

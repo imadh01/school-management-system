@@ -75,7 +75,11 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
             .HasForeignKey(u => u.DeletedBy)
             .OnDelete(DeleteBehavior.NoAction);
 
+        // E2: optimistic concurrency for the Users page (account + profile edits). App-managed version (see User.RowVersion): a concurrency token the services change on edits,
+        // so sign-in bookkeeping (LastLoginAt, failed attempts) never makes an edit form stale.
+        builder.Property(u => u.RowVersion).HasColumnType("binary(8)").IsConcurrencyToken().IsRequired();
+
         // Soft delete enforced here, once, not repeated in every query later.
         builder.HasQueryFilter(u => !u.IsDeleted);
     }
-}
+}
