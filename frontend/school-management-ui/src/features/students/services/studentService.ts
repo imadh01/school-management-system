@@ -31,7 +31,7 @@ export const studentService = {
       .put<StudentResponse>(`/students/${id}`, request)
       .then((res) => res.data),
 
-  // Needs both Students.Manage and Students.ViewSensitive.
+  // Needs both Students.Edit and Students.ViewSensitive.
   updateIdentity: (id: number, request: UpdateStudentIdentityRequest) =>
     apiClient
       .put<StudentIdentityResponse>(`/students/${id}/identity`, request)

@@ -115,7 +115,7 @@ public class StudentsController : ControllerBase
         return Ok(await _studentService.UpdateAsync(id, request, await CanViewSensitiveAsync(cancellationToken), cancellationToken));
     }
 
-    /// <summary>Set Aadhaar / passport / visa details. Requires Students.ViewSensitive (and Students.Manage).</summary>
+    /// <summary>Set Aadhaar / passport / visa details. Requires both Students.Edit and Students.ViewSensitive.</summary>
     [HttpPut("{id:int}/identity")]
     [Authorize(Policy = Permissions.StudentsEdit)]
     [Authorize(Policy = Permissions.StudentsViewSensitive)]
