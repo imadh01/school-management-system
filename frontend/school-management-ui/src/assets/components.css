@@ -318,8 +318,19 @@
   cursor: pointer;
   border: 1px solid var(--border);
 }
-.pipeline__step:hover {
+/* :hover has higher specificity than the --active/colour modifiers, so the hover rule must not touch a
+   selected pill: otherwise the pill under the mouse (the one just clicked) turns light and its white text vanishes. */
+.pipeline__step:hover:not(.pipeline__step--active):not(.pipeline__step--dark):not(.pipeline__step--green):not(.pipeline__step--amber):not(.pipeline__step--red):not(.pipeline__step--purple) {
   background: var(--surface-3);
+}
+.pipeline__step--active:hover,
+.pipeline__step--dark:hover {
+  background: var(--primary);
+  filter: brightness(1.1);
+}
+/* A pill row placed directly inside a card (list pages) lines up with the card header's 22px padding. */
+.panel > .pipeline {
+  padding: 0 22px;
 }
 .pipeline__step--active,
 .pipeline__step--dark {

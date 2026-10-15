@@ -11,7 +11,7 @@
 -- checked after it is written, so you know it can be restored. If anything fails, the script stops
 -- with the error and prints nothing that looks like success.
 
-DECLARE @label  nvarchar(50)  = N'G1b';  -- the migration about to be applied
+DECLARE @label  nvarchar(50)  = N'G2';  -- the migration about to be applied
 DECLARE @folder nvarchar(300) = NULL;    -- NULL = the instance's default backup folder
 
 SET @folder = COALESCE(@folder, CAST(SERVERPROPERTY('InstanceDefaultBackupPath') AS nvarchar(300)));

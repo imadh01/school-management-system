@@ -1,5 +1,4 @@
-﻿// File: backend/SchoolManagement.Tests/IntegrationTests/DataScopeTests.cs
-//
+﻿
 // Batch F1: scoped reads ("ViewScoped") against a small, fixed school:
 //
 //   Current year            Class teacher   Subject teacher   Students
