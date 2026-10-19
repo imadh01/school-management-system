@@ -4,6 +4,11 @@ namespace SchoolManagement.Application.Interfaces;
 
 public interface IStudentService
 {
+    /// <summary>Deleted students with who deleted them and when. Admin only.</summary>
+    Task<List<DeletedStudentResponse>> GetDeletedAsync(CancellationToken cancellationToken);
+    /// <summary>Brings a deleted student back. Admin only; 404 unknown, 409 if not deleted, login taken, class inactive or full.</summary>
+    Task RestoreAsync(int id, CancellationToken cancellationToken);
+
     // Reads come in two shapes (F1). The controller picks one from the caller's DataScope:
     //   full    → Students.View holders, every student, every field;
     //   scoped  → Students.ViewScoped holders, related students only, reduced fields.

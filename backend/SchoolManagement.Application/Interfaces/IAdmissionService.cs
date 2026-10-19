@@ -19,4 +19,6 @@ public interface IAdmissionService
     Task<AdmissionResponse> EnrollAsync(int id, EnrollAdmissionRequest request, CancellationToken cancellationToken);
     Task<AdmissionResponse> RejectAsync(int id, RejectAdmissionRequest request, CancellationToken cancellationToken);
     Task DeleteAsync(int id, CancellationToken cancellationToken);
+    /// <summary>Brings a deleted application back. Admin only; 404 unknown, 409 if not deleted or a unique value is taken.</summary>
+    Task<AdmissionResponse> RestoreAsync(int id, CancellationToken cancellationToken);
 }

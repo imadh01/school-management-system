@@ -29,6 +29,12 @@ export const admissionService = {
       .get<DeletedAdmissionResponse[]>("/admissions/deleted")
       .then((res) => res.data),
 
+  // Brings a deleted application back. Admin only (needs Admissions.Delete as well).
+  restore: (id: number) =>
+    apiClient
+      .post<AdmissionResponse>(`/admissions/${id}/restore`)
+      .then((res) => res.data),
+
   getById: (id: number) =>
     apiClient
       .get<AdmissionResponse>(`/admissions/${id}`)

@@ -65,10 +65,6 @@ public class UserService : IUserService
         var profile = new StaffProfile();
         Apply(profile, request.Profile);
         profile.Addresses = addresses;
-        // Every teacher and staff member is an employee: a blank number is generated (EMP-0001...).
-        // A typed number still works and was checked for duplicates above.
-        profile.EmployeeNumber ??= NumberFormats.EmployeeNumber(
-            await _users.GetMaxEmployeeSerialAsync(NumberFormats.EmployeePrefix, cancellationToken) + 1);
 
         var user = new User
         {
@@ -81,8 +77,20 @@ public class UserService : IUserService
             StaffProfile = profile,
         };
 
+        var generateEmployeeNumber = profile.EmployeeNumber is null; // stays true if the execution strategy retries
         await _users.ExecuteInTransactionAsync(async () =>
         {
+            // Every teacher and staff member is an employee: a blank number is generated (EMP-0001...).
+            // A typed number still works and was checked for duplicates above. The next number is read INSIDE
+            // the transaction and behind the account-changes lock (held until commit), so two creates at the
+            // same moment queue up and the second one sees the first one's number instead of repeating it.
+            if (generateEmployeeNumber)
+            {
+                await _users.LockAccountChangesAsync(cancellationToken);
+                profile.EmployeeNumber = NumberFormats.EmployeeNumber(
+                    await _users.GetMaxEmployeeSerialAsync(NumberFormats.EmployeePrefix, cancellationToken) + 1);
+            }
+
             // Gives the role (one per user) and, for Teacher, adds the teacher record from the profile.
             await _accounts.ApplyRoleChangeAsync(user, role, Clean(request.Specialization), cancellationToken);
             await _users.AddAsync(user, cancellationToken); // one save: user, role, profile, addresses, teacher

@@ -82,6 +82,7 @@ The **Frontend page** column was found by searching the React code for the call 
 | `POST` | `/api/admissions/{id}/enroll` | Enrols an Admitted application: creates the student and parents in one transaction and marks it Enrolled. | Admissions.Enroll | Admission detail (Enroll dialog) |
 | `POST` | `/api/admissions/{id}/reject` | Rejects a Registered or Admitted application with a reason. | Admissions.Edit | Admission detail |
 | `DELETE` | `/api/admissions/{id}` | Soft-deletes an application (not allowed once Enrolled). | Admissions.Delete | Admissions list, Admission detail |
+| `POST` | `/api/admissions/{id}/restore` | Brings a deleted application back. 404 unknown id, 409 if it is not deleted or its registration number is taken. | Admissions.Delete **and** the Admin role (checked in the service) | Admissions list (Deleted applications) |
 
 #### Attendance
 
@@ -191,12 +192,14 @@ The **Frontend page** column was found by searching the React code for the call 
 | `GET` | `/api/students/{id}` | Returns one student (full, or reduced when scoped); the read is audited. | Students.View or Students.ViewScoped | Student detail, Student edit |
 | `POST` | `/api/students` | Creates a student directly (students normally arrive through enrolment). | Students.Create | — (no screen; students are created by Enroll) |
 | `PUT` | `/api/students/{id}` | Edits a student: personal data, class move, status, health, pickup persons. | Students.Edit | Student edit |
-| `PUT` | `/api/students/{id}/identity` | Sets Aadhaar / passport / visa numbers. | Students.Edit **and** Students.ViewSensitive | Student edit (Identity section) |
+| `PUT` | `/api/students/{id}/identity` | Sets Aadhaar / Emirates ID / passport / visa numbers. Needs the student's `rowVersion` (409 if stale); returns the student with the new `rowVersion`. | Students.Edit **and** Students.ViewSensitive | Student edit (Identity section) |
 | `GET` | `/api/students/{id}/enrollments` | Returns the student's academic history, newest first. | Students.View or Students.ViewScoped | Student detail (History) |
 | `GET` | `/api/students/{id}/guardians` | Lists the student's parents/guardians (full or contact-only). | Students.View or Students.ViewScoped | — (not used by the UI yet) |
 | `POST` | `/api/students/{id}/guardians` | Links a parent to this student. | Parents.Edit | — (not used by the UI yet; the UI links from the Parent page) |
 | `DELETE` | `/api/students/{id}/guardians/{parentId}` | Unlinks a parent from this student. | Parents.Edit | — (not used by the UI yet; the UI unlinks from the Parent page) |
-| `DELETE` | `/api/students/{id}` | Soft-deletes a student. | Students.Delete | Students list, Student detail |
+| `DELETE` | `/api/students/{id}` | Soft-deletes a student (409 if it has class history or attendance, which every student created through the app does). | Students.Delete | Students list, Student detail |
+| `GET` | `/api/students/deleted` | Lists deleted students with who deleted them and when. | Students.Delete **and** the Admin role (checked in the service) | — (no screen yet) |
+| `POST` | `/api/students/{id}/restore` | Brings a deleted student back (204). 404 unknown id; 409 if not deleted, the login account is deleted or now used by another student, or the class is inactive or full. | Students.Delete **and** the Admin role (checked in the service) | — (no screen yet) |
 
 #### Subjects
 

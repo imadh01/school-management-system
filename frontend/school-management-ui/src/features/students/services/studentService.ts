@@ -5,7 +5,6 @@ import type {
   CreateStudentRequest,
   UpdateStudentRequest,
   UpdateStudentIdentityRequest,
-  StudentIdentityResponse,
   StudentEnrollmentResponse,
   StudentDetail,
 } from "../types/student.types";
@@ -32,9 +31,17 @@ export const studentService = {
       .then((res) => res.data),
 
   // Needs both Students.Edit and Students.ViewSensitive.
-  updateIdentity: (id: number, request: UpdateStudentIdentityRequest) =>
+  // Sends the student's rowVersion (409 if it is stale) and returns the whole student with the NEW rowVersion.
+  updateIdentity: (
+    id: number,
+    request: UpdateStudentIdentityRequest,
+    rowVersion: string,
+  ) =>
     apiClient
-      .put<StudentIdentityResponse>(`/students/${id}/identity`, request)
+      .put<StudentResponse>(`/students/${id}/identity`, {
+        ...request,
+        rowVersion,
+      })
       .then((res) => res.data),
 
   getEnrollments: (id: number) =>

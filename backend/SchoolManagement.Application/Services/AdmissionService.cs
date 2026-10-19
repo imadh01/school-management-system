@@ -1,5 +1,6 @@
 ﻿using SchoolManagement.Application.DTOs.Admissions;
 using SchoolManagement.Application.Interfaces;
+using SchoolManagement.Domain.Constants;
 using SchoolManagement.Domain.Entities;
 using SchoolManagement.Domain.Exceptions;
 
@@ -16,6 +17,9 @@ public class AdmissionService : IAdmissionService
     private readonly IAddressService _addressService;
     private readonly IDocumentRepository _documentRepository;
     private readonly ICurrentUser _currentUser;
+    private readonly ISchoolSettingsProvider _schoolSettings;
+    private readonly TimeProvider _time;
+    private readonly ICurrentUserPermissions _permissions;
 
     public AdmissionService(
         IAdmissionRepository admissionRepository,
@@ -26,7 +30,10 @@ public class AdmissionService : IAdmissionService
         IConcurrencyGuard concurrency,
         IAddressService addressService,
         IDocumentRepository documentRepository,
-        ICurrentUser currentUser)
+        ICurrentUser currentUser,
+        ISchoolSettingsProvider schoolSettings,
+        TimeProvider time,
+        ICurrentUserPermissions permissions)
     {
         _admissionRepository = admissionRepository;
         _classSectionRepository = classSectionRepository;
@@ -37,6 +44,9 @@ public class AdmissionService : IAdmissionService
         _addressService = addressService;
         _documentRepository = documentRepository;
         _currentUser = currentUser;
+        _schoolSettings = schoolSettings;
+        _time = time;
+        _permissions = permissions;
     }
 
     public async Task<List<AdmissionResponse>> GetAllAsync(CancellationToken cancellationToken)
@@ -66,6 +76,9 @@ public class AdmissionService : IAdmissionService
         var addresses = await _addressService.BuildAsync(request.Addresses ?? new(), cancellationToken);
         var guardians = await MapGuardiansAsync(request.Guardians, new HashSet<int>(), canLinkParents, cancellationToken);
 
+        // The registration date, and the year in RegNo, are the school's today (its time zone), not the server's UTC date.
+        var today = SchoolTimeZones.Today((await _schoolSettings.GetAsync(cancellationToken)).TimeZoneId, _time.GetUtcNow());
+
         // One transaction: the application, its guardians, addresses and the RegNo update succeed or fail together.
         return await _admissionRepository.ExecuteInTransactionAsync(async () =>
         {
@@ -82,7 +95,7 @@ public class AdmissionService : IAdmissionService
                 PreviousSchool = request.PreviousSchool,
                 Phone = request.Phone,
                 Email = request.Email,
-                RegistrationDate = DateOnly.FromDateTime(DateTime.UtcNow),
+                RegistrationDate = today,
                 Status = "Registered",
                 Remarks = request.Remarks,
                 Addresses = addresses,
@@ -94,7 +107,7 @@ public class AdmissionService : IAdmissionService
 
             // Matches the prototype exactly: RegNo = 'REG-' + year + '-' + zero-padded id,
             // not a per-year-reset counter — it's literally the row's own sequential id.
-            admission.RegNo = $"REG-{DateTime.UtcNow.Year}-{admission.Id:D4}";
+            admission.RegNo = $"REG-{today.Year}-{admission.Id:D4}";
             await _admissionRepository.SaveChangesAsync(cancellationToken);
 
             admission.AcademicYear = classSection.AcademicYear;
@@ -472,6 +485,29 @@ public class AdmissionService : IAdmissionService
         admission.DeletedAt = DateTime.UtcNow;
         admission.DeletedBy = _currentUser.UserId;
         await _admissionRepository.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<AdmissionResponse> RestoreAsync(int id, CancellationToken cancellationToken)
+    {
+        // Restoring is an Admin action on top of the Admissions.Delete permission the endpoint needs.
+        if (!await _permissions.IsInRoleAsync(RoleNames.Admin, cancellationToken))
+            throw new ForbiddenException("Only an Admin can restore a deleted application.");
+
+        var admission = await _admissionRepository.GetIncludingDeletedByIdAsync(id, cancellationToken)
+            ?? throw new NotFoundException($"Application {id} does not exist.");
+        if (!admission.IsDeleted)
+            throw new ConflictException($"Application '{admission.RegNo}' is not deleted.");
+
+        // Unique values are checked again: the registration number could have been taken since the delete.
+        if (await _admissionRepository.ExistsLiveWithRegNoAsync(admission.RegNo, id, cancellationToken))
+            throw new ConflictException(
+                $"Application '{admission.RegNo}' cannot be restored: another application now uses that registration number.");
+
+        admission.IsDeleted = false;
+        admission.DeletedAt = null;
+        admission.DeletedBy = null;
+        await _admissionRepository.SaveChangesAsync(cancellationToken); // the audit log records IsDeleted true -> false and who did it
+        return ToResponse(admission);
     }
 
     // ---------------------------------------------------------------- helpers

@@ -371,7 +371,12 @@ export function AdmissionsPage() {
         />
       </Panel>
 
-      {canDelete && <DeletedAdmissionsPanel version={admissions.length} />}
+      {canDelete && (
+        <DeletedAdmissionsPanel
+          version={admissions.length}
+          onRestored={() => void list.reload()}
+        />
+      )}
 
       {remove.dialog}
     </div>

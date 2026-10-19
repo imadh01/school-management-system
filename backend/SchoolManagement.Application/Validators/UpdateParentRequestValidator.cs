@@ -9,10 +9,12 @@ public class UpdateParentRequestValidator : AbstractValidator<UpdateParentReques
     public UpdateParentRequestValidator()
     {
         RuleFor(x => x.RowVersion).Must(RowVersionRules.IsValid).WithMessage(RowVersionRules.Message);
-        RuleFor(x => x.Name).NotEmpty().MaximumLength(100);
+        this.ValidateParentFields(
+            x => x.Name, x => x.Mobile, x => x.Email,
+            x => x.Occupation, x => x.Nationality, x => x.CountryOfResidence, x => x.Timezone,
+            x => x.PreferredLanguage, x => x.PreferredContactMethod, x => x.Whatsapp,
+            x => x.Employer, x => x.JobTitle, x => x.WorkEmail, x => x.WorkPhone);
         this.ValidateAddresses(x => x.Addresses);
-        RuleFor(x => x.Mobile).NotEmpty().MaximumLength(20);
-        RuleFor(x => x.Email).EmailAddress().When(x => !string.IsNullOrEmpty(x.Email));
         RuleFor(x => x.Status).Must(ActiveStatuses.IsValid)
             .WithMessage("Status must be 'Active' or 'Inactive'.");
     }

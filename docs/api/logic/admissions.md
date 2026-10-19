@@ -1104,3 +1104,15 @@ Tests that exist: `Deleting_an_enrolled_application_is_refused_and_keeps_it`, `D
 14. **Deleting an application leaves its documents and files.** The rows are hidden, not removed. Whether `DocumentPurgeJob` ever removes the files of a deleted application is **Not verified** (that job is covered in the Documents file).
 15. **Rejected is final.** Is "no reopen" an agreed business rule, or should a rejected application be able to return to `Registered`? This is a **BUSINESS DECISION REQUIRED**.
 16. **The registration number placeholder.** Every new application is inserted with `RegNo = "PENDING"` and fixed inside the same transaction. With a unique index on `RegNo`, two simultaneous registrations queue behind each other on that key until the first commits. Probably harmless at school volume; inferred from the code, not measured.
+
+## Restore (deleted applications)
+
+- `POST /api/admissions/{id}/restore`: needs `Admissions.Delete` **and** the Admin role (checked in `AdmissionService.RestoreAsync`; anyone else gets 403).
+- 404 if the id does not exist. 409 if the application is not deleted, or another live application already uses its registration number (the unique index is not filtered by `IsDeleted`, so this cannot normally happen; the check gives a clear message if it ever does).
+- Sets `IsDeleted = false` and clears `DeletedAt` / `DeletedBy`. The audit log gets an `Update` row for `Admissions` with `IsDeleted` true -> false, the user and the trace id.
+- The Deleted applications panel shows a Restore button to Admins only.
+
+## Numbers and the school's date
+
+- `RegistrationDate` and the year in `REG-yyyy-nnnn` are the school's today (the time zone in School settings), not the server's UTC date. Between 00:00 and 04:00 in Abu Dhabi, and on 1 January, UTC would still show the previous day or year.
+- `ADM-yyyy-nnnn` uses the year of the **admission date** the clerk enters at enrolment (a date without a time zone). The serial restarts every year: the next number is the highest `ADM-yyyy-` serial plus one (deleted students still count, their number stays reserved). It is read inside the enrolment transaction behind `sp_getapplock` (`AdmissionNumber:{year}`), so two enrolments at the same moment queue up.

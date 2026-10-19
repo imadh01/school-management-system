@@ -229,6 +229,21 @@ public class StudentsController : ControllerBase
         return NoContent();
     }
 
+    /// <summary>Deleted students, with who deleted each and when. Needs Students.Delete and the Admin role.</summary>
+    [HttpGet("deleted")]
+    [Authorize(Policy = Permissions.StudentsDelete)]
+    public async Task<IActionResult> GetDeleted(CancellationToken cancellationToken) =>
+        Ok(await _studentService.GetDeletedAsync(cancellationToken));
+
+    /// <summary>Brings a deleted student back. Needs Students.Delete and the Admin role.</summary>
+    [HttpPost("{id:int}/restore")]
+    [Authorize(Policy = Permissions.StudentsDelete)]
+    public async Task<IActionResult> Restore(int id, CancellationToken cancellationToken)
+    {
+        await _studentService.RestoreAsync(id, cancellationToken);
+        return NoContent();
+    }
+
     [HttpDelete("{id:int}")]
     [Authorize(Policy = Permissions.StudentsDelete)]
     public async Task<IActionResult> Delete(int id, CancellationToken cancellationToken)

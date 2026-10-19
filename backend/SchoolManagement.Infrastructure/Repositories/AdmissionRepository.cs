@@ -31,6 +31,12 @@ public class AdmissionRepository : IAdmissionRepository
     public Task<List<Admission>> GetAllAsync(CancellationToken cancellationToken) =>
         WithIncludes().OrderByDescending(a => a.Id).ToListAsync(cancellationToken);
 
+    public Task<Admission?> GetIncludingDeletedByIdAsync(int id, CancellationToken cancellationToken) =>
+        WithIncludes().IgnoreQueryFilters().FirstOrDefaultAsync(a => a.Id == id, cancellationToken);
+
+    public Task<bool> ExistsLiveWithRegNoAsync(string regNo, int excludeAdmissionId, CancellationToken cancellationToken) =>
+        _context.Admissions.AnyAsync(a => a.RegNo == regNo && a.Id != excludeAdmissionId, cancellationToken);
+
     public async Task<List<DeletedAdmissionRow>> GetDeletedAsync(CancellationToken cancellationToken)
     {
         var rows = await _context.Admissions.IgnoreQueryFilters()

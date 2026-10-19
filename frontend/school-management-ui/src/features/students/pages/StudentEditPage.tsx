@@ -312,9 +312,15 @@ export function StudentEditPage() {
       return;
     }
 
+    // The identity save moves the student's version on again, so the page keeps the version it returns.
+    let final = saved;
     if (!sensitiveHidden) {
       try {
-        await studentService.updateIdentity(student.id, blankToNull(identity));
+        final = await studentService.updateIdentity(
+          student.id,
+          blankToNull(identity),
+          saved.rowVersion,
+        );
       } catch (err) {
         record.setIsSaving(false);
         // The main record is saved: take its new version so the next save does not conflict,
@@ -334,7 +340,7 @@ export function StudentEditPage() {
 
     record.setIsSaving(false);
     record.finishSaved(
-      stateFrom(saved),
+      stateFrom(final),
       `${saved.firstName} ${saved.lastName} was saved.`,
       `/students/${student.id}`,
     );

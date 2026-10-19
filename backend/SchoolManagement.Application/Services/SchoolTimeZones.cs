@@ -17,6 +17,16 @@ public static class SchoolTimeZones
         && TimeZoneInfo.TryFindSystemTimeZoneById(id, out var zone)
         && zone.HasIanaId;
 
+    /// <summary>"Today" on the school's wall clock. The server runs in UTC, so between midnight and 04:00 in Abu Dhabi
+    /// UTC is still yesterday (and, on 1 January, still the old year). Falls back to UTC for an unknown id.</summary>
+    public static DateOnly Today(string? timeZoneId, DateTimeOffset utcNow)
+    {
+        var zone = !string.IsNullOrWhiteSpace(timeZoneId) && TimeZoneInfo.TryFindSystemTimeZoneById(timeZoneId, out var found)
+            ? found
+            : TimeZoneInfo.Utc;
+        return DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(utcNow, zone).DateTime);
+    }
+
     /// <summary>Windows' conversion table (and old tzdata) gives some zones by their former IANA names.
     /// The list offers the current name when the server knows it, so India is "Asia/Kolkata", not "Asia/Calcutta".</summary>
     private static readonly Dictionary<string, string> CurrentNames = new(StringComparer.Ordinal)

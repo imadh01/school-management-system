@@ -32,6 +32,7 @@ public class UpdateStudentIdentityRequestValidator : AbstractValidator<UpdateStu
 {
     public UpdateStudentIdentityRequestValidator()
     {
+        RuleFor(x => x.RowVersion).Must(RowVersionRules.IsValid).WithMessage(RowVersionRules.Message);
         // Spaces are allowed on input ("1234 5678 9012") and stripped by the service.
         RuleFor(x => x.AadhaarNumber)
             .Must(a => a!.Replace(" ", "").Length == 12 && a.Replace(" ", "").All(char.IsAsciiDigit))

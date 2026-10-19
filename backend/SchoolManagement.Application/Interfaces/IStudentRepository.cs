@@ -18,8 +18,22 @@ public record StudentEnrollmentRow(
     int ClassSectionId, string ClassName, string ClassSection,
     string RollNumber, DateOnly StartDate, DateOnly? EndDate, string Status, string? Remarks);
 
+/// <summary>A soft-deleted student for the Deleted list.</summary>
+public record DeletedStudentRow(
+    int Id, string AdmNo, string FirstName, string LastName, string ClassName, string ClassSection,
+    string AcademicYearName, string Status, DateTime DeletedAt, string? DeletedByUsername);
+
 public interface IStudentRepository
 {
+    /// <summary>Soft-deleted students, newest deletion first (query filters off).</summary>
+    Task<List<DeletedStudentRow>> GetDeletedAsync(CancellationToken cancellationToken);
+    /// <summary>One student whether or not deleted (query filters off), tracked, for Restore.</summary>
+    Task<Student?> GetIncludingDeletedByIdAsync(int id, CancellationToken cancellationToken);
+    /// <summary>True if the user account exists and is not deleted.</summary>
+    Task<bool> LoginAccountIsLiveAsync(int userId, CancellationToken cancellationToken);
+    /// <summary>True if another LIVE student is already linked to this user account.</summary>
+    Task<bool> LoginAccountUsedByOtherStudentAsync(int userId, int excludeStudentId, CancellationToken cancellationToken);
+
     Task<List<Student>> GetAllAsync(CancellationToken cancellationToken);
     /// <summary>List rows, filtered to <paramref name="scope"/> inside the query (F1).</summary>
     Task<List<StudentSummaryRow>> GetSummariesAsync(DataScope scope, CancellationToken cancellationToken);

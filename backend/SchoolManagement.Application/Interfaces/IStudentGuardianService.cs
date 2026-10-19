@@ -21,5 +21,6 @@ public interface IStudentGuardianService
     /// </summary>
     Task<List<LinkedStudentResponse>> GetForParentAsync(int parentId, DataScope scope, CancellationToken cancellationToken);
     Task<LinkedStudentResponse> LinkStudentAsync(int parentId, LinkStudentRequest request, CancellationToken cancellationToken);
+    /// <summary>Makes the parent the student's primary contact. 404 when the two are not linked.</summary>
     Task SetPrimaryAsync(int parentId, int studentId, CancellationToken cancellationToken);
 }

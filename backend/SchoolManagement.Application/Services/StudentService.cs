@@ -1,6 +1,7 @@
 ﻿using SchoolManagement.Application.DTOs.Parents;
 using SchoolManagement.Application.DTOs.Students;
 using SchoolManagement.Application.Interfaces;
+using SchoolManagement.Domain.Constants;
 using SchoolManagement.Domain.Entities;
 using SchoolManagement.Domain.Exceptions;
 
@@ -14,6 +15,7 @@ public class StudentService : IStudentService
     private readonly IConcurrencyGuard _concurrency;
     private readonly ISensitiveReadLog _sensitiveReads;
     private readonly IAddressService _addressService;
+    private readonly ICurrentUserPermissions _permissions;
 
     public StudentService(
         IStudentRepository studentRepository,
@@ -21,7 +23,8 @@ public class StudentService : IStudentService
         IStudentGuardianRepository guardianRepository,
         IConcurrencyGuard concurrency,
         ISensitiveReadLog sensitiveReads,
-        IAddressService addressService)
+        IAddressService addressService,
+        ICurrentUserPermissions permissions)
     {
         _studentRepository = studentRepository;
         _classSectionRepository = classSectionRepository;
@@ -29,6 +32,7 @@ public class StudentService : IStudentService
         _concurrency = concurrency;
         _sensitiveReads = sensitiveReads;
         _addressService = addressService;
+        _permissions = permissions;
     }
 
     // The health block and identity numbers are sensitive: every opening of a detail leaves a "Read"
@@ -155,6 +159,10 @@ public class StudentService : IStudentService
         var becomesLeft = request.Status == "Left";
         // A student who left (or a legacy row with no open period) coming back needs a fresh period.
         var needsFreshPeriod = !becomesLeft && activePeriod is null;
+        // An Inactive student has no seat (seats count Active students only) but keeps an open period.
+        // Setting them back to Active in the same class takes a seat again, so it is checked like a move.
+        var reactivates = !becomesLeft && student.Status != StudentStatuses.Active
+                          && request.Status == StudentStatuses.Active && activePeriod is not null;
 
         // Keeps the history unambiguous: a class move and "left" are two different events.
         if (becomesLeft && classChanged)
@@ -170,7 +178,7 @@ public class StudentService : IStudentService
 
         // A move to another class, or a returning student, takes a seat. That whole edit then runs in
         // one transaction behind a lock on the target class, so two people cannot both take the last seat.
-        var takesSeat = !becomesLeft && (classChanged || needsFreshPeriod);
+        var takesSeat = !becomesLeft && (classChanged || needsFreshPeriod || reactivates);
 
         // null = addresses not sent: keep the stored ones. Checked before anything is written.
         var addresses = request.Addresses is null
@@ -179,9 +187,9 @@ public class StudentService : IStudentService
 
         async Task<StudentResponse> ApplyAsync()
         {
-            // Only a *move to a different class* (or coming back) is checked for status and room,
-            // so editing a student whose current class is inactive or at capacity still works.
-            if (!becomesLeft && (classChanged || needsFreshPeriod))
+            // Only a *move to a different class*, coming back, or being set Active again is checked for
+            // status and room, so editing a student whose current class is inactive or at capacity still works.
+            if (!becomesLeft && (classChanged || needsFreshPeriod || reactivates))
             {
                 ClassSectionRules.EnsureActive(classSection);
                 ClassSectionRules.EnsureHasRoom(classSection,
@@ -288,6 +296,9 @@ public class StudentService : IStudentService
     public async Task<StudentResponse> UpdateIdentityAsync(int id, UpdateStudentIdentityRequest request, CancellationToken cancellationToken)
     {
         var student = await GetDetailOrThrowAsync(id, cancellationToken);
+        // Same check as the main edit: 409 if the student was saved after this form was loaded. It also puts the
+        // student row in the UPDATE, so a successful identity save moves the version on.
+        _concurrency.Expect(student, request.RowVersion);
 
         var aadhaar = string.IsNullOrWhiteSpace(request.AadhaarNumber)
             ? null
@@ -356,6 +367,64 @@ public class StudentService : IStudentService
         student.IsDeleted = true;
         student.DeletedAt = DateTime.UtcNow;
         await _studentRepository.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<List<DeletedStudentResponse>> GetDeletedAsync(CancellationToken cancellationToken)
+    {
+        await EnsureAdminAsync(cancellationToken);
+        var rows = await _studentRepository.GetDeletedAsync(cancellationToken);
+        return rows.Select(r => new DeletedStudentResponse(
+            r.Id, r.AdmNo, $"{r.FirstName} {r.LastName}",
+            ClassSection.BuildDisplayName(r.ClassName, r.ClassSection, r.AcademicYearName),
+            r.Status, r.DeletedAt, r.DeletedByUsername)).ToList();
+    }
+
+    public async Task RestoreAsync(int id, CancellationToken cancellationToken)
+    {
+        await EnsureAdminAsync(cancellationToken);
+
+        var student = await _studentRepository.GetIncludingDeletedByIdAsync(id, cancellationToken)
+            ?? throw new NotFoundException($"Student {id} does not exist.");
+        if (!student.IsDeleted)
+            throw new ConflictException($"Student '{student.AdmNo}' is not deleted.");
+
+        // Values that were free when the student was deleted may be taken now (the AdmNo stays reserved by its
+        // unique index, and the identity-document numbers by theirs, so those cannot clash).
+        if (student.UserId is { } userId)
+        {
+            if (!await _studentRepository.LoginAccountIsLiveAsync(userId, cancellationToken))
+                throw new ConflictException(
+                    $"Student '{student.AdmNo}' cannot be restored: the login account linked to it has been deleted.");
+            if (await _studentRepository.LoginAccountUsedByOtherStudentAsync(userId, id, cancellationToken))
+                throw new ConflictException(
+                    $"Student '{student.AdmNo}' cannot be restored: its login account is now linked to another student.");
+        }
+
+        var classSection = await GetClassSectionOrThrowAsync(student.ClassSectionId, cancellationToken);
+
+        await _studentRepository.ExecuteInTransactionAsync(async () =>
+        {
+            // An Active student takes a seat again: same lock and count as every other way of taking one.
+            if (student.Status == StudentStatuses.Active)
+            {
+                ClassSectionRules.EnsureActive(classSection);
+                await _classSectionRepository.LockSeatsAsync(classSection.Id, cancellationToken);
+                ClassSectionRules.EnsureHasRoom(classSection,
+                    await _classSectionRepository.CountActiveStudentsAsync(classSection.Id, cancellationToken));
+            }
+
+            student.IsDeleted = false;
+            student.DeletedAt = null;
+            student.DeletedBy = null;
+            await _studentRepository.SaveChangesAsync(cancellationToken); // the audit log records IsDeleted true -> false and who did it
+            return true;
+        }, cancellationToken);
+    }
+
+    private async Task EnsureAdminAsync(CancellationToken cancellationToken)
+    {
+        if (!await _permissions.IsInRoleAsync(RoleNames.Admin, cancellationToken))
+            throw new ForbiddenException("Only an Admin can see or restore deleted students.");
     }
 
     // ---------------------------------------------------------------- helpers

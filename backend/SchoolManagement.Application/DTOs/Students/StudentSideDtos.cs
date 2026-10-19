@@ -20,4 +20,5 @@ public record StudentIdentityResponse(
 
 public record UpdateStudentIdentityRequest(
     string? AadhaarNumber, string? PassportNumber, DateOnly? PassportExpiry,
-    string? VisaType, DateOnly? VisaExpiry, string? EmiratesIdNumber = null);
+    string? VisaType, DateOnly? VisaExpiry, string? EmiratesIdNumber = null,
+    string RowVersion = "");

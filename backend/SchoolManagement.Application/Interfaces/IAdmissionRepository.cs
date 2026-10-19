@@ -21,6 +21,11 @@ public interface IAdmissionRepository
     /// <summary>Soft-deleted applications, newest deletion first (query filters off).</summary>
     Task<List<DeletedAdmissionRow>> GetDeletedAsync(CancellationToken cancellationToken);
 
+    /// <summary>One application whether or not it is deleted (query filters off), tracked, for Restore.</summary>
+    Task<Admission?> GetIncludingDeletedByIdAsync(int id, CancellationToken cancellationToken);
+    /// <summary>True if another LIVE application already uses this registration number.</summary>
+    Task<bool> ExistsLiveWithRegNoAsync(string regNo, int excludeAdmissionId, CancellationToken cancellationToken);
+
     Task<List<Admission>> GetAllAsync(CancellationToken cancellationToken);
     Task<Admission?> GetByIdAsync(int id, CancellationToken cancellationToken);
     Task AddAsync(Admission admission, CancellationToken cancellationToken);

@@ -11,5 +11,9 @@ public interface IStudentGuardianRepository
     Task AddLinkAsync(StudentGuardian link, CancellationToken cancellationToken);
     Task<StudentGuardian?> GetLinkAsync(int studentId, int parentId, CancellationToken cancellationToken);
     Task RemoveLinkAsync(StudentGuardian link, CancellationToken cancellationToken);
-    Task SetPrimaryAsync(int studentId, int parentId, CancellationToken cancellationToken);
+    /// <summary>
+    /// Makes this parent the student's one primary contact: the old primary is cleared and the new one set in
+    /// ONE transaction. Returns false (changing nothing) when the student has no link to this parent.
+    /// </summary>
+    Task<bool> SetPrimaryAsync(int studentId, int parentId, CancellationToken cancellationToken);
 }

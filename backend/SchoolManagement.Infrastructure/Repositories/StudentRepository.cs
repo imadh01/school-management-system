@@ -77,6 +77,42 @@ public class StudentRepository : IStudentRepository
         return access;
     }
 
+    public async Task<List<DeletedStudentRow>> GetDeletedAsync(CancellationToken cancellationToken)
+    {
+        var rows = await _context.Students.IgnoreQueryFilters().AsNoTracking()
+            .Where(s => s.IsDeleted)
+            .Select(s => new
+            {
+                s.Id, s.AdmNo, s.FirstName, s.LastName,
+                ClassName = s.ClassSection.Name, Section = s.ClassSection.Section,
+                AcademicYearName = s.ClassSection.AcademicYear.Name,
+                s.Status, s.DeletedAt, s.DeletedBy,
+            })
+            .ToListAsync(cancellationToken);
+
+        var userIds = rows.Where(r => r.DeletedBy != null).Select(r => r.DeletedBy!.Value).Distinct().ToList();
+        var names = await _context.Users.IgnoreQueryFilters()
+            .Where(u => userIds.Contains(u.Id))
+            .ToDictionaryAsync(u => u.Id, u => u.Username, cancellationToken);
+
+        return rows
+            .OrderByDescending(r => r.DeletedAt)
+            .Select(r => new DeletedStudentRow(
+                r.Id, r.AdmNo, r.FirstName, r.LastName, r.ClassName, r.Section, r.AcademicYearName, r.Status,
+                r.DeletedAt ?? DateTime.MinValue,
+                r.DeletedBy is { } id && names.TryGetValue(id, out var n) ? n : null))
+            .ToList();
+    }
+
+    public Task<Student?> GetIncludingDeletedByIdAsync(int id, CancellationToken cancellationToken) =>
+        _context.Students.IgnoreQueryFilters().FirstOrDefaultAsync(s => s.Id == id, cancellationToken);
+
+    public Task<bool> LoginAccountIsLiveAsync(int userId, CancellationToken cancellationToken) =>
+        _context.Users.AnyAsync(u => u.Id == userId, cancellationToken); // the query filter leaves out deleted users
+
+    public Task<bool> LoginAccountUsedByOtherStudentAsync(int userId, int excludeStudentId, CancellationToken cancellationToken) =>
+        _context.Students.AnyAsync(s => s.UserId == userId && s.Id != excludeStudentId, cancellationToken);
+
     public Task<Student?> GetByIdAsync(int id, CancellationToken cancellationToken) =>
         WithIncludes().FirstOrDefaultAsync(s => s.Id == id, cancellationToken);
 

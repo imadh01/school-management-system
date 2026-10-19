@@ -95,6 +95,12 @@ public class AdmissionsController : ControllerBase
     public async Task<IActionResult> GetDeleted(CancellationToken cancellationToken) =>
         Ok(await _admissionService.GetDeletedAsync(cancellationToken));
 
+    /// <summary>Brings a deleted application back. Needs Admissions.Delete and the Admin role.</summary>
+    [HttpPost("{id:int}/restore")]
+    [Authorize(Policy = Permissions.AdmissionsDelete)]
+    public async Task<IActionResult> Restore(int id, CancellationToken cancellationToken) =>
+        Ok(await _admissionService.RestoreAsync(id, cancellationToken));
+
     [HttpGet("{id:int}")]
     [Authorize(Policy = Permissions.AdmissionsView)]
     public async Task<IActionResult> GetById(int id, CancellationToken cancellationToken) =>

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Trash2 } from "lucide-react";
+import { RotateCcw, Trash2 } from "lucide-react";
 import { admissionService } from "../services/admissionService";
 import {
   ADMISSION_STATUS_TONE,
@@ -8,8 +8,11 @@ import {
 import { Panel } from "@/components/Panel";
 import { DataTable, type Column } from "@/components/DataTable";
 import { Badge } from "@/components/Badge";
+import { IconButton } from "@/components/IconButton";
 import { Notice } from "@/components/Notice";
 import { useAsyncData } from "@/hooks/useAsyncData";
+import { useConfirmAction } from "@/hooks/useConfirmAction";
+import { useAuth } from "@/store/AuthContext";
 import { formatUtcDate } from "@/utils/format";
 
 const columns: Column<DeletedAdmissionResponse>[] = [
@@ -58,12 +61,50 @@ const columns: Column<DeletedAdmissionResponse>[] = [
   },
 ];
 
-function DeletedTable() {
+function DeletedTable({ onRestored }: { onRestored: () => void }) {
+  // Restore is an Admin action (the API refuses anyone else), so only Admins see the button.
+  const { user } = useAuth();
+  const isAdmin = user?.roles.includes("Admin") ?? false;
+
   const list = useAsyncData(
     () => admissionService.getDeleted(),
     [],
     "Could not load the deleted applications.",
   );
+
+  const restore = useConfirmAction<DeletedAdmissionResponse>({
+    title: "Restore application",
+    message: (a) =>
+      `Restore the application for ${a.applicantName} (${a.regNo})? It goes back to the applications list as it was.`,
+    confirmLabel: "Restore",
+    danger: false,
+    run: async (a) => {
+      await admissionService.restore(a.id);
+      await list.reload();
+      onRestored();
+    },
+    success: (a) => `Application ${a.regNo} was restored.`,
+    failure: "Could not restore this application.",
+  });
+
+  const allColumns: Column<DeletedAdmissionResponse>[] = isAdmin
+    ? [
+        ...columns,
+        {
+          key: "actions",
+          header: "",
+          render: (a) => (
+            <IconButton
+              icon={RotateCcw}
+              label={`Restore ${a.regNo}`}
+              tone="info"
+              onClick={() => restore.ask(a)}
+            />
+          ),
+        },
+      ]
+    : columns;
+
   return (
     <>
       {list.error && (
@@ -73,12 +114,13 @@ function DeletedTable() {
       )}
       <DataTable
         caption="Deleted applications"
-        columns={columns}
+        columns={allColumns}
         rows={list.data ?? []}
         rowKey={(a) => a.id}
         loading={list.isLoading && !list.data}
         empty={<p className="cell-muted">No application has been deleted.</p>}
       />
+      {restore.dialog}
     </>
   );
 }
@@ -88,7 +130,13 @@ function DeletedTable() {
  * and when. Only for users who may delete applications. Opened on demand so the list is not loaded
  * for everyone. `version` changes after a delete so an open list shows the new row.
  */
-export function DeletedAdmissionsPanel({ version }: { version: number }) {
+export function DeletedAdmissionsPanel({
+  version,
+  onRestored,
+}: {
+  version: number;
+  onRestored: () => void;
+}) {
   const [open, setOpen] = useState(false);
   return (
     <Panel
@@ -106,7 +154,7 @@ export function DeletedAdmissionsPanel({ version }: { version: number }) {
         </button>
       }
     >
-      {open && <DeletedTable key={version} />}
+      {open && <DeletedTable key={version} onRestored={onRestored} />}
     </Panel>
   );
 }
