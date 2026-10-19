@@ -33,6 +33,18 @@ export interface AdmissionGuardianResponse {
   parentId: number | null;
 }
 
+/** An application that was deleted (kept, not erased): what it was, who deleted it and when. */
+export interface DeletedAdmissionResponse {
+  id: number;
+  regNo: string;
+  applicantName: string;
+  appliedForClassSectionName: string;
+  status: AdmissionStatus;
+  phone: string;
+  deletedAt: string;
+  deletedBy: string | null;
+}
+
 export interface AdmissionResponse {
   id: number;
   regNo: string;
@@ -111,8 +123,9 @@ export interface GuardianDecision {
 }
 
 export interface EnrollAdmissionRequest {
-  rollNumber: string;
-  admissionNumber: string;
+  /** null = the server generates it (for example 5A001 / ADM-2026-0001). */
+  rollNumber: string | null;
+  admissionNumber: string | null;
   admissionDate: string;
   entryPoint: string | null;
   transportRequired: boolean;

@@ -1,6 +1,7 @@
 ﻿using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using SchoolManagement.Application.Interfaces;
+using SchoolManagement.Application.Services;
 using SchoolManagement.Domain.Entities;
 using SchoolManagement.Domain.Exceptions;
 using SchoolManagement.Infrastructure.Persistence;
@@ -91,6 +92,22 @@ public class StudentRepository : IStudentRepository
             .AsSplitQuery()
             .FirstOrDefaultAsync(s => s.Id == id, cancellationToken);
 
+    public async Task<int> GetMaxAdmNoSerialAsync(string prefix, CancellationToken cancellationToken) =>
+        NumberFormats.MaxSerial(
+            await _context.Students.IgnoreQueryFilters()
+                .Where(s => s.AdmNo.StartsWith(prefix))
+                .Select(s => s.AdmNo)
+                .ToListAsync(cancellationToken),
+            prefix);
+
+    public async Task<int> GetMaxRollSerialAsync(int classSectionId, string prefix, CancellationToken cancellationToken) =>
+        NumberFormats.MaxSerial(
+            await _context.StudentEnrollments
+                .Where(e => e.ClassSectionId == classSectionId && e.RollNumber.StartsWith(prefix))
+                .Select(e => e.RollNumber)
+                .ToListAsync(cancellationToken),
+            prefix);
+
     public Task<bool> ExistsByAdmNoAsync(string admNo, CancellationToken cancellationToken) =>
         _context.Students.AnyAsync(s => s.AdmNo == admNo, cancellationToken);
 
@@ -104,6 +121,11 @@ public class StudentRepository : IStudentRepository
     public async Task<bool> HasAcademicHistoryAsync(int studentId, CancellationToken cancellationToken) =>
         await _context.StudentEnrollments.AnyAsync(e => e.StudentId == studentId, cancellationToken)
         || await _context.AttendanceRecords.AnyAsync(r => r.StudentId == studentId, cancellationToken);
+
+    public Task<bool> ExistsByEmiratesIdAsync(string emiratesIdNumber, int excludeStudentId, CancellationToken cancellationToken) =>
+        _context.StudentIdentityDocuments.AnyAsync(
+            d => d.EmiratesIdNumber == emiratesIdNumber && d.StudentId != excludeStudentId,
+            cancellationToken);
 
     public Task<bool> ExistsByAadhaarAsync(string aadhaarNumber, int excludeStudentId, CancellationToken cancellationToken) =>
         _context.StudentIdentityDocuments.AnyAsync(
@@ -153,7 +175,7 @@ public class StudentRepository : IStudentRepository
         {
             throw new ConflictException(
                 "This student conflicts with a record just saved by someone else " +
-                "(admission number, roll number, Aadhaar number or admission already in use). Reload and try again.");
+                "(admission number, roll number, Aadhaar or Emirates ID number, or admission already in use). Reload and try again.");
         }
     }
 }

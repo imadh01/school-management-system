@@ -9,6 +9,8 @@ public interface IParentRepository
     /// <summary>The parent if it exists AND is visible under <paramref name="scope"/>; otherwise null (F1).</summary>
     Task<Parent?> GetVisibleByIdAsync(int id, DataScope scope, CancellationToken cancellationToken);
     Task<Parent?> GetByIdAsync(int id, CancellationToken cancellationToken);
+    /// <summary>How many (not deleted) students are linked to this parent.</summary>
+    Task<int> CountLinkedStudentsAsync(int parentId, CancellationToken cancellationToken);
     Task AddAsync(Parent parent, CancellationToken cancellationToken);
     Task SaveChangesAsync(CancellationToken cancellationToken);
     Task<T> ExecuteInTransactionAsync<T>(Func<Task<T>> operation, CancellationToken cancellationToken);

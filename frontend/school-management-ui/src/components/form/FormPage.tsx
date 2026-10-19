@@ -7,6 +7,7 @@ import {
 } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft, CircleAlert } from "lucide-react";
+import { ActiveFormSectionContext } from "./FormSection";
 
 export interface FormSectionLink {
   id: string;
@@ -36,10 +37,9 @@ interface Props {
 
 /**
  * U2: the full-page add/edit layout.
- *   - left: the section list (stays in view; jumps to a section; marks sections with errors);
- *   - right: the section cards;
+ *   - top: fixed section tabs (stay in view; one is open at a time; marked when they have errors);
+ *   - below: the open section's card (the other sections stay mounted but hidden);
  *   - bottom: the save bar, always visible.
- * On narrow screens the section list becomes a scrollable row above the form.
  */
 export function FormPage({
   title,
@@ -58,33 +58,6 @@ export function FormPage({
 }: Props) {
   const [current, setCurrent] = useState(sections[0]?.id);
 
-  // Highlight the section being read: the last one whose top has scrolled past the sticky top bar.
-  useEffect(() => {
-    let frame = 0;
-    const onScroll = () => {
-      cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(() => {
-        let active = sections[0]?.id;
-        for (const s of sections) {
-          const el = document.getElementById(s.id);
-          if (el && el.getBoundingClientRect().top <= 160) active = s.id;
-        }
-        // At the very bottom the last sections may never reach the top: pick the last one.
-        if (
-          window.innerHeight + window.scrollY >=
-          document.documentElement.scrollHeight - 4
-        )
-          active = sections[sections.length - 1]?.id;
-        setCurrent(active);
-      });
-    };
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => {
-      window.removeEventListener("scroll", onScroll);
-      cancelAnimationFrame(frame);
-    };
-  }, [sections]);
-
   // When a save fails, bring the error summary into view (it is also announced: role="alert").
   const alertRef = useRef<HTMLDivElement>(null);
   const totalErrors = sections.reduce((n, s) => n + (s.errorCount ?? 0), 0);
@@ -93,16 +66,19 @@ export function FormPage({
   const errorSignature = `${totalErrors}|${formErrors.join("|")}`;
   useEffect(() => {
     if (!hasErrors) return;
+    // Open the first tab that has a field error, so the problem is on screen.
+    const firstBad = sections.find((s) => (s.errorCount ?? 0) > 0);
+    if (firstBad) setCurrent(firstBad.id);
     alertRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- hasErrors follows errorSignature
   }, [errorSignature]);
 
   const jumpTo = (id: string) => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    el.scrollIntoView({ behavior: "smooth", block: "start" });
-    el.focus({ preventScroll: true }); // keyboard and screen-reader users land in the section
     setCurrent(id);
+    // Bring the top of the form into view when the page was scrolled down.
+    const nav = document.querySelector(".form-nav");
+    if (nav && nav.getBoundingClientRect().top < 0)
+      nav.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
   const handleSubmit = (e: FormEvent) => {
@@ -130,7 +106,7 @@ export function FormPage({
                 <li key={s.id}>
                   <a
                     href={`#${s.id}`}
-                    aria-current={current === s.id ? "location" : undefined}
+                    aria-current={current === s.id ? "page" : undefined}
                     className={errors > 0 ? "has-errors" : undefined}
                     onClick={(e) => {
                       e.preventDefault();
@@ -175,7 +151,9 @@ export function FormPage({
             </div>
           )}
 
-          {children}
+          <ActiveFormSectionContext.Provider value={current ?? null}>
+            {children}
+          </ActiveFormSectionContext.Provider>
 
           <div className="save-bar">
             <span className="save-bar__status" aria-live="polite">

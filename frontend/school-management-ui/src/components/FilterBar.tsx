@@ -1,5 +1,6 @@
 import { Funnel } from "lucide-react";
 import type { ReactNode } from "react";
+import { SearchableSelect } from "./form/SearchableSelect";
 
 /** U1: the shaded row of filters between a panel's header and its table. */
 export function FilterBar({ children }: { children: ReactNode }) {
@@ -27,21 +28,16 @@ export function FilterSelect({
   options: readonly string[];
 }) {
   return (
-    <label>
-      <span className="visually-hidden">{label}</span>
-      <select
+    <div className="filter-select">
+      <SearchableSelect
         className="select"
+        ariaLabel={label}
+        options={options.map((o) => ({ value: o, label: o }))}
+        emptyLabel={allLabel}
         value={value}
-        onChange={(e) => onChange(e.target.value)}
-      >
-        <option value="">{allLabel}</option>
-        {options.map((o) => (
-          <option key={o} value={o}>
-            {o}
-          </option>
-        ))}
-      </select>
-    </label>
+        onChange={onChange}
+      />
+    </div>
   );
 }
 

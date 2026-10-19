@@ -171,3 +171,11 @@
     #6e3b30 100%
   );
 }
+
+/* No underlines on links anywhere; colour and hover tone show that something is clickable. */
+a,
+a:hover,
+a:focus,
+a:active {
+  text-decoration: none;
+}

@@ -17,7 +17,6 @@ export const STUDENT_FORM_SECTIONS: readonly FormSectionDef[] = [
       "classSectionId",
       "admissionDate",
       "status",
-      "photoUrl",
     ],
   },
   {

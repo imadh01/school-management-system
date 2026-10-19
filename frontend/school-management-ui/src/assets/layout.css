@@ -600,3 +600,8 @@
     border-color: Highlight;
   }
 }
+
+/* A photo in place of the initials */
+.avatar--photo {
+  object-fit: cover;
+}

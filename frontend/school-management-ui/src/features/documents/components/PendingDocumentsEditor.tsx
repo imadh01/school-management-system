@@ -25,6 +25,10 @@ export function PendingDocumentsEditor({
 }) {
   const inputId = useId();
   const [dragging, setDragging] = useState(false);
+  // The type is chosen BEFORE the files, like in the Documents module: every file added next gets it
+  // (still changeable per file below).
+  const [pickType, setPickType] = useState("");
+  const pickedType = options.types.find((t) => String(t.id) === pickType);
   const room = MAX_PENDING_DOCUMENTS - items.length;
 
   const add = async (files: FileList | File[] | null) => {
@@ -34,7 +38,7 @@ export function PendingDocumentsEditor({
         .slice(0, room)
         .map((f) => toPendingDocument(f, options.maxFileSizeBytes)),
     );
-    onChange([...items, ...picked]);
+    onChange([...items, ...picked.map((p) => ({ ...p, typeId: pickType }))]);
   };
 
   const update = (key: string, changes: Partial<PendingDocument>) =>
@@ -43,14 +47,29 @@ export function PendingDocumentsEditor({
   const onDrop = (e: DragEvent<HTMLLabelElement>) => {
     e.preventDefault();
     setDragging(false);
-    if (!disabled) void add(e.dataTransfer.files);
+    if (!disabled && pickType) void add(e.dataTransfer.files);
   };
 
   return (
     <div>
+      <div className="form-grid" style={{ marginBottom: 12 }}>
+        <SelectField
+          id={`${inputId}-type`}
+          label="What are you uploading?"
+          emptyLabel="Choose a document type…"
+          options={options.types.map((t) => ({ value: t.id, label: t.name }))}
+          value={pickType}
+          onChange={setPickType}
+          hint={
+            pickedType?.isSensitive
+              ? "Identity / medical: only staff allowed to see sensitive details can open it."
+              : "Choose the type first, then add the file(s). You can change a file's type below."
+          }
+        />
+      </div>
       <label
         htmlFor={inputId}
-        className={`dropzone dropzone--input${dragging ? " dropzone--active" : ""}`}
+        className={`dropzone dropzone--input${dragging ? " dropzone--active" : ""}${!pickType ? " dropzone--disabled" : ""}`}
         onDragOver={(e) => {
           e.preventDefault();
           setDragging(true);
@@ -64,14 +83,14 @@ export function PendingDocumentsEditor({
           multiple
           className="visually-hidden"
           accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
-          disabled={disabled || room <= 0}
+          disabled={disabled || room <= 0 || !pickType}
           onChange={(e) => {
             void add(e.target.files);
             e.target.value = ""; // so the same file can be chosen again after removing it
           }}
         />
         <FileUp size={28} aria-hidden="true" />
-        <strong>Choose files or drop them here</strong>
+        <strong>{pickType ? "Choose files or drop them here" : "Choose a document type first"}</strong>
         <span>
           PDF, JPG or PNG, up to {describeSize(options.maxFileSizeBytes)} each.
           They are uploaded right after the application is saved.

@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Field } from "./Field";
+import { SearchableSelect } from "./SearchableSelect";
 
 /**
  * U2: the standard form controls, each a <Field> (label, required mark, error, hint) around one
@@ -107,22 +108,16 @@ export function SelectField({
   return (
     <Field {...field}>
       {(c) => (
-        <select
+        <SearchableSelect
           {...c}
-          value={value ?? ""}
+          options={options.map((o) =>
+            typeof o === "string" ? { value: o, label: o } : o,
+          )}
+          emptyLabel={emptyLabel}
+          value={value}
           disabled={field.disabled}
-          onChange={(e) => onChange(e.target.value)}
-        >
-          {emptyLabel !== undefined && <option value="">{emptyLabel}</option>}
-          {options.map((o) => {
-            const option = typeof o === "string" ? { value: o, label: o } : o;
-            return (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            );
-          })}
-        </select>
+          onChange={onChange}
+        />
       )}
     </Field>
   );

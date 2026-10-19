@@ -87,4 +87,6 @@ export const PAGE_PERMISSIONS: Readonly<Record<string, readonly string[]>> = {
   "/users-staff": [Permission.UsersView],
   "/roles-permissions": [Permission.RolesView],
   "/settings": [Permission.SettingsView],
+  "/masters": [Permission.SettingsView],
+  "/masters/admission-fees": [Permission.SettingsView],
 };

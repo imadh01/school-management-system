@@ -30,6 +30,7 @@ import { Badge } from "@/components/Badge";
 import { PageLoadError, PageLoading } from "@/components/PageState";
 import { useAsyncData } from "@/hooks/useAsyncData";
 import { useCountries } from "@/hooks/useCountries";
+import { useSchoolBasics } from "@/hooks/useSchoolBasics";
 import { useRecordForm } from "@/hooks/useRecordForm";
 import type { AddressFormRow } from "@/types/address";
 import {
@@ -55,6 +56,8 @@ import {
   RELIGIONS,
 } from "@/types/lookups";
 import { STUDENT_FORM_SECTIONS } from "./studentFormSections";
+import { StudentPhotoField } from "../components/StudentPhotoField";
+import { NATIONALITIES, withCurrent } from "@/utils/nationalities";
 
 const MAX_PICKUP_PERSONS = 10;
 
@@ -78,7 +81,6 @@ function stateFrom(s: StudentResponse): FormState {
     form: {
       rollNumber: s.rollNumber,
       classSectionId: s.classSectionId,
-      photoUrl: s.photoUrl,
       firstName: s.firstName,
       middleName: s.middleName,
       lastName: s.lastName,
@@ -117,6 +119,7 @@ function stateFrom(s: StudentResponse): FormState {
     })),
     identity: {
       aadhaarNumber: s.identity.aadhaarNumber,
+      emiratesIdNumber: s.identity.emiratesIdNumber,
       passportNumber: s.identity.passportNumber,
       passportExpiry: s.identity.passportExpiry,
       visaType: s.identity.visaType,
@@ -161,6 +164,7 @@ export function StudentEditPage() {
     "Could not load this student.",
   );
   const countries = useCountries();
+  const school = useSchoolBasics();
   const record = useRecordForm<FormState>({
     sections: STUDENT_FORM_SECTIONS,
     initial: EMPTY_STATE,
@@ -231,6 +235,10 @@ export function StudentEditPage() {
     "student",
     "health.",
   );
+  // The Emirates ID is collected when the school is in the UAE (or the student already has one on file).
+  const schoolIsInUae =
+    countries.data?.find((c) => c.id === school?.countryId)?.code === "AE";
+  const showEmiratesId = schoolIsInUae || !!identity.emiratesIdNumber;
   const bindIdentity = fieldBinder(
     identity,
     setIdentity,
@@ -338,7 +346,7 @@ export function StudentEditPage() {
       <FormPage
         {...record.pageProps}
         title={`Edit ${student.firstName} ${student.lastName}`}
-        subtitle={`Adm # ${student.admNo} · ${student.classSectionName}`}
+        subtitle={`Adm No ${student.admNo} · ${student.classSectionName}`}
         back={{ to: `/students/${student.id}`, label: "Back to student" }}
         onSubmit={handleSave}
         onCancel={() => navigate(`/students/${student.id}`)}
@@ -385,11 +393,10 @@ export function StudentEditPage() {
             options={["Active", "Inactive", "Left"]}
             onChange={(v) => update({ status: v as StudentStatus })}
           />
-          <TextField
-            {...bind("photoUrl")}
-            label="Photo URL"
-            type="url"
-            placeholder="https://…"
+          <StudentPhotoField
+            studentId={student.id}
+            studentName={`${form.firstName} ${form.lastName}`.trim()}
+            hasPhoto={student.photoUrl != null}
           />
         </FormSection>
 
@@ -509,10 +516,11 @@ export function StudentEditPage() {
 
         {/* 6. Citizenship */}
         <FormSection id="citizenship" title="Citizenship">
-          <TextField {...bind("nationality")} label="Nationality" />
-          <TextField
-            {...bind("secondNationality")}
-            label="Second nationality"
+          <SelectField
+            {...bind("nationality")}
+            label="Nationality"
+            emptyLabel="Not specified"
+            options={withCurrent(NATIONALITIES, form.nationality)}
           />
           <TextField {...bind("countryOfBirth")} label="Country of birth" />
         </FormSection>
@@ -533,7 +541,6 @@ export function StudentEditPage() {
             emptyLabel="Not specified"
             options={CURRICULA}
           />
-          <TextField {...bind("ealCode")} label="EAL code" />
           <SelectField
             {...bind("admissionType")}
             label="Admission type"
@@ -545,6 +552,7 @@ export function StudentEditPage() {
         <FormSection
           id="safeguarding"
           title="Safeguarding & pickup"
+          description="Child-protection details kept by the office: who has custody, whether photos of the child may be shared, and the people allowed to collect the child from school."
           grid={false}
         >
           <div className="form-grid" style={{ marginBottom: 18 }}>
@@ -671,15 +679,6 @@ export function StudentEditPage() {
                 span="full"
               />
             )}
-            <TextField
-              {...bindHealth("insuranceProvider")}
-              label="Insurance provider"
-            />
-            <TextField
-              {...bindHealth("insurancePolicyExpiry")}
-              label="Insurance policy expiry"
-              type="date"
-            />
           </div>
         </FormSection>
 
@@ -729,6 +728,14 @@ export function StudentEditPage() {
                 label="Aadhaar number"
                 placeholder="12 digits"
               />
+              {showEmiratesId && (
+                <TextField
+                  {...bindIdentity("emiratesIdNumber")}
+                  label="Emirates ID"
+                  placeholder="784-YYYY-NNNNNNN-N"
+                  hint="Collected because the school is in the UAE."
+                />
+              )}
               <TextField
                 {...bindIdentity("passportNumber")}
                 label="Passport number"

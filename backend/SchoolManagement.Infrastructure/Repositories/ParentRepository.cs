@@ -25,6 +25,10 @@ public class ParentRepository : IParentRepository
             .VisibleTo(_context, scope)
             .FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
 
+    public Task<int> CountLinkedStudentsAsync(int parentId, CancellationToken cancellationToken) =>
+        _context.StudentGuardians.CountAsync(
+            g => g.ParentId == parentId && !g.Student.IsDeleted, cancellationToken);
+
     public Task<Parent?> GetByIdAsync(int id, CancellationToken cancellationToken) =>
         WithAddresses(_context.Parents).FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
 

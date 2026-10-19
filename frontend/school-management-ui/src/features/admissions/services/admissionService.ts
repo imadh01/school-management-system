@@ -1,6 +1,7 @@
 import { apiClient } from "@/services/apiClient";
 import type {
   AdmissionResponse,
+  DeletedAdmissionResponse,
   CreateAdmissionRequest,
   UpdateAdmissionRequest,
   ConfirmAdmissionRequest,
@@ -13,6 +14,20 @@ import type {
 export const admissionService = {
   getAll: () =>
     apiClient.get<AdmissionResponse[]>("/admissions").then((res) => res.data),
+
+  // The standard fee of the class this application is for (amount null = none set).
+  getSuggestedFee: (id: number) =>
+    apiClient
+      .get<{ className: string; amount: number | null }>(
+        `/admissions/${id}/suggested-fee`,
+      )
+      .then((res) => res.data),
+
+  // Deleted applications with who deleted them and when (needs Admissions.Delete).
+  getDeleted: () =>
+    apiClient
+      .get<DeletedAdmissionResponse[]>("/admissions/deleted")
+      .then((res) => res.data),
 
   getById: (id: number) =>
     apiClient

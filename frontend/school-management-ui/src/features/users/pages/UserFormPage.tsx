@@ -402,7 +402,8 @@ export function UserFormPage() {
             {...bind("employeeNumber")}
             label="Employee no."
             maxLength={30}
-            hint="Optional; must be unique when given."
+            placeholder="Automatic"
+            hint="Leave blank to generate one (EMP-0001, EMP-0002 ...). Must be unique."
           />
           <TextField
             {...bind("qualification")}

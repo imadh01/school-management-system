@@ -2,7 +2,7 @@
 //   - an oversized file is refused with its exact size and the limit;
 //   - a renamed file whose content is not PDF/JPG/PNG is refused;
 //   - the same file uploaded twice gives one document, not two;
-//   - nobody verifies their own upload;
+//   - an Admin may verify their own upload;
 //   - a verified document must be unverified before it can be deleted;
 // plus the download (same bytes, Read audit row, sensitive files need Students.ViewSensitive) and the
 // move of an applicant's documents to the student at enrolment.
@@ -96,20 +96,22 @@ public class DocumentApiTests
     }
 
     [Fact]
-    public async Task The_uploader_cannot_verify_their_own_document_but_someone_else_can()
+    public async Task An_Admin_can_verify_their_own_upload_and_someone_else_can_too()
     {
         var uploader = await CreateUserAsync(RoleNames.Admin);
         var reviewer = await CreateUserAsync(RoleNames.Admin);
         var studentId = await CreateStudentAsync();
-        var document = await UploadOkAsync(uploader, studentId, "Photo", UniquePng(), "photo.png");
+        var own = await UploadOkAsync(uploader, studentId, "Photo", UniquePng(), "photo.png");
+        var other = await UploadOkAsync(uploader, studentId, "Photo", UniquePng(), "photo2.png");
 
-        var own = await PostAsync(uploader, $"/api/documents/{document.Id}/verify", new { rowVersion = document.RowVersion });
-        Assert.Equal(HttpStatusCode.UnprocessableEntity, own.StatusCode);
-        Assert.Contains("someone else", (await BodyAsync(own)).GetProperty("message").GetString());
+        // An Admin may review their own upload (decision of 16 Oct); the same rule still stops everyone else.
+        var ownReview = await PostAsync(uploader, $"/api/documents/{own.Id}/verify", new { rowVersion = own.RowVersion });
+        Assert.Equal(HttpStatusCode.OK, ownReview.StatusCode);
+        Assert.Equal("Verified", (await ReadAsync<DocumentDto>(ownReview)).Status);
 
-        var other = await PostAsync(reviewer, $"/api/documents/{document.Id}/verify", new { rowVersion = document.RowVersion });
-        Assert.Equal(HttpStatusCode.OK, other.StatusCode);
-        var verified = await ReadAsync<DocumentDto>(other);
+        var byOther = await PostAsync(reviewer, $"/api/documents/{other.Id}/verify", new { rowVersion = other.RowVersion });
+        Assert.Equal(HttpStatusCode.OK, byOther.StatusCode);
+        var verified = await ReadAsync<DocumentDto>(byOther);
         Assert.Equal("Verified", verified.Status);
         Assert.Equal(reviewer.Username, verified.ReviewedBy);
     }

@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Pencil, Trash } from "lucide-react";
+import { LogOut, Pencil, Trash } from "lucide-react";
 
 /** "Edit" in a detail page's header; opens the full-page edit form. */
 export function EditButton({
@@ -17,6 +17,16 @@ export function EditButton({
       <Pencil size={16} aria-hidden="true" />
       Edit
     </Link>
+  );
+}
+
+/** "Mark as left" in a student's header; pair it with useConfirmAction. */
+export function MarkLeftButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button type="button" className="btn btn--secondary" onClick={onClick}>
+      <LogOut size={16} aria-hidden="true" />
+      Mark as left
+    </button>
   );
 }
 

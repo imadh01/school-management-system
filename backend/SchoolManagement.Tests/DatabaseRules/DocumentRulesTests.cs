@@ -11,7 +11,7 @@ namespace SchoolManagement.Tests.DatabaseRules;
 
 /// <summary>
 /// G1b: the document rules hold in the DATABASE, whatever code writes the rows: exactly one owner,
-/// nobody reviews their own upload, a rejection has a reason, a pending document has no reviewer,
+/// a rejection has a reason, a pending document has no reviewer,
 /// and the same file once per owner (a deleted copy does not count). Plus the seeded types.
 /// (The API tests in DocumentApiTests check the same rules through the service.)
 /// </summary>
@@ -30,22 +30,6 @@ public class DocumentRulesTests
 
         db.Documents.Add(await NewDocumentAsync(db, studentId: null));
         await AssertViolatesAsync(db, "CK_Documents_ExactlyOneOwner");
-    }
-
-    [Fact]
-    public async Task The_uploader_cannot_be_the_reviewer()
-    {
-        using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        var user = await NewUserAsync(db);
-        var document = await NewDocumentAsync(db, await NewStudentAsync(db));
-        document.CreatedBy = user.Id;
-        document.Status = DocumentStatuses.Verified;
-        document.VerifiedBy = user.Id;
-        document.VerifiedAt = DateTime.UtcNow;
-
-        db.Documents.Add(document);
-        await AssertViolatesAsync(db, "CK_Documents_NoSelfVerify");
     }
 
     [Fact]

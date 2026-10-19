@@ -31,6 +31,33 @@ public class AdmissionRepository : IAdmissionRepository
     public Task<List<Admission>> GetAllAsync(CancellationToken cancellationToken) =>
         WithIncludes().OrderByDescending(a => a.Id).ToListAsync(cancellationToken);
 
+    public async Task<List<DeletedAdmissionRow>> GetDeletedAsync(CancellationToken cancellationToken)
+    {
+        var rows = await _context.Admissions.IgnoreQueryFilters()
+            .Where(a => a.IsDeleted)
+            .Select(a => new
+            {
+                a.Id, a.RegNo, a.FirstName, a.LastName,
+                ClassName = a.AppliedForClassSection.Name,
+                AcademicYearName = a.AcademicYear.Name,
+                a.Status, a.Phone, a.DeletedAt, a.DeletedBy,
+            })
+            .ToListAsync(cancellationToken);
+
+        var userIds = rows.Where(r => r.DeletedBy != null).Select(r => r.DeletedBy!.Value).Distinct().ToList();
+        var names = await _context.Users.IgnoreQueryFilters()
+            .Where(u => userIds.Contains(u.Id))
+            .ToDictionaryAsync(u => u.Id, u => u.Username, cancellationToken);
+
+        return rows
+            .OrderByDescending(r => r.DeletedAt)
+            .Select(r => new DeletedAdmissionRow(
+                r.Id, r.RegNo, r.FirstName, r.LastName, r.ClassName, r.AcademicYearName, r.Status, r.Phone,
+                r.DeletedAt ?? DateTime.MinValue,
+                r.DeletedBy is { } id && names.TryGetValue(id, out var n) ? n : null))
+            .ToList();
+    }
+
     public Task<Admission?> GetByIdAsync(int id, CancellationToken cancellationToken) =>
         WithIncludes().FirstOrDefaultAsync(a => a.Id == id, cancellationToken);
 
@@ -64,6 +91,22 @@ public class AdmissionRepository : IAdmissionRepository
                     "(for example the same admission number or roll number). Reload and try again.");
             }
         });
+    }
+
+    public async Task LockAdmissionNumbersAsync(int year, CancellationToken cancellationToken)
+    {
+        if (_context.Database.CurrentTransaction is null)
+            throw new InvalidOperationException("LockAdmissionNumbersAsync must be called inside a transaction.");
+
+        var result = new SqlParameter("@result", System.Data.SqlDbType.Int) { Direction = System.Data.ParameterDirection.Output };
+        await _context.Database.ExecuteSqlRawAsync(
+            "EXEC @result = sp_getapplock @Resource = @resource, @LockMode = 'Exclusive', " +
+            "@LockOwner = 'Transaction', @LockTimeout = 10000;",
+            new object[] { result, new SqlParameter("@resource", $"AdmissionNumber:{year}") },
+            cancellationToken);
+
+        if ((int)result.Value < 0)
+            throw new ConflictException("Admission numbers are being issued right now. Please try again.");
     }
 
     public async Task LockForEnrolmentAsync(int admissionId, CancellationToken cancellationToken)

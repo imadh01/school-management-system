@@ -43,6 +43,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<Document> Documents => Set<Document>();
     public DbSet<StaffProfile> StaffProfiles => Set<StaffProfile>();
     public DbSet<SchoolSettings> SchoolSettings => Set<SchoolSettings>();
+    public DbSet<AdmissionFee> AdmissionFees => Set<AdmissionFee>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)

@@ -31,8 +31,8 @@ export function LoginPage() {
   return (
     <div className="login-page">
       <div className="login-page__brand-panel">
-        <img src={logo} alt="Synergein" className="login-page__logo" />
-        <h1 className="login-page__brand-name">Synergein School Management</h1>
+        <img src={logo} alt="Escoule" className="login-page__logo" />
+        <h1 className="login-page__brand-name">Escoule</h1>
         <p className="login-page__brand-tagline">
           One system for admissions, academics, attendance, fees, and everything
           in between.
@@ -43,7 +43,7 @@ export function LoginPage() {
         <div className="login-page__card">
           <h2 className="login-page__title">Welcome back</h2>
           <p className="login-page__subtitle">
-            Sign in to continue to your dashboard
+            Sign in to Escoule
           </p>
 
           <form onSubmit={handleSubmit}>
@@ -81,6 +81,9 @@ export function LoginPage() {
             >
               {isSubmitting ? "Signing in…" : "Sign in"}
             </button>
+            <p className="login-page__hint">
+              Forgot your password? Ask your administrator to reset it.
+            </p>
           </form>
         </div>
       </div>

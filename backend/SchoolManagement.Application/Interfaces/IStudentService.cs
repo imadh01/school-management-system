@@ -21,4 +21,5 @@ public interface IStudentService
     Task<StudentResponse> UpdateIdentityAsync(int id, UpdateStudentIdentityRequest request, CancellationToken cancellationToken);
     Task<List<StudentEnrollmentResponse>> GetEnrollmentsAsync(int studentId, DataScope scope, CancellationToken cancellationToken);
     Task DeleteAsync(int id, CancellationToken cancellationToken);
+    Task MarkLeftAsync(int id, CancellationToken cancellationToken);
 }

@@ -6,16 +6,23 @@ export function PersonCell({
   name,
   to,
   sub,
+  photoSrc,
 }: {
   name: string;
   to?: string;
   sub?: string;
+  /** A picture to show instead of the initials. */
+  photoSrc?: string | null;
 }) {
   return (
     <div className="person">
-      <span className="avatar" aria-hidden="true">
-        {initialsOf(name)}
-      </span>
+      {photoSrc ? (
+        <img className="avatar avatar--photo" src={photoSrc} alt="" />
+      ) : (
+        <span className="avatar" aria-hidden="true">
+          {initialsOf(name)}
+        </span>
+      )}
       <div>
         {to ? (
           <Link className="person__name person__link" to={to}>

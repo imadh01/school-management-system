@@ -30,6 +30,8 @@ import { RolesPage } from "../features/roles/pages/RolesPage";
 import { RoleDetailPage } from "../features/roles/pages/RoleDetailPage";
 import { RoleFormPage } from "../features/roles/pages/RoleFormPage";
 import { MyAccountPage } from "../features/account/pages/MyAccountPage";
+import { MastersPage } from "../features/masters/pages/MastersPage";
+import { AdmissionFeesPage } from "../features/masters/pages/AdmissionFeesPage";
 import { SchoolSettingsPage } from "../features/settings/pages/SchoolSettingsPage";
 import { SubjectsPage } from "../features/subjects/pages/SubjectsPage";
 import { SubjectFormPage } from "../features/subjects/pages/SubjectFormPage";
@@ -177,6 +179,8 @@ export const router = createBrowserRouter(
           {/* E3b: every signed-in user has an account page; Settings needs Settings.View. */}
           <Route path="/my-account" element={<MyAccountPage />} />
           {guarded("/settings", <SchoolSettingsPage />)}
+          {guarded("/masters", <MastersPage />)}
+          {guarded("/masters/admission-fees", <AdmissionFeesPage />)}
           {guarded("/attendance", <AttendancePage />)}
           {guarded("/documents", <DocumentsPage />)}
           {/* Modules from the prototype that are not built yet. */}

@@ -10,6 +10,7 @@ import {
   Users,
 } from "lucide-react";
 import { studentService } from "../services/studentService";
+import { useStudentPhoto } from "../hooks/useStudentPhoto";
 import { DocumentsPanel } from "@/features/documents/components/DocumentsPanel";
 import {
   isFullStudent,
@@ -19,7 +20,7 @@ import {
 import { DetailHeader } from "@/components/detail/DetailHeader";
 import { AddressList } from "@/components/detail/AddressList";
 import { DetailCard } from "@/components/detail/DetailCard";
-import { DeleteButton, EditButton } from "@/components/detail/HeaderButtons";
+import { EditButton, MarkLeftButton } from "@/components/detail/HeaderButtons";
 import { ContactCard, ContactList } from "@/components/detail/ContactCard";
 import { Tabs, TabPanel, type TabItem } from "@/components/detail/Tabs";
 import { KeyValueGrid } from "@/components/detail/KeyValueGrid";
@@ -56,18 +57,21 @@ export function StudentDetailPage() {
     "Could not load the history.",
   );
 
-  const remove = useConfirmAction<StudentDetail>({
-    title: "Delete student",
+  const photoSrc = useStudentPhoto(studentId, student?.photoUrl != null);
+
+  // A student is closed with "Left" rather than deleted: the record and class history are kept.
+  const leave = useConfirmAction<StudentDetail>({
+    title: "Mark student as left",
     message: (s) =>
-      `Delete ${s.firstName} ${s.lastName} (${s.admNo})? This cannot be undone.`,
-    confirmLabel: "Delete",
+      `Mark ${s.firstName} ${s.lastName} (${s.admNo}) as left? Their class seat is released and they will no longer appear in attendance. The record and history are kept.`,
+    confirmLabel: "Mark as left",
     danger: true,
     run: async (s) => {
-      await studentService.delete(s.id);
+      await studentService.markLeft(s.id);
       navigate("/students");
     },
-    success: (s) => `${s.firstName} ${s.lastName} was deleted.`,
-    failure: "Could not delete this student.",
+    success: (s) => `${s.firstName} ${s.lastName} was marked as left.`,
+    failure: "Could not mark this student as left.",
   });
 
   const full = student && isFullStudent(student) ? student : null;
@@ -99,7 +103,6 @@ export function StudentDetailPage() {
     : !isFullStudent(student) && student.health.hasAllergies;
   const age = ageOn(student.dateOfBirth);
   const canEdit = can(Permission.StudentsEdit);
-  const canDelete = can(Permission.StudentsDelete);
 
   const tabs: TabItem[] = [
     { id: "overview", label: "Overview", icon: UserRound },
@@ -124,9 +127,9 @@ export function StudentDetailPage() {
       <DetailHeader
         back={{ to: "/students", label: "All students" }}
         title={name}
-        photoUrl={student.photoUrl}
+        photoUrl={photoSrc}
         meta={[
-          `Adm # ${student.admNo}`,
+          `Adm No ${student.admNo}`,
           student.classSectionName,
           `Roll ${student.rollNumber}`,
         ]}
@@ -140,13 +143,13 @@ export function StudentDetailPage() {
           </>
         }
         actions={
-          full && (canEdit || canDelete) ? (
+          full && canEdit ? (
             <>
               {canEdit && (
                 <EditButton primary to={`/students/${student.id}/edit`} />
               )}
-              {canDelete && (
-                <DeleteButton onClick={() => remove.ask(student)} />
+              {student.status !== "Left" && (
+                <MarkLeftButton onClick={() => leave.ask(student)} />
               )}
             </>
           ) : undefined
@@ -181,10 +184,6 @@ export function StudentDetailPage() {
                     ? [
                         { label: "Blood group", value: full.health.bloodGroup },
                         { label: "Nationality", value: full.nationality },
-                        {
-                          label: "Second nationality",
-                          value: full.secondNationality,
-                        },
                         {
                           label: "Country of birth",
                           value: full.countryOfBirth,
@@ -227,7 +226,6 @@ export function StudentDetailPage() {
                           label: "English proficiency",
                           value: full.englishProficiency,
                         },
-                        { label: "EAL code", value: full.ealCode },
                       ]
                     : []),
                 ]}
@@ -423,14 +421,6 @@ export function StudentDetailPage() {
                     value: full.health.dietaryRequirements,
                   },
                   {
-                    label: "Insurance provider",
-                    value: full.health.insuranceProvider,
-                  },
-                  {
-                    label: "Insurance expiry",
-                    value: formatDate(full.health.insurancePolicyExpiry),
-                  },
-                  {
                     label: "Medical notes",
                     value: full.health.medicalNotes,
                     wide: true,
@@ -501,7 +491,7 @@ export function StudentDetailPage() {
         </TabPanel>
       )}
 
-      {remove.dialog}
+      {leave.dialog}
     </div>
   );
 }
@@ -529,6 +519,9 @@ function IdentityCard({ student }: { student: StudentResponse }) {
         <KeyValueGrid
           items={[
             { label: "Aadhaar", value: idn.aadhaarNumber },
+            ...(idn.emiratesIdNumber
+              ? [{ label: "Emirates ID", value: idn.emiratesIdNumber }]
+              : []),
             { label: "Passport", value: idn.passportNumber },
             { label: "Passport expiry", value: formatDate(idn.passportExpiry) },
             { label: "Visa type", value: idn.visaType },

@@ -7,7 +7,7 @@ namespace SchoolManagement.Application.DTOs.Students;
 /// (an empty list clears them). Identity numbers have their own endpoint.
 /// </summary>
 public record UpdateStudentRequest(
-    string RollNumber, int ClassSectionId, string Status, string? PhotoUrl,
+    string RollNumber, int ClassSectionId, string Status,
     string FirstName, string? MiddleName, string LastName, string Gender, DateOnly DateOfBirth,
     string? Mobile, string? Email,
     string Category, string? Religion, string? PreviousSchool,

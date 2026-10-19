@@ -7,7 +7,7 @@ namespace SchoolManagement.Application.DTOs.Students;
 /// POST /api/students/{id}/guardians; identity numbers are set with PUT /api/students/{id}/identity.
 /// </summary>
 public record CreateStudentRequest(
-    string AdmNo, string RollNumber, int ClassSectionId, DateOnly AdmissionDate, string? PhotoUrl,
+    string AdmNo, string RollNumber, int ClassSectionId, DateOnly AdmissionDate,
     string FirstName, string? MiddleName, string LastName, string Gender, DateOnly DateOfBirth,
     string? Mobile, string? Email,
     string Category, string? Religion, string? PreviousSchool,

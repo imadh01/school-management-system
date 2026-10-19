@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CircleCheck } from "lucide-react";
+import { admissionService } from "../services/admissionService";
 import type {
   AdmissionResponse,
   ConfirmAdmissionRequest,
@@ -36,8 +37,35 @@ export function ConfirmAdmissionModal({ admission, onClose, onSubmit }: Props) {
   });
   const patch = (changes: Partial<ConfirmAdmissionRequest>) =>
     setForm((f) => ({ ...f, ...changes }));
-  const bind = fieldBinder(form, patch, {}, "confirm");
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const bind = fieldBinder(form, patch, fieldErrors, "confirm");
   const { isSubmitting, errors, submit } = useDialogSubmit(onClose);
+
+  // Pre-fill the fee set for this class in Masters. It stays editable, and a fee the clerk has
+  // already typed is never overwritten. A failed lookup just leaves the box empty.
+  useEffect(() => {
+    let cancelled = false;
+    admissionService
+      .getSuggestedFee(admission.id)
+      .then((s) => {
+        if (!cancelled && s.amount != null)
+          setForm((f) => (f.admissionFee == null ? { ...f, admissionFee: s.amount } : f));
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [admission.id]);
+
+  // Payment is taken when the admission is confirmed, so both payment fields are required.
+  const validate = () => {
+    const e: Record<string, string> = {};
+    if (form.admissionFee == null) e.admissionFee = "Fee amount is required.";
+    if (!form.admissionFeeReference?.trim())
+      e.admissionFeeReference = "Payment reference is required.";
+    setFieldErrors(e);
+    return Object.keys(e).length === 0;
+  };
 
   return (
     <Dialog
@@ -51,6 +79,7 @@ export function ConfirmAdmissionModal({ admission, onClose, onSubmit }: Props) {
         <DialogFooter
           onCancel={onClose}
           onSubmit={() =>
+            validate() &&
             submit(
               () => onSubmit(admission.id, blankToNull(form)),
               "Could not confirm this admission. It may have already moved past Registered.",
@@ -67,6 +96,7 @@ export function ConfirmAdmissionModal({ admission, onClose, onSubmit }: Props) {
         <TextField
           {...bind("admissionFee")}
           label="Fee amount"
+          required
           type="number"
           min={0}
           onChange={(v) => patch({ admissionFee: numberOrNull(v) })}
@@ -74,6 +104,7 @@ export function ConfirmAdmissionModal({ admission, onClose, onSubmit }: Props) {
         <TextField
           {...bind("admissionFeeReference")}
           label="Payment reference"
+          required
         />
       </div>
 

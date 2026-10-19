@@ -65,6 +65,10 @@ public class UserService : IUserService
         var profile = new StaffProfile();
         Apply(profile, request.Profile);
         profile.Addresses = addresses;
+        // Every teacher and staff member is an employee: a blank number is generated (EMP-0001...).
+        // A typed number still works and was checked for duplicates above.
+        profile.EmployeeNumber ??= NumberFormats.EmployeeNumber(
+            await _users.GetMaxEmployeeSerialAsync(NumberFormats.EmployeePrefix, cancellationToken) + 1);
 
         var user = new User
         {

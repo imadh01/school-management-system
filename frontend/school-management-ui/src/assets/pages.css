@@ -75,7 +75,7 @@
   background: var(--surface-2);
   color: var(--text);
 }
-.form-nav a[aria-current="location"] {
+.form-nav a[aria-current="page"] {
   background: var(--nav-active-bg);
   color: var(--nav-active-text);
   border-bottom-color: var(--accent-solid);
@@ -325,7 +325,8 @@
   color: var(--text);
 }
 .tabs__tab[aria-selected="true"] {
-  color: var(--text);
+  color: var(--nav-active-text);
+  background: var(--nav-active-bg);
   border-bottom-color: var(--accent-solid);
 }
 .tabs__tab:focus-visible {
@@ -505,7 +506,6 @@
 }
 .person__link:hover {
   color: var(--accent-text);
-  text-decoration: underline;
 }
 
 /* File drop area (documents). Disabled until the documents module (G1) is switched on. */

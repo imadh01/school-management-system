@@ -131,8 +131,8 @@ The **Frontend page** column was found by searching the React code for the call 
 | `GET` | `/api/documents/{id}/file` | Downloads the file (sensitive types also need Students.ViewSensitive). | Documents.View | Documents (download link) |
 | `POST` | `/api/students/{studentId}/documents` | Uploads a PDF/JPG/PNG to a student (multipart form). | Documents.Upload | Student detail (Documents tab) |
 | `POST` | `/api/admissions/{admissionId}/documents` | Uploads a PDF/JPG/PNG to an application (multipart form). | Documents.Upload | Admission detail, Admission form |
-| `POST` | `/api/documents/{id}/verify` | Marks a Pending document Verified (not your own upload). | Documents.Verify | Documents |
-| `POST` | `/api/documents/{id}/reject` | Rejects a Pending document with a reason (not your own upload). | Documents.Verify | Documents |
+| `POST` | `/api/documents/{id}/verify` | Marks a Pending document Verified (not your own upload, unless you are an Admin). | Documents.Verify | Documents |
+| `POST` | `/api/documents/{id}/reject` | Rejects a Pending document with a reason (not your own upload, unless you are an Admin). | Documents.Verify | Documents |
 | `POST` | `/api/documents/{id}/unverify` | Puts a Verified document back to Pending. | Documents.Verify | Documents |
 | `DELETE` | `/api/documents/{id}` | Deletes a document (a Verified one must be unverified first). | Documents.Delete | Documents |
 

@@ -239,7 +239,7 @@ export function AdmissionDetailPage() {
         back={{ to: "/admissions", label: "All applications" }}
         title={name}
         meta={[
-          `Reg # ${a.regNo}`,
+          `Reg No ${a.regNo}`,
           `Applied for ${a.appliedForClassSectionName}`,
           `Registered ${formatDate(a.registrationDate)}`,
         ]}

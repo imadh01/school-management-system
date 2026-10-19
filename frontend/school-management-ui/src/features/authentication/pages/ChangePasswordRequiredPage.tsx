@@ -112,8 +112,8 @@ export function ChangePasswordRequiredPage() {
   return (
     <div className="login-page">
       <div className="login-page__brand-panel">
-        <img src={logo} alt="Synergein" className="login-page__logo" />
-        <p className="login-page__brand-name">Synergein School Management</p>
+        <img src={logo} alt="Escoule" className="login-page__logo" />
+        <p className="login-page__brand-name">Escoule</p>
       </div>
 
       <div className="login-page__form-panel">

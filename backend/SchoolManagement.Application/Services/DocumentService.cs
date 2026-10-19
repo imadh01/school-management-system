@@ -19,7 +19,7 @@ namespace SchoolManagement.Application.Services;
 /// attached to the same owner. Only then is the file stored and the row inserted.
 ///
 /// Review: Pending -> Verified or Rejected (with a reason); Verified -> Pending (unverify).
-/// Nobody reviews their own upload. A verified document must be unverified before it is deleted.
+/// Nobody but an Admin reviews their own upload. A verified document must be unverified before it is deleted.
 /// The database enforces the same rules (DocumentConfiguration); the checks here give clear messages.
 /// </summary>
 public class DocumentService : IDocumentService
@@ -279,7 +279,7 @@ public class DocumentService : IDocumentService
     {
         var document = await GetForChangeAsync(id, request.RowVersion, cancellationToken);
         RequireStatus(document, DocumentStatuses.Pending, "verified");
-        RefuseSelfReview(document);
+        await RefuseSelfReviewAsync(document, cancellationToken);
 
         document.Status = DocumentStatuses.Verified;
         document.VerifiedBy = _currentUser.UserId;
@@ -293,7 +293,7 @@ public class DocumentService : IDocumentService
     {
         var document = await GetForChangeAsync(id, request.RowVersion, cancellationToken);
         RequireStatus(document, DocumentStatuses.Pending, "rejected");
-        RefuseSelfReview(document);
+        await RefuseSelfReviewAsync(document, cancellationToken);
 
         document.Status = DocumentStatuses.Rejected;
         document.VerifiedBy = _currentUser.UserId;
@@ -379,10 +379,16 @@ public class DocumentService : IDocumentService
                 $"Only a {required.ToLowerInvariant()} document can be {verb}; this one is {document.Status.ToLowerInvariant()}.");
     }
 
-    private void RefuseSelfReview(Document document)
+    /// <summary>
+    /// The uploader may not review their own document, except an Admin (a small school may have one
+    /// administrator who does both). Enforced here only: there is no database rule, because the
+    /// database cannot tell an Admin from anyone else.
+    /// </summary>
+    private async Task RefuseSelfReviewAsync(Document document, CancellationToken cancellationToken)
     {
-        if (document.CreatedBy is not null && document.CreatedBy == _currentUser.UserId)
-            throw new BusinessRuleException("You uploaded this document, so someone else must verify or reject it.");
+        if (document.CreatedBy is null || document.CreatedBy != _currentUser.UserId) return;
+        if (await _permissions.IsInRoleAsync(RoleNames.Admin, cancellationToken)) return;
+        throw new BusinessRuleException("You uploaded this document, so someone else must verify or reject it.");
     }
 
     private async Task<DocumentResponse> GetResponseAsync(int id, CancellationToken cancellationToken)
@@ -396,6 +402,7 @@ public class DocumentService : IDocumentService
     {
         var canSeeSensitive = await _permissions.HasPermissionAsync(Permissions.StudentsViewSensitive, cancellationToken);
         var userId = _currentUser.UserId;
+        var isAdmin = await _permissions.IsInRoleAsync(RoleNames.Admin, cancellationToken);
         var today = Today;
 
         return rows.Select(r => new DocumentResponse(
@@ -420,7 +427,7 @@ public class DocumentService : IDocumentService
             ReviewedBy: r.ReviewedBy,
             ReviewedAt: r.VerifiedAt,
             RejectionReason: r.RejectionReason,
-            IsOwnUpload: userId is not null && r.CreatedBy == userId,
+            IsOwnUpload: !isAdmin && userId is not null && r.CreatedBy == userId,
             CanDownload: !r.IsSensitive || canSeeSensitive,
             RowVersion: Convert.ToBase64String(r.RowVersion))).ToList();
     }

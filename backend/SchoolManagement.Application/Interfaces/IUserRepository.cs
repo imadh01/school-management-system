@@ -19,6 +19,8 @@ public interface IUserRepository
     /// <param name="excludeUserId">The user being edited (its own value is not a clash), or null.</param>
     Task<bool> ExistsByUsernameAsync(string username, int? excludeUserId, CancellationToken cancellationToken);
     Task<bool> ExistsByEmailAsync(string email, int? excludeUserId, CancellationToken cancellationToken);
+    /// <summary>The highest serial among employee numbers shaped prefix + digits (deleted staff included); 0 when none.</summary>
+    Task<int> GetMaxEmployeeSerialAsync(string prefix, CancellationToken cancellationToken);
     Task<bool> ExistsByEmployeeNumberAsync(string employeeNumber, int? excludeUserId, CancellationToken cancellationToken);
     Task AddAsync(User user, CancellationToken cancellationToken);
     Task<IReadOnlyList<string>> GetRoleNamesAsync(int userId, CancellationToken cancellationToken);

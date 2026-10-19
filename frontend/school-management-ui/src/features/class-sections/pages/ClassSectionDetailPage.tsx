@@ -38,7 +38,7 @@ const STUDENT_COLUMNS: Column<StudentSummaryResponse>[] = [
       <PersonCell
         name={`${s.firstName} ${s.lastName}`}
         to={`/students/${s.id}`}
-        sub={`Adm # ${s.admNo}`}
+        sub={`Adm No ${s.admNo}`}
       />
     ),
   },

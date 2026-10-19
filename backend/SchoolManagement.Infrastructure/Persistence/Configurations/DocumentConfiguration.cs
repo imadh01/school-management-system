@@ -10,7 +10,7 @@ namespace SchoolManagement.Infrastructure.Persistence.Configurations;
 ///   - exactly one owner per row (CK_Documents_ExactlyOneOwner);
 ///   - status, content type and size are valid (CK_Documents_Status / _ContentType / _SizePositive);
 ///   - a reviewed document names its reviewer, a rejected one has a reason;
-///   - the reviewer is never the uploader (CK_Documents_NoSelfVerify);
+///   - the reviewer is never the uploader, except an Admin (checked in DocumentService, not here);
 ///   - the same file is attached to one owner only once while not deleted (UX_Documents_{Owner}_Sha256).
 ///
 /// The size LIMIT is a setting (Documents:MaxFileSizeBytes), so the database only checks that a
@@ -37,8 +37,8 @@ public class DocumentConfiguration : IEntityTypeConfiguration<Document>
                 "[Status] <> 'Pending' OR ([VerifiedBy] IS NULL AND [VerifiedAt] IS NULL AND [RejectionReason] IS NULL)");
             t.HasCheckConstraint("CK_Documents_RejectedHasReason",
                 "[Status] <> 'Rejected' OR LEN(LTRIM(RTRIM([RejectionReason]))) > 0");
-            t.HasCheckConstraint("CK_Documents_NoSelfVerify",
-                "[VerifiedBy] IS NULL OR [CreatedBy] IS NULL OR [VerifiedBy] <> [CreatedBy]");
+            // (No "uploader <> reviewer" CHECK: an Admin may review their own upload, and the database
+            // cannot tell an Admin from anyone else. DocumentService enforces the rule for everyone else.)
         });
 
         builder.HasKey(d => d.Id);

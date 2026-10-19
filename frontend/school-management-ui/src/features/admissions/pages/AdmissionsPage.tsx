@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { DeletedAdmissionsPanel } from "../components/DeletedAdmissionsPanel";
 import {
   CircleCheck,
   CircleX,
@@ -121,7 +122,7 @@ export function AdmissionsPage() {
   const remove = useConfirmAction<AdmissionResponse>({
     title: "Delete application",
     message: (a) =>
-      `Delete the application for ${fullName(a)} (${a.regNo})? This cannot be undone.`,
+      `Delete the application for ${fullName(a)} (${a.regNo})? It is removed from this list and kept in the Deleted applications list.`,
     confirmLabel: "Delete",
     danger: true,
     run: async (a) => {
@@ -172,7 +173,7 @@ export function AdmissionsPage() {
   const columns: Column<AdmissionResponse>[] = [
     {
       key: "regNo",
-      header: "Reg #",
+      header: "Reg No",
       sortValue: (a) => a.regNo,
       render: (a) => <span className="cell-strong">{a.regNo}</span>,
     },
@@ -369,6 +370,8 @@ export function AdmissionsPage() {
           }
         />
       </Panel>
+
+      {canDelete && <DeletedAdmissionsPanel version={admissions.length} />}
 
       {remove.dialog}
     </div>

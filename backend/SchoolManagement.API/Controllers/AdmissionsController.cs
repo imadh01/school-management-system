@@ -16,6 +16,7 @@ namespace SchoolManagement.API.Controllers;
 public class AdmissionsController : ControllerBase
 {
     private readonly IAdmissionService _admissionService;
+    private readonly IAdmissionFeeService _admissionFees;
     private readonly ICurrentUserPermissions _permissions;
     private readonly IValidator<CreateAdmissionRequest> _createValidator;
     private readonly IValidator<UpdateAdmissionRequest> _updateValidator;
@@ -25,6 +26,7 @@ public class AdmissionsController : ControllerBase
 
     public AdmissionsController(
         IAdmissionService admissionService,
+        IAdmissionFeeService admissionFees,
         ICurrentUserPermissions permissions,
         IValidator<CreateAdmissionRequest> createValidator,
         IValidator<UpdateAdmissionRequest> updateValidator,
@@ -33,6 +35,7 @@ public class AdmissionsController : ControllerBase
         IValidator<RejectAdmissionRequest> rejectValidator)
     {
         _admissionService = admissionService;
+        _admissionFees = admissionFees;
         _permissions = permissions;
         _createValidator = createValidator;
         _updateValidator = updateValidator;
@@ -79,6 +82,18 @@ public class AdmissionsController : ControllerBase
     [Authorize(Policy = Permissions.AdmissionsView)]
     public async Task<IActionResult> GetAll(CancellationToken cancellationToken) =>
         Ok(await _admissionService.GetAllAsync(cancellationToken));
+
+    /// <summary>The standard admission fee of this application's class (from Masters), to pre-fill Confirm. Needs Admissions.Edit.</summary>
+    [HttpGet("{id:int}/suggested-fee")]
+    [Authorize(Policy = Permissions.AdmissionsEdit)]
+    public async Task<IActionResult> GetSuggestedFee(int id, CancellationToken cancellationToken) =>
+        Ok(await _admissionFees.GetSuggestedForAdmissionAsync(id, cancellationToken));
+
+    /// <summary>Deleted applications, with who deleted each and when. Needs Admissions.Delete.</summary>
+    [HttpGet("deleted")]
+    [Authorize(Policy = Permissions.AdmissionsDelete)]
+    public async Task<IActionResult> GetDeleted(CancellationToken cancellationToken) =>
+        Ok(await _admissionService.GetDeletedAsync(cancellationToken));
 
     [HttpGet("{id:int}")]
     [Authorize(Policy = Permissions.AdmissionsView)]

@@ -57,5 +57,7 @@ export const LANGUAGES = [
   "Hindi",
   "Urdu",
   "Arabic",
+  "Tamil",
   "Korean",
 ] as const;
+export const RESIDENCE_COUNTRIES = ["India", "United Arab Emirates"] as const;

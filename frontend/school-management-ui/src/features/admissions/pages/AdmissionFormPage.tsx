@@ -263,6 +263,29 @@ export function AdmissionFormPage() {
   const selectedSection = classSections.find(
     (c) => c.id === form.appliedForClassSectionId,
   );
+  // The section is chosen at enrolment, so registration only asks for the class. The application
+  // still stores one section of that class (the first active one) because the column is required;
+  // the Enrol dialog lets the office pick the real section.
+  const classChoices = (() => {
+    const byKey = new Map<string, { key: string; label: string; sectionId: number }>();
+    for (const s of classSections) {
+      const key = `${s.academicYearId}|${s.name}`;
+      const keep =
+        s.status === "Active" || s.id === form.appliedForClassSectionId;
+      if (!keep) continue;
+      const existing = byKey.get(key);
+      if (!existing || (s.status === "Active" && existing.sectionId > s.id))
+        byKey.set(key, {
+          key,
+          label: `${s.name} (${s.academicYearName})`,
+          sectionId: s.id,
+        });
+    }
+    return [...byKey.values()];
+  })();
+  const selectedClassKey = selectedSection
+    ? `${selectedSection.academicYearId}|${selectedSection.name}`
+    : "";
 
   // ---------------------------------------------------------------- guardians
   const setGuardians = (
@@ -327,6 +350,8 @@ export function AdmissionFormPage() {
       if (isBlankGuardian(g)) return; // an empty row is ignored
       if (g.parentId == null && !g.name.trim())
         e[`guardians.${i}.name`] = "Name is required.";
+      if (g.parentId == null && !g.mobile?.trim())
+        e[`guardians.${i}.mobile`] = "Mobile is required.";
       if (g.relationType !== "Guardian") {
         counted[g.relationType] = (counted[g.relationType] ?? 0) + 1;
         if (counted[g.relationType] > 1)
@@ -510,17 +535,13 @@ export function AdmissionFormPage() {
             label="Class"
             required
             emptyLabel="Select a class…"
-            options={classSections
-              .filter(
-                (s) =>
-                  s.status === "Active" ||
-                  s.id === form.appliedForClassSectionId,
-              )
-              .map((s) => ({ value: s.id, label: s.displayName }))}
-            value={form.appliedForClassSectionId || ""}
-            onChange={(v) =>
-              record.patch({ appliedForClassSectionId: Number(v) })
-            }
+            options={classChoices.map((c) => ({ value: c.key, label: c.label }))}
+            value={selectedClassKey}
+            hint="The section is chosen later, when the child is enrolled."
+            onChange={(v) => {
+              const choice = classChoices.find((c) => c.key === v);
+              record.patch({ appliedForClassSectionId: choice?.sectionId ?? 0 });
+            }}
           />
           <SelectField
             {...bind("admissionType")}
@@ -547,7 +568,7 @@ export function AdmissionFormPage() {
           id="guardians"
           title="Parents / guardians"
           grid={false}
-          description="Optional while the application is a draft. Enrolment needs at least one guardian with a mobile number: the number is used to find parents already in the school."
+          description="Add at least one parent or guardian. The mobile number is required for each person added: it is used to find parents already in the school."
         >
           {errors.guardians && (
             <p className="field__error" style={{ marginBottom: 12 }}>
@@ -590,6 +611,7 @@ export function AdmissionFormPage() {
                   {...bindRow("mobile")}
                   label="Mobile"
                   type="tel"
+                  required
                   disabled={g.parentId != null}
                 />
                 <TextField
@@ -683,7 +705,11 @@ export function AdmissionFormPage() {
         </FormSection>
 
         {/* 5. Remarks */}
-        <FormSection id="remarks" title="Remarks">
+        <FormSection
+          id="remarks"
+          title="Remarks"
+          description="Optional. Internal notes for the school office, for example a sibling already studying here, a special request, or why a document is missing. Parents do not see this."
+        >
           <TextAreaField
             {...bind("remarks")}
             label="Remarks"
@@ -697,7 +723,7 @@ export function AdmissionFormPage() {
           id="documents"
           title="Documents"
           grid={false}
-          description="Birth certificate, previous school records, photos. PDF, JPG or PNG."
+          description="Optional: no document is needed to register. You can add them now or later from the application's page. For each file, choose what it is (birth certificate, previous school record, photo, etc.) from the Type list. PDF, JPG or PNG."
         >
           {!isNew ? (
             <Notice>

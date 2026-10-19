@@ -1,5 +1,6 @@
 ﻿using FluentValidation;
 using SchoolManagement.Application.DTOs.Students;
+using SchoolManagement.Application.Services;
 
 namespace SchoolManagement.Application.Validators;
 
@@ -36,6 +37,7 @@ public class UpdateStudentIdentityRequestValidator : AbstractValidator<UpdateStu
             .Must(a => a!.Replace(" ", "").Length == 12 && a.Replace(" ", "").All(char.IsAsciiDigit))
             .When(x => !string.IsNullOrWhiteSpace(x.AadhaarNumber))
             .WithMessage("Aadhaar number must be exactly 12 digits.");
+        RuleFor(x => x.EmiratesIdNumber).Must(EmiratesIdRules.IsValid).WithMessage(EmiratesIdRules.Message);
         RuleFor(x => x.PassportNumber).MaximumLength(30);
         RuleFor(x => x.VisaType).MaximumLength(30);
     }

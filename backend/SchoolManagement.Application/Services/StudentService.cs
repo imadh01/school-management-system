@@ -42,7 +42,7 @@ public class StudentService : IStudentService
         return rows.Select(r => new StudentSummaryResponse(
             r.Id, r.AdmNo, r.RollNumber, r.ClassSectionId,
             ClassSection.BuildDisplayName(r.ClassName, r.ClassSection, r.AcademicYearName),
-            r.AdmissionDate, r.Status, r.PhotoUrl,
+            r.AdmissionDate, r.Status, StudentPhotoService.RouteFor(r.Id, r.PhotoUrl),
             r.FirstName, r.MiddleName, r.LastName, r.Gender, r.DateOfBirth,
             r.Mobile, r.Category, r.TransportRequired,
             r.Nationality, r.CurriculumTrack, r.House, r.EalCode,
@@ -56,7 +56,7 @@ public class StudentService : IStudentService
         return rows.Select(r => new StudentScopedSummaryResponse(
             r.Id, r.AdmNo, r.RollNumber, r.ClassSectionId,
             ClassSection.BuildDisplayName(r.ClassName, r.ClassSection, r.AcademicYearName),
-            r.Status, r.PhotoUrl,
+            r.Status, StudentPhotoService.RouteFor(r.Id, r.PhotoUrl),
             r.FirstName, r.MiddleName, r.LastName, r.Gender, r.DateOfBirth,
             r.House, HasText(r.Allergies))).ToList();
     }
@@ -84,7 +84,7 @@ public class StudentService : IStudentService
 
         var response = new StudentScopedResponse(
             student.Id, student.AdmNo, student.RollNumber, student.ClassSectionId, student.ClassSection.DisplayName,
-            student.Status, student.PhotoUrl,
+            student.Status, StudentPhotoService.RouteFor(student.Id, student.PhotoUrl),
             student.FirstName, student.MiddleName, student.LastName, student.PreferredName,
             student.Gender, student.DateOfBirth, student.House,
             new StudentScopedHealthResponse(HasText(student.Health?.Allergies)),
@@ -127,7 +127,7 @@ public class StudentService : IStudentService
             };
             // First academic-history period; saved in the same SaveChanges as the student.
             student.Enrollments.Add(StudentEnrollmentRules.StartNew(classSection, request.RollNumber, request.AdmissionDate));
-            ApplyCore(student, request.PhotoUrl, request.FirstName, request.MiddleName, request.LastName, request.Gender,
+            ApplyCore(student, request.FirstName, request.MiddleName, request.LastName, request.Gender,
                 request.DateOfBirth, request.Mobile, request.Email,
                 request.Category, request.Religion, request.PreviousSchool, request.TransportRequired, request.TransportRoute,
                 request.Nationality, request.SecondNationality, request.CountryOfBirth, request.PreferredName,
@@ -228,7 +228,7 @@ public class StudentService : IStudentService
                 student.ClassSectionId = classSection.Id;
             }
             student.Status = request.Status;
-            ApplyCore(student, request.PhotoUrl, request.FirstName, request.MiddleName, request.LastName, request.Gender,
+            ApplyCore(student, request.FirstName, request.MiddleName, request.LastName, request.Gender,
                 request.DateOfBirth, request.Mobile, request.Email,
                 request.Category, request.Religion, request.PreviousSchool, request.TransportRequired, request.TransportRoute,
                 request.Nationality, request.SecondNationality, request.CountryOfBirth, request.PreferredName,
@@ -284,7 +284,7 @@ public class StudentService : IStudentService
         }, cancellationToken);
     }
 
-    /// <summary>Sets Aadhaar / passport / visa. The controller only lets Students.ViewSensitive callers in.</summary>
+    /// <summary>Sets Aadhaar / Emirates ID / passport / visa. The controller only lets Students.ViewSensitive callers in.</summary>
     public async Task<StudentResponse> UpdateIdentityAsync(int id, UpdateStudentIdentityRequest request, CancellationToken cancellationToken)
     {
         var student = await GetDetailOrThrowAsync(id, cancellationToken);
@@ -296,8 +296,13 @@ public class StudentService : IStudentService
         if (aadhaar is not null && await _studentRepository.ExistsByAadhaarAsync(aadhaar, student.Id, cancellationToken))
             throw new ConflictException("This Aadhaar number is already recorded for another student.");
 
+        var emiratesId = EmiratesIdRules.Normalize(request.EmiratesIdNumber);
+        if (emiratesId is not null && await _studentRepository.ExistsByEmiratesIdAsync(emiratesId, student.Id, cancellationToken))
+            throw new ConflictException("This Emirates ID is already recorded for another student.");
+
         var doc = student.IdentityDocument ??= new StudentIdentityDocument();
         doc.AadhaarNumber = aadhaar;
+        doc.EmiratesIdNumber = emiratesId;
         doc.PassportNumber = Clean(request.PassportNumber);
         doc.PassportExpiry = request.PassportExpiry;
         doc.VisaType = Clean(request.VisaType);
@@ -316,6 +321,25 @@ public class StudentService : IStudentService
             r.Id, r.AcademicYearId, r.AcademicYearName,
             r.ClassSectionId, ClassSection.BuildDisplayName(r.ClassName, r.ClassSection, r.AcademicYearName),
             r.RollNumber, r.StartDate, r.EndDate, r.Status, r.Remarks)).ToList();
+    }
+
+    /// <summary>
+    /// Closes the student: status Left, and the open class period ends today. The seat is released (seats
+    /// count Active students only) and the record, history and attendance stay. This is the one-click
+    /// form of what the edit page does when Status is set to Left.
+    /// </summary>
+    public async Task MarkLeftAsync(int id, CancellationToken cancellationToken)
+    {
+        var student = await GetDetailOrThrowAsync(id, cancellationToken);
+        if (student.Status == "Left")
+            throw new BusinessRuleException("This student has already left.");
+
+        var activePeriod = student.Enrollments.FirstOrDefault(e => e.Status == EnrollmentStatuses.Active);
+        if (activePeriod is not null)
+            StudentEnrollmentRules.Close(activePeriod, EnrollmentStatuses.Left, StudentEnrollmentRules.Today());
+
+        student.Status = "Left";
+        await _studentRepository.SaveChangesAsync(cancellationToken);
     }
 
     public async Task DeleteAsync(int id, CancellationToken cancellationToken)
@@ -364,14 +388,13 @@ public class StudentService : IStudentService
 
     // Fields shared by create and update. Parent/guardian contact data is NOT here: it lives on Parent.
     private static void ApplyCore(
-        Student s, string? photoUrl, string firstName, string? middleName, string lastName, string gender, DateOnly dob,
+        Student s, string firstName, string? middleName, string lastName, string gender, DateOnly dob,
         string? mobile, string? email,
         string category, string? religion, string? previousSchool, bool transportRequired, string? transportRoute,
         string? nationality, string? secondNationality, string? countryOfBirth, string? preferredName,
         string? motherTongue, string? homeLanguage, string? englishProficiency, string? curriculumTrack, string admissionType,
         string? custodyArrangement, bool mediaConsent, string? house, string? ealCode, decimal? feeConcessionPercent)
     {
-        s.PhotoUrl = photoUrl;
         s.FirstName = firstName; s.MiddleName = middleName; s.LastName = lastName;
         s.Gender = gender; s.DateOfBirth = dob;
         s.Mobile = mobile; s.Email = email;
@@ -432,11 +455,14 @@ public class StudentService : IStudentService
             includeSensitive ? d?.AadhaarNumber : SensitiveDataMasker.MaskTail(d?.AadhaarNumber),
             includeSensitive ? d?.PassportNumber : SensitiveDataMasker.MaskTail(d?.PassportNumber),
             d?.PassportExpiry, d?.VisaType, d?.VisaExpiry,
-            IsMasked: !includeSensitive);
+            IsMasked: !includeSensitive,
+            EmiratesIdNumber: includeSensitive
+                ? EmiratesIdRules.Format(d?.EmiratesIdNumber)
+                : SensitiveDataMasker.MaskTail(d?.EmiratesIdNumber));
 
         return new StudentResponse(
             s.Id, s.AdmNo, s.RollNumber, s.ClassSectionId, s.ClassSection.DisplayName,
-            s.AdmissionDate, s.Status, s.PhotoUrl,
+            s.AdmissionDate, s.Status, StudentPhotoService.RouteFor(s.Id, s.PhotoUrl),
             s.FirstName, s.MiddleName, s.LastName, s.Gender, s.DateOfBirth,
             s.Mobile, s.Email,
             AddressMapping.ToResponses(s.Addresses),

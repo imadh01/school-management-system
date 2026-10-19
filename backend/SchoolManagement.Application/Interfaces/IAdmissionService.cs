@@ -5,6 +5,8 @@ namespace SchoolManagement.Application.Interfaces;
 public interface IAdmissionService
 {
     Task<List<AdmissionResponse>> GetAllAsync(CancellationToken cancellationToken);
+    /// <summary>Deleted applications with who deleted them and when (needs Admissions.Delete).</summary>
+    Task<List<DeletedAdmissionResponse>> GetDeletedAsync(CancellationToken cancellationToken);
     Task<AdmissionResponse> GetByIdAsync(int id, CancellationToken cancellationToken);
     /// <param name="canLinkParents">G2: true only for callers holding Parents.View. Naming an existing parent without it is refused (403).</param>
     Task<AdmissionResponse> CreateAsync(CreateAdmissionRequest request, CancellationToken cancellationToken, bool canLinkParents = false);

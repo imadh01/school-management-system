@@ -27,7 +27,12 @@ import {
   toAddressRows,
   validateAddresses,
 } from "@/utils/address";
-import { CONTACT_METHODS, LANGUAGES } from "@/types/lookups";
+import {
+  CONTACT_METHODS,
+  LANGUAGES,
+  RESIDENCE_COUNTRIES,
+} from "@/types/lookups";
+import { withCurrent } from "@/utils/nationalities";
 import { blankToNull, fieldBinder, type FormSectionDef } from "@/utils/form";
 
 type FormState = Omit<CreateParentRequest, "addresses"> & {
@@ -62,17 +67,6 @@ const SECTIONS: readonly FormSectionDef[] = [
       "whatsapp",
       "emergencyOnly",
       "notify",
-    ],
-  },
-  {
-    id: "work",
-    title: "Work & billing",
-    fields: [
-      "employer",
-      "jobTitle",
-      "workEmail",
-      "workPhone",
-      "billingContact",
     ],
   },
   {
@@ -272,9 +266,11 @@ export function ParentFormPage() {
 
         <FormSection id="residence" title="Identity & residence">
           <TextField {...bind("nationality")} label="Nationality" />
-          <TextField
+          <SelectField
             {...bind("countryOfResidence")}
             label="Country of residence"
+            emptyLabel="Not specified"
+            options={withCurrent(RESIDENCE_COUNTRIES, form.countryOfResidence)}
           />
           <TextField
             {...bind("timezone")}
@@ -311,21 +307,6 @@ export function ParentFormPage() {
               onToggle={(label) =>
                 record.patch({ [NOTIFY[label]]: !form[NOTIFY[label]] })
               }
-            />
-          </div>
-        </FormSection>
-
-        <FormSection id="work" title="Work & billing">
-          <TextField {...bind("employer")} label="Employer" />
-          <TextField {...bind("jobTitle")} label="Job title" />
-          <TextField {...bind("workEmail")} label="Work email" type="email" />
-          <TextField {...bind("workPhone")} label="Work phone" type="tel" />
-          <div className="field field--full">
-            <CheckboxField
-              id="parent-billingContact"
-              label="Billing contact: send fee invoices and billing notices to this parent"
-              checked={form.billingContact}
-              onChange={(v) => record.patch({ billingContact: v })}
             />
           </div>
         </FormSection>

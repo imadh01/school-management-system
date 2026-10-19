@@ -1,4 +1,10 @@
-import type { ReactNode } from "react";
+import { createContext, useContext, type ReactNode } from "react";
+
+/**
+ * The section tab that is open. FormPage provides it; a FormSection that is not the open one is
+ * hidden (still mounted, so what was typed is kept). null = no tabs around it: always shown.
+ */
+export const ActiveFormSectionContext = createContext<string | null>(null);
 
 interface Props {
   /** Anchor id: the section list on the left links to it. */
@@ -18,9 +24,11 @@ export function FormSection({
   grid = true,
   children,
 }: Props) {
+  const activeId = useContext(ActiveFormSectionContext);
   return (
     <section
       id={id}
+      hidden={activeId !== null && activeId !== id}
       className="form-section"
       aria-labelledby={`${id}-title`}
       tabIndex={-1}

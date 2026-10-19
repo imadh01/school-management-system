@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using SchoolManagement.Application.Interfaces;
+using SchoolManagement.Domain.Entities;
 using SchoolManagement.Domain.Exceptions;
 using SchoolManagement.Infrastructure.Persistence;
 using SchoolManagement.Tests.Support;
@@ -67,5 +68,41 @@ public class StudentDeleteRulesTests
         using var scope2 = _factory.Services.CreateScope();
         var service = scope2.ServiceProvider.GetRequiredService<IStudentService>();
         await service.DeleteAsync(studentId, CancellationToken.None); // must not throw
+    }
+
+    [Fact]
+    public async Task Marking_a_student_left_closes_the_class_period_and_a_second_call_is_refused()
+    {
+        int studentId;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var section = await TestData.CreateSectionAsync(db);
+            var student = TestData.NewStudent(section, "3");
+            db.Students.Add(student);
+            await db.SaveChangesAsync();
+            studentId = student.Id;
+        }
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var service = scope.ServiceProvider.GetRequiredService<IStudentService>();
+            await service.MarkLeftAsync(studentId, CancellationToken.None);
+        }
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var student = await db.Students.Include(s => s.Enrollments).SingleAsync(s => s.Id == studentId);
+            Assert.Equal("Left", student.Status);
+            Assert.DoesNotContain(student.Enrollments, e => e.Status == EnrollmentStatuses.Active);
+            Assert.Contains(student.Enrollments, e => e.Status == EnrollmentStatuses.Left);
+        }
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var service = scope.ServiceProvider.GetRequiredService<IStudentService>();
+            await Assert.ThrowsAsync<BusinessRuleException>(() => service.MarkLeftAsync(studentId, CancellationToken.None));
+        }
     }
 }

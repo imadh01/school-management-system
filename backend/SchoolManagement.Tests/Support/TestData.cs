@@ -66,7 +66,7 @@ public static class TestData
 
     /// <summary>An edit request that moves <paramref name="student"/> to another class and changes nothing else.</summary>
     public static UpdateStudentRequest MoveRequest(Student student, int targetClassSectionId, string rollNumber, string? rowVersion = null) =>
-        new(RollNumber: rollNumber, ClassSectionId: targetClassSectionId, Status: "Active", PhotoUrl: null,
+        new(RollNumber: rollNumber, ClassSectionId: targetClassSectionId, Status: "Active",
             FirstName: student.FirstName, MiddleName: null, LastName: student.LastName,
             Gender: student.Gender, DateOfBirth: student.DateOfBirth,
             Mobile: null, Email: null,

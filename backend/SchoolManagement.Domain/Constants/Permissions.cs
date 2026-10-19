@@ -104,7 +104,7 @@ public static class Permissions
     /// Identity and medical files also need Students.ViewSensitive.</summary>
     public const string DocumentsView = "Documents.View";
     public const string DocumentsUpload = "Documents.Upload";
-    /// <summary>Verify, reject and unverify. Never your own upload (checked in the service and the database).</summary>
+    /// <summary>Verify, reject and unverify. Not your own upload, unless you are an Admin (checked in the service).</summary>
     public const string DocumentsVerify = "Documents.Verify";
     /// <summary>Delete (soft) a document that is not verified. The file is kept for the retention period.</summary>
     public const string DocumentsDelete = "Documents.Delete";

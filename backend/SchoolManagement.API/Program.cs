@@ -10,6 +10,7 @@ using SchoolManagement.API.Configuration;
 using SchoolManagement.API.Extensions;
 using SchoolManagement.API.Middleware;
 using SchoolManagement.API.Swagger;
+using SchoolManagement.Application.DTOs.AdmissionFees;
 using SchoolManagement.Application.DTOs.Admissions;
 using SchoolManagement.Application.DTOs.Auth;
 using SchoolManagement.Application.DTOs.ClassSections;
@@ -125,6 +126,10 @@ builder.Services.AddScoped<IValidator<RejectAdmissionRequest>, RejectAdmissionRe
 
 builder.Services.AddScoped<IStudentRepository, StudentRepository>();
 builder.Services.AddScoped<IStudentService, StudentService>();
+builder.Services.AddScoped<IStudentPhotoService, StudentPhotoService>();
+builder.Services.AddScoped<IAdmissionFeeRepository, AdmissionFeeRepository>();
+builder.Services.AddScoped<IAdmissionFeeService, AdmissionFeeService>();
+builder.Services.AddScoped<IValidator<SetAdmissionFeeRequest>, SetAdmissionFeeRequestValidator>();
 builder.Services.AddScoped<IValidator<CreateStudentRequest>, CreateStudentRequestValidator>();
 builder.Services.AddScoped<IValidator<CreateStudentFromAdmissionRequest>, CreateStudentFromAdmissionRequestValidator>();
 builder.Services.AddScoped<IValidator<UpdateStudentRequest>, UpdateStudentRequestValidator>();

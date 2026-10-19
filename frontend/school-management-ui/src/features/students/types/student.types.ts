@@ -29,6 +29,7 @@ export interface PickupPersonResponse extends PickupPersonRequest {
 
 export interface StudentIdentityResponse {
   aadhaarNumber: string | null;
+  emiratesIdNumber: string | null;
   passportNumber: string | null;
   passportExpiry: string | null;
   visaType: string | null;
@@ -39,6 +40,7 @@ export interface StudentIdentityResponse {
 
 export interface UpdateStudentIdentityRequest {
   aadhaarNumber: string | null;
+  emiratesIdNumber: string | null;
   passportNumber: string | null;
   passportExpiry: string | null;
   visaType: string | null;
@@ -130,7 +132,6 @@ export interface CreateStudentRequest {
   rollNumber: string;
   classSectionId: number;
   admissionDate: string;
-  photoUrl: string | null;
   firstName: string;
   middleName: string | null;
   lastName: string;

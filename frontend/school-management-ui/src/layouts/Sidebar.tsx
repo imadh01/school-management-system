@@ -18,7 +18,7 @@ import { IconButton } from "../components/IconButton";
 import brandMark from "../assets/synergein-mark.jpg";
 
 // TODO (E2): read from SchoolSettings once that module exists.
-const SCHOOL_NAME = "Demo School";
+const APP_NAME = "Escoule";
 
 interface Props {
   /** Narrow screens: the sidebar is a drawer. */
@@ -100,8 +100,7 @@ export function Sidebar({ isOpen, onClose }: Props) {
             <img src={brandMark} alt="" />
           </div>
           <div>
-            <div className="sidebar__brand-name">Synergein School</div>
-            <div className="sidebar__brand-sub">{SCHOOL_NAME}</div>
+            <div className="sidebar__brand-name">{APP_NAME}</div>
           </div>
         </div>
 
@@ -160,7 +159,7 @@ export function Sidebar({ isOpen, onClose }: Props) {
       <ConfirmDialog
         isOpen={confirmingLogout}
         title="Log out"
-        message={`Log out of ${SCHOOL_NAME}? You will need to sign in again.`}
+        message={`Log out of ${APP_NAME}? You will need to sign in again.`}
         confirmLabel="Log out"
         onConfirm={handleLogout}
         onCancel={() => setConfirmingLogout(false)}

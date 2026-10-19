@@ -329,6 +329,7 @@ public class DataScopeTests
         ("StudentsController.GetById",           "/api/students/{sA2}",               null,        _ => 0),
         ("StudentsController.GetEnrollments",    "/api/students/{sA2}/enrollments",   null,        _ => 0),
         ("StudentsController.GetGuardians",      "/api/students/{sA2}/guardians",     null,        _ => 0),
+        ("StudentsController.GetPhoto",          "/api/students/{sA2}/photo",         null,        _ => 0),
         ("ParentsController.GetAll",             "/api/parents",                      "id",        w => w.PB),
         ("ParentsController.GetById",            "/api/parents/{pB}",                 null,        _ => 0),
         ("ParentsController.GetLinkedStudents",  "/api/parents/{pB}/students",        null,        _ => 0),

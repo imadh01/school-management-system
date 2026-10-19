@@ -9,12 +9,17 @@ public class StudentIdentityDocumentConfiguration : IEntityTypeConfiguration<Stu
     public void Configure(EntityTypeBuilder<StudentIdentityDocument> builder)
     {
         builder.ToTable("StudentIdentityDocuments", t =>
+        {
             t.HasCheckConstraint("CK_StudentIdentityDocuments_Aadhaar",
-                "[AadhaarNumber] IS NULL OR (LEN([AadhaarNumber]) = 12 AND [AadhaarNumber] NOT LIKE '%[^0-9]%')"));
+                "[AadhaarNumber] IS NULL OR (LEN([AadhaarNumber]) = 12 AND [AadhaarNumber] NOT LIKE '%[^0-9]%')");
+            t.HasCheckConstraint("CK_StudentIdentityDocuments_EmiratesId",
+                "[EmiratesIdNumber] IS NULL OR (LEN([EmiratesIdNumber]) = 15 AND [EmiratesIdNumber] NOT LIKE '%[^0-9]%' AND [EmiratesIdNumber] LIKE '784%')");
+        });
 
         builder.HasKey(d => d.StudentId); // 1:1
 
         builder.Property(d => d.AadhaarNumber).HasMaxLength(12);
+        builder.Property(d => d.EmiratesIdNumber).HasMaxLength(15);
         builder.Property(d => d.PassportNumber).HasMaxLength(30);
         builder.Property(d => d.VisaType).HasMaxLength(30);
 
@@ -26,6 +31,11 @@ public class StudentIdentityDocumentConfiguration : IEntityTypeConfiguration<Stu
             .IsUnique()
             .HasFilter("[AadhaarNumber] IS NOT NULL")
             .HasDatabaseName("UX_StudentIdentityDocuments_Aadhaar");
+
+        builder.HasIndex(d => d.EmiratesIdNumber)
+            .IsUnique()
+            .HasFilter("[EmiratesIdNumber] IS NOT NULL")
+            .HasDatabaseName("UX_StudentIdentityDocuments_EmiratesId");
 
         builder.HasOne(d => d.Student)
             .WithOne(s => s.IdentityDocument)

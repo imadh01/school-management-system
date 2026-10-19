@@ -3,6 +3,7 @@ using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using SchoolManagement.Application.DTOs.Users;
 using SchoolManagement.Application.Interfaces;
+using SchoolManagement.Application.Services;
 using SchoolManagement.Domain.Constants;
 using SchoolManagement.Domain.Entities;
 using SchoolManagement.Domain.Exceptions;
@@ -73,6 +74,17 @@ public class UserRepository : IUserRepository
 
     public Task<bool> ExistsByEmailAsync(string email, int? excludeUserId, CancellationToken cancellationToken) =>
         _context.Users.AnyAsync(u => u.Email == email && u.Id != (excludeUserId ?? 0), cancellationToken);
+
+    public async Task<int> GetMaxEmployeeSerialAsync(string prefix, CancellationToken cancellationToken)
+    {
+        // Deleted staff keep their number reserved, so a number is never handed out twice.
+        var numbers = await _context.StaffProfiles
+            .IgnoreQueryFilters()
+            .Where(p => p.EmployeeNumber != null && p.EmployeeNumber.StartsWith(prefix))
+            .Select(p => p.EmployeeNumber!)
+            .ToListAsync(cancellationToken);
+        return NumberFormats.MaxSerial(numbers, prefix);
+    }
 
     public Task<bool> ExistsByEmployeeNumberAsync(string employeeNumber, int? excludeUserId, CancellationToken cancellationToken) =>
         _context.StaffProfiles.AnyAsync(

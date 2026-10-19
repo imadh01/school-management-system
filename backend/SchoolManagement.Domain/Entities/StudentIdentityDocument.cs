@@ -13,6 +13,8 @@ public class StudentIdentityDocument
     public Student Student { get; set; } = null!;
 
     public string? AadhaarNumber { get; set; } // 12 digits, unique when present
+    /// <summary>Emirates ID: 15 digits starting 784, stored without dashes, unique when present. Collected when the school is in the UAE.</summary>
+    public string? EmiratesIdNumber { get; set; }
     public string? PassportNumber { get; set; }
     public DateOnly? PassportExpiry { get; set; }
     public string? VisaType { get; set; }

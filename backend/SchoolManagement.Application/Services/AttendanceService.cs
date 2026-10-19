@@ -221,7 +221,7 @@ public class AttendanceService : IAttendanceService
     /// <summary>
     /// Decisions 2 and 3. Scope first (who), then dates (when):
     /// teachers only mark their own class (daily) or their own subject; non-admins only the
-    /// last 7 days; nobody marks the future.
+    /// last day; nobody marks the future.
     /// </summary>
     private async Task<AccessDecision> EvaluateAccessAsync(
         AttendanceActor actor, ClassSection classSection, Subject? subject, DateOnly date,
@@ -246,7 +246,20 @@ public class AttendanceService : IAttendanceService
 
         if (!actor.IsAdmin && date < today.AddDays(-AttendanceRules.EditWindowDays))
             return AccessDecision.RuleViolation(
-                $"Only an Admin can change attendance older than {AttendanceRules.EditWindowDays} days.");
+                $"Only an Admin can change attendance older than {AttendanceRules.EditWindowDays} " +
+                $"{(AttendanceRules.EditWindowDays == 1 ? "day" : "days")}.");
+
+        // A register that already exists locks 24 hours after it was first saved (not for an Admin).
+        if (!actor.IsAdmin)
+        {
+            var existing = await _attendance.GetSessionAsync(
+                classSection.Id, date, subject?.Id, forUpdate: false, cancellationToken);
+            if (existing is not null
+                && _time.GetUtcNow().UtcDateTime - existing.CreatedAt > TimeSpan.FromHours(AttendanceRules.LockAfterHours))
+                return AccessDecision.RuleViolation(
+                    $"This register was saved more than {AttendanceRules.LockAfterHours} hours ago. " +
+                    "Only an Admin can change it now.");
+        }
 
         return AccessDecision.Allowed;
     }

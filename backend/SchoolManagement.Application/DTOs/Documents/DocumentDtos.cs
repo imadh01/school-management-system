@@ -76,7 +76,7 @@ public record DocumentResponse(
     string? ReviewedBy,
     DateTime? ReviewedAt,
     string? RejectionReason,
-    // True when the caller uploaded it: the UI hides Verify/Reject (the API refuses them anyway).
+    // True when the caller uploaded it and is not an Admin: the UI disables Verify/Reject (the API refuses them anyway).
     bool IsOwnUpload,
     // False for a sensitive file when the caller lacks Students.ViewSensitive.
     bool CanDownload,

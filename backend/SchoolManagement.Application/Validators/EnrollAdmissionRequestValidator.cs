@@ -23,8 +23,9 @@ public class EnrollAdmissionRequestValidator : AbstractValidator<EnrollAdmission
 {
     public EnrollAdmissionRequestValidator()
     {
-        RuleFor(x => x.RollNumber).NotEmpty().MaximumLength(20);
-        RuleFor(x => x.AdmissionNumber).NotEmpty().MaximumLength(30);
+        // Blank = the system generates it (roll 5A001, admission ADM-2026-0001); typed values are still checked.
+        RuleFor(x => x.RollNumber).MaximumLength(20);
+        RuleFor(x => x.AdmissionNumber).MaximumLength(30);
         RuleFor(x => x.AllottedClassSectionId).GreaterThan(0);
 
         RuleFor(x => x.EntryPoint).MaximumLength(50);

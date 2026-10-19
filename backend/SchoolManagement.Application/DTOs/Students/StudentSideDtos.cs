@@ -16,8 +16,8 @@ public record PickupPersonResponse(int Id, string Name, string Relation, string 
 /// </summary>
 public record StudentIdentityResponse(
     string? AadhaarNumber, string? PassportNumber, DateOnly? PassportExpiry,
-    string? VisaType, DateOnly? VisaExpiry, bool IsMasked);
+    string? VisaType, DateOnly? VisaExpiry, bool IsMasked, string? EmiratesIdNumber = null);
 
 public record UpdateStudentIdentityRequest(
     string? AadhaarNumber, string? PassportNumber, DateOnly? PassportExpiry,
-    string? VisaType, DateOnly? VisaExpiry);
+    string? VisaType, DateOnly? VisaExpiry, string? EmiratesIdNumber = null);

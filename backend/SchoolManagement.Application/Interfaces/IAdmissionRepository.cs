@@ -11,8 +11,16 @@ public record ParentSummaryRow(int ParentId, string Name, string Mobile, string?
 /// <summary>A child already linked to a parent (shown so staff can tell families apart).</summary>
 public record ParentChildRow(int ParentId, string StudentName);
 
+/// <summary>A soft-deleted application for the Deleted list.</summary>
+public record DeletedAdmissionRow(
+    int Id, string RegNo, string FirstName, string LastName, string ClassName, string AcademicYearName,
+    string Status, string Phone, DateTime DeletedAt, string? DeletedByUsername);
+
 public interface IAdmissionRepository
 {
+    /// <summary>Soft-deleted applications, newest deletion first (query filters off).</summary>
+    Task<List<DeletedAdmissionRow>> GetDeletedAsync(CancellationToken cancellationToken);
+
     Task<List<Admission>> GetAllAsync(CancellationToken cancellationToken);
     Task<Admission?> GetByIdAsync(int id, CancellationToken cancellationToken);
     Task AddAsync(Admission admission, CancellationToken cancellationToken);
@@ -25,6 +33,8 @@ public interface IAdmissionRepository
     /// Must be called inside <see cref="ExecuteInTransactionAsync{T}"/>.
     /// </summary>
     Task LockForEnrolmentAsync(int admissionId, CancellationToken cancellationToken);
+    /// <summary>Serialises admission-number generation for one year (transaction-owned lock). Call inside a transaction.</summary>
+    Task LockAdmissionNumbersAsync(int year, CancellationToken cancellationToken);
 
     Task<List<ParentCandidateRow>> GetParentCandidatesAsync(int admissionId, CancellationToken cancellationToken);
     /// <summary>

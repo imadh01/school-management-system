@@ -134,9 +134,6 @@ export function EnrollModal({
     const fields: Record<string, string> = {};
     if (!form.allottedClassSectionId)
       fields.allottedClassSectionId = "Choose a class.";
-    if (!form.rollNumber.trim()) fields.rollNumber = "Roll number is required.";
-    if (!form.admissionNumber.trim())
-      fields.admissionNumber = "Admission number is required.";
     if (!form.admissionDate)
       fields.admissionDate = "Admission date is required.";
 
@@ -202,8 +199,8 @@ export function EnrollModal({
       () =>
         onSubmit(admission.id, {
           ...blankToNull(form),
-          rollNumber: form.rollNumber.trim(),
-          admissionNumber: form.admissionNumber.trim(),
+          rollNumber: form.rollNumber?.trim() || null,
+          admissionNumber: form.admissionNumber?.trim() || null,
           guardians: decisions,
         }),
       "Could not enrol this applicant.",
@@ -271,11 +268,17 @@ export function EnrollModal({
               value={form.allottedClassSectionId || ""}
               onChange={(v) => patch({ allottedClassSectionId: Number(v) })}
             />
-            <TextField {...bind("rollNumber")} label="Roll number" required />
+            <TextField
+              {...bind("rollNumber")}
+              label="Roll number"
+              placeholder="Automatic"
+              hint="Leave blank to generate it: class + section + 3-digit number (for example 5A001)."
+            />
             <TextField
               {...bind("admissionNumber")}
               label="Admission number"
-              required
+              placeholder="Automatic"
+              hint="Leave blank to generate it by year (for example ADM-2026-0001)."
             />
             <TextField
               {...bind("admissionDate")}
@@ -369,8 +372,11 @@ export function EnrollModal({
             items={[
               { label: "Name", value: name },
               { label: "Class", value: allottedSection?.displayName ?? "—" },
-              { label: "Roll number", value: form.rollNumber },
-              { label: "Admission number", value: form.admissionNumber },
+              { label: "Roll number", value: form.rollNumber?.trim() || "Generated automatically" },
+              {
+                label: "Admission number",
+                value: form.admissionNumber?.trim() || "Generated automatically",
+              },
               {
                 label: "Admission date",
                 value: formatDate(form.admissionDate),

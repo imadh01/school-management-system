@@ -1,4 +1,5 @@
 import { PageHero } from "@/components/PageHero";
+import { SearchableSelect } from "@/components/form/SearchableSelect";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { ValidationModal } from "@/components/ValidationModal";
@@ -410,17 +411,16 @@ export function AttendancePage() {
         </div>
         <div className="filters">
           <div className="field">
-            <label>Class</label>
-            <select
+            <label htmlFor="attendance-class">Class</label>
+            <SearchableSelect
+              id="attendance-class"
+              options={activeClasses.map((c) => ({
+                value: c.id,
+                label: c.displayName,
+              }))}
               value={classSectionId ?? ""}
-              onChange={(e) => changeClass(Number(e.target.value))}
-            >
-              {activeClasses.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.displayName}
-                </option>
-              ))}
-            </select>
+              onChange={(v) => changeClass(Number(v))}
+            />
           </div>
           <div className="field">
             <label>Date</label>

@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Mvc;
 using FluentValidation;
 using SchoolManagement.API.Common;
 using SchoolManagement.API.Extensions;
+using SchoolManagement.API.Filters;
+using SchoolManagement.Application.DTOs.Documents;
 using SchoolManagement.Application.DTOs.Students;
 using SchoolManagement.Application.DTOs.Parents;
 using SchoolManagement.Application.Interfaces;
@@ -17,6 +19,7 @@ public class StudentsController : ControllerBase
 {
     private readonly IStudentService _studentService;
     private readonly IStudentGuardianService _guardianService;
+    private readonly IStudentPhotoService _photoService;
     private readonly IValidator<CreateStudentRequest> _createValidator;
     private readonly IValidator<UpdateStudentRequest> _updateValidator;
     private readonly IValidator<UpdateStudentIdentityRequest> _identityValidator;
@@ -27,6 +30,7 @@ public class StudentsController : ControllerBase
     public StudentsController(
         IStudentService studentService,
         IStudentGuardianService guardianService,
+        IStudentPhotoService photoService,
         IValidator<CreateStudentRequest> createValidator,
         IValidator<UpdateStudentRequest> updateValidator,
         IValidator<UpdateStudentIdentityRequest> identityValidator,
@@ -36,6 +40,7 @@ public class StudentsController : ControllerBase
     {
         _studentService = studentService;
         _guardianService = guardianService;
+        _photoService = photoService;
         _createValidator = createValidator;
         _updateValidator = updateValidator;
         _identityValidator = identityValidator;
@@ -164,6 +169,63 @@ public class StudentsController : ControllerBase
     public async Task<IActionResult> UnlinkGuardian(int id, int parentId, CancellationToken cancellationToken)
     {
         await _guardianService.UnlinkAsync(id, parentId, cancellationToken);
+        return NoContent();
+    }
+
+    /// <summary>The form of a photo upload (multipart/form-data, one file).</summary>
+    public sealed class StudentPhotoForm
+    {
+        public IFormFile? File { get; set; }
+    }
+
+    /// <summary>The picture, streamed through the API so the usual permissions and data scope apply.</summary>
+    [HttpGet("{id:int}/photo")]
+    [Authorize(Policy = CompositePolicies.StudentsRead)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetPhoto(int id, CancellationToken cancellationToken)
+    {
+        var photo = await _photoService.GetAsync(id, await StudentScopeAsync(cancellationToken), cancellationToken);
+        Response.Headers["X-Content-Type-Options"] = "nosniff";
+        Response.Headers.CacheControl = "private, no-cache";
+        return File(photo.Content, photo.ContentType);
+    }
+
+    /// <summary>Uploads or replaces the photo (JPG or PNG, 2 MB). Needs Students.Edit.</summary>
+    [HttpPut("{id:int}/photo")]
+    [Authorize(Policy = Permissions.StudentsEdit)]
+    [DocumentUploadLimit]
+    public async Task<IActionResult> SetPhoto(int id, [FromForm] StudentPhotoForm form, CancellationToken cancellationToken)
+    {
+        if (form.File is null)
+            return BadRequest(new ApiErrorResponse
+            {
+                Message = "Validation failed.",
+                ErrorCode = "VALIDATION_ERROR",
+                Errors = new Dictionary<string, string[]> { ["file"] = new[] { "Choose a photo to upload." } },
+                TraceId = HttpContext.GetCorrelationId(),
+            });
+
+        await using var content = form.File.OpenReadStream();
+        await _photoService.SetAsync(id, new DocumentUpload(form.File.FileName, form.File.Length, content), cancellationToken);
+        return NoContent();
+    }
+
+    /// <summary>Removes the photo. Needs Students.Edit.</summary>
+    [HttpDelete("{id:int}/photo")]
+    [Authorize(Policy = Permissions.StudentsEdit)]
+    public async Task<IActionResult> RemovePhoto(int id, CancellationToken cancellationToken)
+    {
+        await _photoService.RemoveAsync(id, cancellationToken);
+        return NoContent();
+    }
+
+    /// <summary>Marks the student as Left: closes the class period and frees the seat. Needs Students.Edit.</summary>
+    [HttpPost("{id:int}/leave")]
+    [Authorize(Policy = Permissions.StudentsEdit)]
+    public async Task<IActionResult> MarkLeft(int id, CancellationToken cancellationToken)
+    {
+        await _studentService.MarkLeftAsync(id, cancellationToken);
         return NoContent();
     }
 

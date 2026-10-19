@@ -394,6 +394,50 @@ namespace SchoolManagement.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("SchoolManagement.Domain.Entities.AdmissionFee", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<string>("ClassName")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("SYSUTCDATETIME()");
+
+                    b.Property<int?>("CreatedBy")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("SYSUTCDATETIME()");
+
+                    b.Property<int?>("UpdatedBy")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClassName")
+                        .IsUnique()
+                        .HasDatabaseName("UX_AdmissionFees_ClassName");
+
+                    b.ToTable("AdmissionFees", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_AdmissionFees_AmountNotNegative", "[Amount] >= 0");
+                        });
+                });
+
             modelBuilder.Entity("SchoolManagement.Domain.Entities.AdmissionGuardian", b =>
                 {
                     b.Property<int>("Id")
@@ -999,8 +1043,6 @@ namespace SchoolManagement.Infrastructure.Migrations
                             t.HasCheckConstraint("CK_Documents_ContentType", "[ContentType] IN ('application/pdf','image/jpeg','image/png')");
 
                             t.HasCheckConstraint("CK_Documents_ExactlyOneOwner", "(CASE WHEN [StudentId] IS NULL THEN 0 ELSE 1 END) + (CASE WHEN [AdmissionId] IS NULL THEN 0 ELSE 1 END) = 1");
-
-                            t.HasCheckConstraint("CK_Documents_NoSelfVerify", "[VerifiedBy] IS NULL OR [CreatedBy] IS NULL OR [VerifiedBy] <> [CreatedBy]");
 
                             t.HasCheckConstraint("CK_Documents_PendingHasNoReviewer", "[Status] <> 'Pending' OR ([VerifiedBy] IS NULL AND [VerifiedAt] IS NULL AND [RejectionReason] IS NULL)");
 
@@ -2013,6 +2055,10 @@ namespace SchoolManagement.Infrastructure.Migrations
                     b.Property<int?>("CreatedBy")
                         .HasColumnType("int");
 
+                    b.Property<string>("EmiratesIdNumber")
+                        .HasMaxLength(15)
+                        .HasColumnType("nvarchar(15)");
+
                     b.Property<DateOnly?>("PassportExpiry")
                         .HasColumnType("date");
 
@@ -2042,9 +2088,16 @@ namespace SchoolManagement.Infrastructure.Migrations
                         .HasDatabaseName("UX_StudentIdentityDocuments_Aadhaar")
                         .HasFilter("[AadhaarNumber] IS NOT NULL");
 
+                    b.HasIndex("EmiratesIdNumber")
+                        .IsUnique()
+                        .HasDatabaseName("UX_StudentIdentityDocuments_EmiratesId")
+                        .HasFilter("[EmiratesIdNumber] IS NOT NULL");
+
                     b.ToTable("StudentIdentityDocuments", null, t =>
                         {
                             t.HasCheckConstraint("CK_StudentIdentityDocuments_Aadhaar", "[AadhaarNumber] IS NULL OR (LEN([AadhaarNumber]) = 12 AND [AadhaarNumber] NOT LIKE '%[^0-9]%')");
+
+                            t.HasCheckConstraint("CK_StudentIdentityDocuments_EmiratesId", "[EmiratesIdNumber] IS NULL OR (LEN([EmiratesIdNumber]) = 15 AND [EmiratesIdNumber] NOT LIKE '%[^0-9]%' AND [EmiratesIdNumber] LIKE '784%')");
                         });
                 });
 

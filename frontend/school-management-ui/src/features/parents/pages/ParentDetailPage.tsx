@@ -138,9 +138,6 @@ export function ParentDetailPage() {
                   Contact by {full.preferredContactMethod}
                 </Badge>
               )}
-              {full.billingContact && (
-                <Badge tone="neutral">Billing contact</Badge>
-              )}
             </>
           ) : undefined
         }
@@ -238,20 +235,6 @@ export function ParentDetailPage() {
                     ]}
                   />
                 </DetailCard>
-                <DetailCard title="Work & billing">
-                  <KeyValueGrid
-                    items={[
-                      { label: "Employer", value: full.employer },
-                      { label: "Job title", value: full.jobTitle },
-                      { label: "Work email", value: full.workEmail },
-                      { label: "Work phone", value: full.workPhone },
-                      {
-                        label: "Billing contact",
-                        value: yesNo(full.billingContact),
-                      },
-                    ]}
-                  />
-                </DetailCard>
                 <DetailCard title="Addresses">
                   <AddressList addresses={full.addresses} />
                 </DetailCard>
@@ -322,7 +305,7 @@ export function ParentDetailPage() {
                   }
                 >
                   <div className="contact-card__line">
-                    Adm # {c.admNo} · {c.classSectionName} · Roll {c.rollNumber}
+                    Adm No {c.admNo} · {c.classSectionName} · Roll {c.rollNumber}
                   </div>
                 </ContactCard>
               ))}

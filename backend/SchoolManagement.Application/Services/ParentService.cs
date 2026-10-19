@@ -117,6 +117,15 @@ public class ParentService : IParentService
     public async Task DeleteAsync(int id, CancellationToken cancellationToken)
     {
         var parent = await GetOrThrowAsync(id, cancellationToken);
+
+        // A parent who still has children linked is not deleted: the children would be left without
+        // a guardian. Unlink each student first (Parent > Linked children), then delete.
+        var linked = await _parentRepository.CountLinkedStudentsAsync(id, cancellationToken);
+        if (linked > 0)
+            throw new ConflictException(
+                $"This parent is linked to {linked} student{(linked == 1 ? "" : "s")}. " +
+                "Unlink them first, then delete the parent.");
+
         parent.IsDeleted = true;
         parent.DeletedAt = DateTime.UtcNow;
         await _parentRepository.SaveChangesAsync(cancellationToken);

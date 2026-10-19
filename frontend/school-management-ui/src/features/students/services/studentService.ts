@@ -43,4 +43,25 @@ export const studentService = {
       .then((res) => res.data),
 
   delete: (id: number) => apiClient.delete(`/students/${id}`),
+
+  // Closes the student's class period and sets the status to Left (needs Students.Edit).
+  markLeft: (id: number) => apiClient.post(`/students/${id}/leave`),
+
+  // The photo is a file behind the API (an <img> tag cannot send the login token), so it is fetched
+  // as a blob and shown through an object URL (see useStudentPhoto).
+  getPhoto: (id: number) =>
+    apiClient
+      .get<Blob>(`/students/${id}/photo`, { responseType: "blob" })
+      .then((res) => res.data),
+
+  // JPG or PNG up to 2 MB, sent as multipart/form-data. Replaces the current photo (needs Students.Edit).
+  setPhoto: (id: number, file: File) => {
+    const form = new FormData();
+    form.append("file", file, file.name);
+    return apiClient.put(`/students/${id}/photo`, form, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+  },
+
+  removePhoto: (id: number) => apiClient.delete(`/students/${id}/photo`),
 };

@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { IconButton } from "@/components/IconButton";
 import {
   CircleCheck,
   CircleMinus,
@@ -22,7 +23,7 @@ import { DataTable, type Column } from "@/components/DataTable";
 import { StatusBadge } from "@/components/Badge";
 import { ListEmptyState } from "@/components/ListEmptyState";
 import { Notice } from "@/components/Notice";
-import { PersonCell } from "@/components/PersonCell";
+import { StudentPersonCell } from "../components/StudentPersonCell";
 import {
   ExportCsvButton,
   PrintButton,
@@ -67,7 +68,6 @@ function AllergyFlag({ student }: { student: StudentSummaryResponse }) {
 export function StudentsPage() {
   const can = useCan();
   const canEdit = can(Permission.StudentsEdit);
-  const canDelete = can(Permission.StudentsDelete);
 
   const list = useAsyncData(
     () => studentService.getAll(),
@@ -82,7 +82,6 @@ export function StudentsPage() {
     classSection: "",
     gender: "",
     curriculum: "",
-    eal: "",
     house: "",
     allergiesOnly: false,
   });
@@ -92,7 +91,6 @@ export function StudentsPage() {
     () => ({
       classes: uniqueSorted(students.map((s) => s.classSectionName)),
       curricula: uniqueSorted(students.map((s) => s.curriculumTrack)),
-      ealLevels: uniqueSorted(students.map((s) => s.ealCode)),
       houses: uniqueSorted(students.map((s) => s.house)),
     }),
     [students],
@@ -106,7 +104,6 @@ export function StudentsPage() {
       if (f.classSection && s.classSectionName !== f.classSection) return false;
       if (f.gender && s.gender !== f.gender) return false;
       if (f.curriculum && s.curriculumTrack !== f.curriculum) return false;
-      if (f.eal && s.ealCode !== f.eal) return false;
       if (f.house && s.house !== f.house) return false;
       if (f.allergiesOnly && !s.hasAllergies) return false;
       if (q) {
@@ -118,32 +115,33 @@ export function StudentsPage() {
     });
   }, [students, f]);
 
-  const remove = useConfirmAction<StudentSummaryResponse>({
-    title: "Delete student",
+  // Students are never deleted from the list: one who has gone is marked as Left (the record and
+  // the class history stay). The seat is freed and the student leaves the attendance roster.
+  const leave = useConfirmAction<StudentSummaryResponse>({
+    title: "Mark student as left",
     message: (s) =>
-      `Delete ${fullName(s)} (${s.admNo})? This cannot be undone.`,
-    confirmLabel: "Delete",
+      `Mark ${fullName(s)} (${s.admNo}) as left? Their class seat is released and they will no longer appear in attendance. The record and history are kept.`,
+    confirmLabel: "Mark as left",
     danger: true,
     run: async (s) => {
-      await studentService.delete(s.id);
+      await studentService.markLeft(s.id);
       await list.reload();
     },
-    success: (s) => `${fullName(s)} was deleted.`,
-    failure: "Could not delete this student.",
+    success: (s) => `${fullName(s)} was marked as left.`,
+    failure: "Could not mark this student as left.",
   });
 
   const exportCsv = () =>
     downloadCsv(
       "students.csv",
       [
-        "Adm #",
+        "Adm No",
         "Student",
         "Class",
         "Gender",
         "House",
         "Nationality",
         "Curriculum",
-        "EAL",
         "Status",
         "Allergies",
       ],
@@ -155,7 +153,6 @@ export function StudentsPage() {
         s.house,
         s.nationality,
         s.curriculumTrack,
-        s.ealCode,
         s.status,
         // The text only for Students.ViewSensitive holders; everyone else exports the flag.
         s.allergies ?? (s.hasAllergies ? "Yes" : ""),
@@ -165,7 +162,7 @@ export function StudentsPage() {
   const columns: Column<StudentSummaryResponse>[] = [
     {
       key: "admNo",
-      header: "Adm #",
+      header: "Adm No",
       sortValue: (s) => s.admNo,
       render: (s) => (
         <span
@@ -183,10 +180,11 @@ export function StudentsPage() {
       header: "Student",
       sortValue: (s) => fullName(s),
       render: (s) => (
-        <PersonCell
+        <StudentPersonCell
+          studentId={s.id}
+          hasPhoto={s.photoUrl != null}
           name={fullName(s)}
-          to={`/students/${s.id}`}
-          sub={`Roll ${s.rollNumber}`}
+          roll={s.rollNumber}
         />
       ),
     },
@@ -229,8 +227,16 @@ export function StudentsPage() {
           name={fullName(s)}
           viewTo={`/students/${s.id}`}
           editTo={canEdit ? `/students/${s.id}/edit` : undefined}
-          onDelete={canDelete ? () => remove.ask(s) : undefined}
-        />
+        >
+          {canEdit && s.status !== "Left" && (
+            <IconButton
+              icon={LogOut}
+              tone="bad"
+              label={`Mark ${fullName(s)} as left`}
+              onClick={() => leave.ask(s)}
+            />
+          )}
+        </RowActions>
       ),
     },
   ];
@@ -320,15 +326,6 @@ export function StudentsPage() {
               onChange={(v) => filters.set("curriculum", v)}
             />
           )}
-          {options.ealLevels.length > 0 && (
-            <FilterSelect
-              label="English level"
-              allLabel="All English levels"
-              options={options.ealLevels}
-              value={f.eal}
-              onChange={(v) => filters.set("eal", v)}
-            />
-          )}
           <FilterCheckbox
             label="Has allergies"
             checked={f.allergiesOnly}
@@ -370,7 +367,7 @@ export function StudentsPage() {
         />
       </Panel>
 
-      {remove.dialog}
+      {leave.dialog}
     </div>
   );
 }

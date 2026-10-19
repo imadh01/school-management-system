@@ -15,6 +15,7 @@ public class AdmissionService : IAdmissionService
     private readonly IConcurrencyGuard _concurrency;
     private readonly IAddressService _addressService;
     private readonly IDocumentRepository _documentRepository;
+    private readonly ICurrentUser _currentUser;
 
     public AdmissionService(
         IAdmissionRepository admissionRepository,
@@ -24,7 +25,8 @@ public class AdmissionService : IAdmissionService
         IStudentGuardianRepository studentGuardianRepository,
         IConcurrencyGuard concurrency,
         IAddressService addressService,
-        IDocumentRepository documentRepository)
+        IDocumentRepository documentRepository,
+        ICurrentUser currentUser)
     {
         _admissionRepository = admissionRepository;
         _classSectionRepository = classSectionRepository;
@@ -34,12 +36,21 @@ public class AdmissionService : IAdmissionService
         _concurrency = concurrency;
         _addressService = addressService;
         _documentRepository = documentRepository;
+        _currentUser = currentUser;
     }
 
     public async Task<List<AdmissionResponse>> GetAllAsync(CancellationToken cancellationToken)
     {
         var admissions = await _admissionRepository.GetAllAsync(cancellationToken);
         return admissions.Select(ToResponse).ToList();
+    }
+
+    public async Task<List<DeletedAdmissionResponse>> GetDeletedAsync(CancellationToken cancellationToken)
+    {
+        var rows = await _admissionRepository.GetDeletedAsync(cancellationToken);
+        return rows.Select(r => new DeletedAdmissionResponse(
+            r.Id, r.RegNo, $"{r.FirstName} {r.LastName}", $"{r.ClassName} ({r.AcademicYearName})",
+            r.Status, r.Phone, r.DeletedAt, r.DeletedByUsername)).ToList();
     }
 
     public async Task<AdmissionResponse> GetByIdAsync(int id, CancellationToken cancellationToken)
@@ -294,17 +305,37 @@ public class AdmissionService : IAdmissionService
             ClassSectionRules.EnsureHasRoom(allottedClassSection,
                 await _classSectionRepository.CountActiveStudentsAsync(allottedClassSection.Id, cancellationToken));
 
-            // Friendly uniqueness errors up front; the unique indexes (caught in the repository) are the safety net.
-            if (await _studentRepository.ExistsByAdmNoAsync(request.AdmissionNumber, cancellationToken))
-                throw new ConflictException($"Admission number '{request.AdmissionNumber}' is already used by another student.");
-            if (await _studentRepository.ExistsByRollNumberInClassAsync(allottedClassSection.Id, request.RollNumber, cancellationToken))
-                throw new ConflictException($"Roll number '{request.RollNumber}' is already taken in {allottedClassSection.DisplayName}.");
+            // Numbers left blank are generated here, inside the transaction and behind a lock, so two
+            // enrolments at the same time cannot get the same one. The section lock above already
+            // covers roll numbers; admission numbers have their own lock per year.
+            var admissionNumber = request.AdmissionNumber?.Trim();
+            if (string.IsNullOrEmpty(admissionNumber))
+            {
+                var year = request.AdmissionDate.Year;
+                await _admissionRepository.LockAdmissionNumbersAsync(year, cancellationToken);
+                var prefix = NumberFormats.AdmissionPrefix(year);
+                admissionNumber = NumberFormats.AdmissionNumber(
+                    year, await _studentRepository.GetMaxAdmNoSerialAsync(prefix, cancellationToken) + 1);
+            }
+            var rollNumber = request.RollNumber?.Trim();
+            if (string.IsNullOrEmpty(rollNumber))
+            {
+                var prefix = NumberFormats.RollPrefix(allottedClassSection);
+                rollNumber = NumberFormats.RollNumber(
+                    prefix, await _studentRepository.GetMaxRollSerialAsync(allottedClassSection.Id, prefix, cancellationToken) + 1);
+            }
+
+            // Friendly uniqueness errors up front (for typed numbers); the unique indexes (caught in the repository) are the safety net.
+            if (await _studentRepository.ExistsByAdmNoAsync(admissionNumber, cancellationToken))
+                throw new ConflictException($"Admission number '{admissionNumber}' is already used by another student.");
+            if (await _studentRepository.ExistsByRollNumberInClassAsync(allottedClassSection.Id, rollNumber, cancellationToken))
+                throw new ConflictException($"Roll number '{rollNumber}' is already taken in {allottedClassSection.DisplayName}.");
 
             // Validates every guardian decision against the real application. No writes yet.
             var plan = await BuildGuardianPlanAsync(admission, request.Guardians, cancellationToken);
 
-            admission.RollNumber = request.RollNumber;
-            admission.AdmissionNumber = request.AdmissionNumber;
+            admission.RollNumber = rollNumber;
+            admission.AdmissionNumber = admissionNumber;
             admission.AdmissionDate = request.AdmissionDate;
             admission.EntryPoint = request.EntryPoint;
             admission.TransportRequired = request.TransportRequired;
@@ -315,8 +346,8 @@ public class AdmissionService : IAdmissionService
             var student = new Student
             {
                 AdmissionId = admission.Id,
-                AdmNo = request.AdmissionNumber,
-                RollNumber = request.RollNumber,
+                AdmNo = admissionNumber,
+                RollNumber = rollNumber,
                 ClassSectionId = allottedClassSection.Id,
                 AdmissionDate = request.AdmissionDate,
                 Status = "Active",
@@ -340,7 +371,7 @@ public class AdmissionService : IAdmissionService
                 // First academic-history period, saved together with the student.
                 Enrollments =
                 {
-                    StudentEnrollmentRules.StartNew(allottedClassSection, request.RollNumber, request.AdmissionDate),
+                    StudentEnrollmentRules.StartNew(allottedClassSection, rollNumber, request.AdmissionDate),
                 },
                 Health = new StudentHealth
                 {
@@ -439,6 +470,7 @@ public class AdmissionService : IAdmissionService
 
         admission.IsDeleted = true;
         admission.DeletedAt = DateTime.UtcNow;
+        admission.DeletedBy = _currentUser.UserId;
         await _admissionRepository.SaveChangesAsync(cancellationToken);
     }
 
@@ -600,7 +632,8 @@ public class AdmissionService : IAdmissionService
     private static AdmissionResponse ToResponse(Admission a) => new(
         a.Id, a.RegNo, a.FirstName, a.MiddleName, a.LastName, a.Gender, a.DateOfBirth,
         a.AcademicYear.Name,
-        a.AppliedForClassSectionId, a.AppliedForClassSection.DisplayName,
+        // Registration only asks for the class; the section is chosen at enrolment (AllottedClassSectionName).
+        a.AppliedForClassSectionId, $"{a.AppliedForClassSection.Name} ({a.AcademicYear.Name})",
         a.AdmissionType, a.PreviousSchool, a.Phone, a.Email, a.RegistrationDate,
         a.Status, a.RejectionReason,
         AddressMapping.ToResponses(a.Addresses),
