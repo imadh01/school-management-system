@@ -45,6 +45,8 @@ public class ApplicationDbContext : DbContext
     public DbSet<SchoolSettings> SchoolSettings => Set<SchoolSettings>();
     public DbSet<AdmissionFee> AdmissionFees => Set<AdmissionFee>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    public DbSet<TimetablePeriod> TimetablePeriods => Set<TimetablePeriod>();
+    public DbSet<TimetableEntry> TimetableEntries => Set<TimetableEntry>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
@@ -69,7 +71,7 @@ public class ApplicationDbContext : DbContext
             StartDate = new DateOnly(2026, 6, 1),
             EndDate = new DateOnly(2027, 3, 31),
             IsCurrent = true,
-            Status = "Active",
+            Status = AcademicYearStatuses.Current,
             CreatedAt = new DateTime(2026, 9, 23, 0, 0, 0, DateTimeKind.Utc),
             UpdatedAt = new DateTime(2026, 9, 23, 0, 0, 0, DateTimeKind.Utc),
         });

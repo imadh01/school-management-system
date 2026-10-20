@@ -9,11 +9,13 @@ public class TeacherService : ITeacherService
 {
     private readonly ITeacherRepository _teachers;
     private readonly IUserAccountService _accounts;
+    private readonly ITimetableService _timetable;
 
-    public TeacherService(ITeacherRepository teachers, IUserAccountService accounts)
+    public TeacherService(ITeacherRepository teachers, IUserAccountService accounts, ITimetableService timetable)
     {
         _teachers = teachers;
         _accounts = accounts;
+        _timetable = timetable;
     }
 
     // ---------- Teacher CRUD ----------
@@ -102,13 +104,23 @@ public class TeacherService : ITeacherService
         if (request.MakeClassTeacher)
             EnsureClassTeacherFree(section, id);
 
-        foreach (var subject in subjects)
-            subject.TeacherId = id;
-        if (request.MakeClassTeacher)
-            section.ClassTeacherId = id;
+        // The timetable lock makes "is this teacher free at every lesson of these subjects?" and the save one
+        // step, so a lesson saved at the same moment cannot put the teacher in two classes at once.
+        await _timetable.RunLockedAsync(section.AcademicYearId, async () =>
+        {
+            foreach (var subject in subjects)
+                await _timetable.EnsureTeacherCanTakeSubjectAsync(subject.Id, id, cancellationToken);
 
-        teacher.UpdatedAt = DateTime.UtcNow;
-        await _teachers.SaveChangesAsync(cancellationToken);
+            foreach (var subject in subjects)
+                subject.TeacherId = id;
+            if (request.MakeClassTeacher)
+                section.ClassTeacherId = id;
+
+            teacher.UpdatedAt = DateTime.UtcNow;
+            await _teachers.SaveChangesAsync(cancellationToken);
+            return true;
+        }, cancellationToken);
+
         return await BuildAssignmentsAsync(id, cancellationToken);
     }
 

@@ -109,6 +109,16 @@ public static class Permissions
     /// <summary>Delete (soft) a document that is not verified. The file is kept for the retention period.</summary>
     public const string DocumentsDelete = "Documents.Delete";
 
+    // ── Timetable ──────────────────────────────────────────────────────
+    /// <summary>See every class's timetable, the school's periods and any teacher's week.</summary>
+    public const string TimetableView = "Timetable.View";
+    /// <summary>See only your own teaching week (a teacher). Not other teachers' weeks and not class grids.</summary>
+    public const string TimetableViewScoped = "Timetable.ViewScoped";
+    /// <summary>Put lessons on a class's grid, clear them, and copy one class's timetable to another.</summary>
+    public const string TimetableEdit = "Timetable.Edit";
+    /// <summary>Create, change and delete the periods (time slots) of the school day.</summary>
+    public const string TimetableManagePeriods = "Timetable.ManagePeriods";
+
     /// <summary>The catalog, in display order (grouped by module).</summary>
     public static readonly IReadOnlyList<PermissionDefinition> Definitions = new PermissionDefinition[]
     {
@@ -174,6 +184,11 @@ public static class Permissions
         new(DocumentsUpload, "Documents", "Upload documents for students and applicants."),
         new(DocumentsVerify, "Documents", "Verify, reject and unverify documents uploaded by someone else."),
         new(DocumentsDelete, "Documents", "Delete documents that are not verified."),
+
+        new(TimetableView, "Timetable", "See every class's timetable, the school's periods and any teacher's week."),
+        new(TimetableViewScoped, "Timetable", "See only your own teaching timetable."),
+        new(TimetableEdit, "Timetable", "Add, change and clear lessons on a class timetable, and copy a timetable from another class."),
+        new(TimetableManagePeriods, "Timetable", "Create, change and delete the periods (time slots) of the school day."),
     };
 
     /// <summary>Every permission name in the catalog. Admin holds all of these in code.</summary>

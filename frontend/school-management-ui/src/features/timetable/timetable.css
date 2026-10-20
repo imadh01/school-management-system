@@ -1,0 +1,89 @@
+/* Timetable page. Classes are tt- prefixed so they cannot collide with the shared styles. */
+
+.tt-wrap {
+  overflow-x: auto;
+}
+.tt-table {
+  width: 100%;
+  min-width: 720px;
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+}
+.tt-table th,
+.tt-table td {
+  border: 1px solid var(--border);
+  padding: 8px;
+  vertical-align: top;
+}
+.tt-table thead th {
+  background: var(--surface-2);
+  font-size: 13px;
+  text-align: center;
+}
+.tt-table .tt-time {
+  width: 104px;
+  background: var(--surface-2);
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: center;
+}
+.tt-break td {
+  background: var(--surface-3);
+  color: var(--text-muted);
+  font-size: 12.5px;
+  font-weight: 600;
+  text-align: center;
+}
+.tt-cell {
+  height: 84px;
+  font-size: 12.5px;
+}
+.tt-cell--button {
+  width: 100%;
+  height: 100%;
+  min-height: 66px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+}
+.tt-cell--button:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--radius-sm);
+}
+.tt-cell__subject {
+  font-weight: 700;
+  color: var(--text);
+}
+.tt-cell__line {
+  display: block;
+  margin-top: 2px;
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+.tt-cell__add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 66px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+.tt-cell--button:hover .tt-cell__add {
+  color: var(--nav-active-text);
+}
+.tt-empty {
+  color: var(--text-muted);
+  text-align: center;
+}
+.tt-skipped {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-size: 13px;
+}

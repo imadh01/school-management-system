@@ -155,7 +155,7 @@ export const NAV_SECTIONS: NavSection[] = [
         label: "Timetable",
         path: "/timetable",
         icon: Calendar,
-        built: false,
+        built: true,
       },
       {
         key: "substitutes",

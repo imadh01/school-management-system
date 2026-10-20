@@ -190,6 +190,20 @@ public class AccessMatrixTests
         new("POST",   $"/api/documents/{Missing}/reject", P(Permissions.DocumentsVerify), HasBody: true),
         new("POST",   $"/api/documents/{Missing}/unverify", P(Permissions.DocumentsVerify), HasBody: true),
         new("DELETE", $"/api/documents/{Missing}", P(Permissions.DocumentsDelete)),
+
+        // Timetable. A teacher with only Timetable.ViewScoped passes authorization on the teacher's-week endpoint and
+        // is then answered 404 for any teacher that is not themselves (999999 here); that is "allowed" for this table.
+        new("GET",    "/api/academic-years", P(Permissions.TimetableView)),
+        new("GET",    "/api/timetable/periods", P(Permissions.TimetableView)),
+        new("POST",   "/api/timetable/periods", P(Permissions.TimetableManagePeriods), HasBody: true),
+        new("PUT",    $"/api/timetable/periods/{Missing}", P(Permissions.TimetableManagePeriods), HasBody: true),
+        new("DELETE", $"/api/timetable/periods/{Missing}", P(Permissions.TimetableManagePeriods)),
+        new("GET",    $"/api/timetable/classes/{Missing}", P(Permissions.TimetableView)),
+        new("PUT",    $"/api/timetable/classes/{Missing}/cells", P(Permissions.TimetableEdit), HasBody: true),
+        new("DELETE", $"/api/timetable/classes/{Missing}/cells?day=1&periodId={Missing}", P(Permissions.TimetableEdit)),
+        new("POST",   $"/api/timetable/classes/{Missing}/copy-from/{Missing}", P(Permissions.TimetableEdit)),
+        new("GET",    $"/api/timetable/teachers/{Missing}",
+                      Requirement.AnyOf(Permissions.TimetableView, Permissions.TimetableViewScoped)),
     };
 
     public static IEnumerable<object[]> Cases() =>

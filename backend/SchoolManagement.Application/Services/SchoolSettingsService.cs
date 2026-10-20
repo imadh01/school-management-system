@@ -12,17 +12,20 @@ public class SchoolSettingsService : ISchoolSettingsService
     private readonly ISchoolSettingsProvider _provider;
     private readonly IConcurrencyGuard _concurrency;
     private readonly TimeProvider _clock;
+    private readonly ITimetableService _timetable;
 
     public SchoolSettingsService(
         ISchoolSettingsRepository settings,
         ISchoolSettingsProvider provider,
         IConcurrencyGuard concurrency,
-        TimeProvider clock)
+        TimeProvider clock,
+        ITimetableService timetable)
     {
         _settings = settings;
         _provider = provider;
         _concurrency = concurrency;
         _clock = clock;
+        _timetable = timetable;
     }
 
     public async Task<SchoolSettingsResponse> GetAsync(CancellationToken cancellationToken) =>
@@ -38,6 +41,11 @@ public class SchoolSettingsService : ISchoolSettingsService
             {
                 ["CountryId"] = new[] { $"Country {countryId} does not exist or is inactive." },
             });
+
+        // A day cannot stop being a working day while lessons of the current academic year are on it.
+        var newDays = request.WorkingDays.Select(d => Enum.Parse<DayOfWeek>(d)).ToHashSet();
+        var removedDays = WorkingDays.ToDays(settings.WorkingDays).Where(d => !newDays.Contains(d)).ToList();
+        await _timetable.EnsureDaysNotUsedAsync(removedDays, cancellationToken);
 
         settings.SchoolName = request.SchoolName.Trim();
         settings.ShortName = Clean(request.ShortName);

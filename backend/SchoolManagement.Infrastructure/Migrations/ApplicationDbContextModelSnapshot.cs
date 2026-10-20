@@ -30,10 +30,22 @@ namespace SchoolManagement.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<DateTime?>("ClosedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("ClosedBy")
+                        .HasColumnType("int");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
                     b.Property<int?>("CreatedBy")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("DeletedBy")
                         .HasColumnType("int");
 
                     b.Property<DateOnly>("EndDate")
@@ -42,10 +54,21 @@ namespace SchoolManagement.Infrastructure.Migrations
                     b.Property<bool>("IsCurrent")
                         .HasColumnType("bit");
 
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
 
                     b.Property<DateOnly>("StartDate")
                         .HasColumnType("date");
@@ -70,11 +93,17 @@ namespace SchoolManagement.Infrastructure.Migrations
                         .HasFilter("[IsCurrent] = 1");
 
                     b.HasIndex("Name")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("UX_AcademicYears_Name")
+                        .HasFilter("[IsDeleted] = 0");
 
                     b.ToTable("AcademicYears", null, t =>
                         {
+                            t.HasCheckConstraint("CK_AcademicYears_CurrentMirror", "([IsCurrent] = 1 AND [Status] = 'Current') OR ([IsCurrent] = 0 AND [Status] <> 'Current')");
+
                             t.HasCheckConstraint("CK_AcademicYears_Dates", "[EndDate] > [StartDate]");
+
+                            t.HasCheckConstraint("CK_AcademicYears_Status", "[Status] IN ('Upcoming','Current','Ended','Closed')");
                         });
 
                     b.HasData(
@@ -84,9 +113,11 @@ namespace SchoolManagement.Infrastructure.Migrations
                             CreatedAt = new DateTime(2026, 9, 23, 0, 0, 0, 0, DateTimeKind.Utc),
                             EndDate = new DateOnly(2027, 3, 31),
                             IsCurrent = true,
+                            IsDeleted = false,
                             Name = "2026-2027",
+                            RowVersion = new byte[0],
                             StartDate = new DateOnly(2026, 6, 1),
-                            Status = "Active",
+                            Status = "Current",
                             UpdatedAt = new DateTime(2026, 9, 23, 0, 0, 0, 0, DateTimeKind.Utc)
                         });
                 });
@@ -2299,6 +2330,165 @@ namespace SchoolManagement.Infrastructure.Migrations
                     b.ToTable("Teachers", (string)null);
                 });
 
+            modelBuilder.Entity("SchoolManagement.Domain.Entities.TimetableEntry", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("ClassSectionId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedBy")
+                        .HasColumnType("int");
+
+                    b.Property<byte>("DayOfWeek")
+                        .HasColumnType("tinyint");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("DeletedBy")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<int>("PeriodId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Room")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<int>("SubjectId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UpdatedBy")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PeriodId");
+
+                    b.HasIndex("ClassSectionId", "DayOfWeek", "PeriodId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_TimetableEntries_Class_Day_Period")
+                        .HasFilter("[IsDeleted] = 0");
+
+                    b.HasIndex("SubjectId", "DayOfWeek", "PeriodId")
+                        .HasDatabaseName("IX_TimetableEntries_Subject_Day_Period")
+                        .HasFilter("[IsDeleted] = 0");
+
+                    b.ToTable("TimetableEntries", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_TimetableEntries_DayOfWeek", "[DayOfWeek] BETWEEN 0 AND 6");
+
+                            t.HasCheckConstraint("CK_TimetableEntries_RoomNotBlank", "[Room] IS NULL OR LEN(LTRIM(RTRIM([Room]))) > 0");
+                        });
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Entities.TimetablePeriod", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AcademicYearId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedBy")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("DeletedBy")
+                        .HasColumnType("int");
+
+                    b.Property<TimeOnly>("EndTime")
+                        .HasColumnType("time(0)");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasDefaultValue("Teaching");
+
+                    b.Property<string>("Label")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.Property<TimeOnly>("StartTime")
+                        .HasColumnType("time(0)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UpdatedBy")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AcademicYearId", "Label")
+                        .IsUnique()
+                        .HasDatabaseName("UX_TimetablePeriods_Year_Label")
+                        .HasFilter("[IsDeleted] = 0");
+
+                    b.HasIndex("AcademicYearId", "SortOrder")
+                        .IsUnique()
+                        .HasDatabaseName("UX_TimetablePeriods_Year_SortOrder")
+                        .HasFilter("[IsDeleted] = 0");
+
+                    b.ToTable("TimetablePeriods", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_TimetablePeriods_Kind", "[Kind] IN ('Teaching','Break')");
+
+                            t.HasCheckConstraint("CK_TimetablePeriods_LabelNotBlank", "LEN(LTRIM(RTRIM([Label]))) > 0");
+
+                            t.HasCheckConstraint("CK_TimetablePeriods_SortOrder", "[SortOrder] >= 1");
+
+                            t.HasCheckConstraint("CK_TimetablePeriods_StartBeforeEnd", "[StartTime] < [EndTime]");
+                        });
+                });
+
             modelBuilder.Entity("SchoolManagement.Domain.Entities.User", b =>
                 {
                     b.Property<int>("Id")
@@ -2810,6 +3000,44 @@ namespace SchoolManagement.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Entities.TimetableEntry", b =>
+                {
+                    b.HasOne("SchoolManagement.Domain.Entities.ClassSection", "ClassSection")
+                        .WithMany()
+                        .HasForeignKey("ClassSectionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SchoolManagement.Domain.Entities.TimetablePeriod", "Period")
+                        .WithMany()
+                        .HasForeignKey("PeriodId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SchoolManagement.Domain.Entities.Subject", "Subject")
+                        .WithMany()
+                        .HasForeignKey("SubjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("ClassSection");
+
+                    b.Navigation("Period");
+
+                    b.Navigation("Subject");
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Entities.TimetablePeriod", b =>
+                {
+                    b.HasOne("SchoolManagement.Domain.Entities.AcademicYear", "AcademicYear")
+                        .WithMany()
+                        .HasForeignKey("AcademicYearId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("AcademicYear");
                 });
 
             modelBuilder.Entity("SchoolManagement.Domain.Entities.User", b =>

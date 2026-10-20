@@ -17,10 +17,12 @@ public class SubjectService : ISubjectService
     };
 
     private readonly ISubjectRepository _subjectRepository;
+    private readonly ITimetableService _timetable;
 
-    public SubjectService(ISubjectRepository subjectRepository)
+    public SubjectService(ISubjectRepository subjectRepository, ITimetableService timetable)
     {
         _subjectRepository = subjectRepository;
+        _timetable = timetable;
     }
 
     public async Task<List<SubjectResponse>> GetAllAsync(CancellationToken cancellationToken)
@@ -73,15 +75,33 @@ public class SubjectService : ISubjectService
                 "Subject Code + Class must be unique. This combination already exists."
                 );
 
-        subject.Name = request.Name;
-        subject.Code = code;
-        subject.ClassSectionId = request.ClassSectionId;
-        subject.Type = request.Type;
-        subject.Status = request.IsActive ? "Active" : "Inactive";
-        ApplyMarks(subject, request.Type, request.MaxMarks, request.PassMarks,
-            request.TheoryMax, request.TheoryPass, request.PracticalMax, request.PracticalPass);
+        async Task<bool> ApplyAndSaveAsync()
+        {
+            subject.Name = request.Name;
+            subject.Code = code;
+            subject.ClassSectionId = request.ClassSectionId;
+            subject.Type = request.Type;
+            subject.Status = request.IsActive ? "Active" : "Inactive";
+            ApplyMarks(subject, request.Type, request.MaxMarks, request.PassMarks,
+                request.TheoryMax, request.TheoryPass, request.PracticalMax, request.PracticalPass);
 
-        await _subjectRepository.SaveChangesAsync(cancellationToken);
+            await _subjectRepository.SaveChangesAsync(cancellationToken);
+            return true;
+        }
+
+        if (request.ClassSectionId == subject.ClassSectionId)
+        {
+            await ApplyAndSaveAsync();
+        }
+        else
+        {
+            // A subject on a class's timetable cannot move to another class: its lessons would follow it.
+            await _timetable.RunLockedAsync(subject.ClassSection.AcademicYearId, async () =>
+            {
+                await _timetable.EnsureSubjectNotOnTimetableAsync(id, "moved to another class", cancellationToken);
+                return await ApplyAndSaveAsync();
+            }, cancellationToken);
+        }
 
         var updated = await _subjectRepository.GetByIdAsync(id, cancellationToken);
         return ToResponse(updated!);
@@ -92,9 +112,15 @@ public class SubjectService : ISubjectService
         var subject = await _subjectRepository.GetByIdAsync(id, cancellationToken)
             ?? throw new NotFoundException("Subject could not be found.");
 
-        subject.IsDeleted = true;
-        subject.DeletedAt = DateTime.UtcNow;
-        await _subjectRepository.SaveChangesAsync(cancellationToken);
+        await _timetable.RunLockedAsync(subject.ClassSection.AcademicYearId, async () =>
+        {
+            await _timetable.EnsureSubjectNotOnTimetableAsync(id, "deleted", cancellationToken);
+
+            subject.IsDeleted = true;
+            subject.DeletedAt = DateTime.UtcNow;
+            await _subjectRepository.SaveChangesAsync(cancellationToken);
+            return true;
+        }, cancellationToken);
     }
 
     private static string ResolveCode(string? code, string name)

@@ -20,11 +20,15 @@ public static class CompositePolicies
     /// <summary>Read attendance: everything (View) or your own classes/subjects/children (ViewScoped).</summary>
     public const string AttendanceRead = "Attendance.Read";
 
+    /// <summary>A teacher's week: anyone's (View) or only your own (ViewScoped). The controller picks the scope.</summary>
+    public const string TimetableRead = "Timetable.Read";
+
     public static readonly IReadOnlyDictionary<string, string[]> AnyOf = new Dictionary<string, string[]>
     {
         [AttendanceWrite] = new[] { Permissions.AttendanceManage, Permissions.AttendanceMark },
         [StudentsRead] = new[] { Permissions.StudentsView, Permissions.StudentsViewScoped },
         [ParentsRead] = new[] { Permissions.ParentsView, Permissions.ParentsViewScoped },
         [AttendanceRead] = new[] { Permissions.AttendanceView, Permissions.AttendanceViewScoped },
+        [TimetableRead] = new[] { Permissions.TimetableView, Permissions.TimetableViewScoped },
     };
 }

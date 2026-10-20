@@ -55,6 +55,9 @@ public static class PermissionDependencies
         [Permissions.AttendanceMark] = new[] { Permissions.ClassSectionsView, Permissions.SubjectsView },
         [Permissions.AttendanceManage] = new[] { Permissions.ClassSectionsView, Permissions.SubjectsView },
 
+        // The timetable grid picks a class and one of its subjects.
+        [Permissions.TimetableEdit] = new[] { Permissions.ClassSectionsView, Permissions.SubjectsView },
+
         // The user form picks a role.
         [Permissions.UsersCreate] = new[] { Permissions.RolesView },
         [Permissions.UsersEdit] = new[] { Permissions.RolesView },

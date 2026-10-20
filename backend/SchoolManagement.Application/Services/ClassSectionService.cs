@@ -48,6 +48,8 @@ public class ClassSectionService : IClassSectionService
                     ? $"Academic year {request.AcademicYearId} does not exist."
                     : "No academic year is currently marked as active.");
 
+        AcademicYearRules.EnsureNotClosed(academicYear); // a closed year takes no new classes
+
         var name = request.Name.Trim();
         var sectionLetter = request.Section.Trim();
 

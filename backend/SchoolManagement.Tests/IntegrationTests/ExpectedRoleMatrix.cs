@@ -33,15 +33,16 @@ internal static class ExpectedRoleMatrix
             [RoleNames.Supervisor] = new HashSet<string>(StaffReads)
             {
                 Permissions.AdmissionsView, Permissions.AttendanceManage, Permissions.StudentsViewSensitive,
+                Permissions.TimetableView, Permissions.TimetableEdit, // ManagePeriods is Admin only
             },
             [RoleNames.Clerk] = new HashSet<string>(StaffReads)
             {
-                Permissions.AdmissionsView, Permissions.AttendanceManage,
+                Permissions.AdmissionsView, Permissions.AttendanceManage, Permissions.TimetableView,
             },
             // Deliberately no Admissions.View (applicant religion, category, medical notes).
             [RoleNames.Teacher] = new HashSet<string>(TeacherReads)
             {
-                Permissions.AttendanceMark,
+                Permissions.AttendanceMark, Permissions.TimetableViewScoped,
             },
             // Still nothing: the scopes exist and are tested (with roles created inside the tests),
             // but the portal and its response shapes come later.
