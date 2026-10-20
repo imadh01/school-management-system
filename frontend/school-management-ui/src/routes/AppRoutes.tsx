@@ -45,6 +45,7 @@ import {
 import { AttendancePage } from "../features/attendance/pages/AttendancePage";
 import { DocumentsPage } from "../features/documents/pages/DocumentsPage";
 import { TimetablePage } from "../features/timetable/pages/TimetablePage";
+import { AcademicYearsPage } from "../features/academic-years/pages/AcademicYearsPage";
 import { AppLayout } from "../layouts/AppLayout";
 import { ALL_NAV_ITEMS } from "../layouts/navConfig";
 import { ComingSoonPage } from "../components/ComingSoonPage";
@@ -185,6 +186,7 @@ export const router = createBrowserRouter(
           {guarded("/attendance", <AttendancePage />)}
           {guarded("/documents", <DocumentsPage />)}
           {guarded("/timetable", <TimetablePage />)}
+          {guarded("/academic-years", <AcademicYearsPage />)}
           {/* Modules from the prototype that are not built yet. */}
           {ALL_NAV_ITEMS.filter((i) => !i.built).map((i) =>
             guarded(i.path, <ComingSoonPage />, UNBUILT_MODULES_PERMISSIONS),

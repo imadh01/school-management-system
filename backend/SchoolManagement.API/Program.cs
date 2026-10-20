@@ -10,6 +10,7 @@ using SchoolManagement.API.Configuration;
 using SchoolManagement.API.Extensions;
 using SchoolManagement.API.Middleware;
 using SchoolManagement.API.Swagger;
+using SchoolManagement.Application.DTOs.AcademicYears;
 using SchoolManagement.Application.DTOs.AdmissionFees;
 using SchoolManagement.Application.DTOs.Admissions;
 using SchoolManagement.Application.DTOs.Auth;
@@ -104,6 +105,10 @@ builder.Services.AddScoped<IAcademicYearService, AcademicYearService>();
 builder.Services.AddScoped<IValidator<CreateTimetablePeriodRequest>, CreateTimetablePeriodRequestValidator>();
 builder.Services.AddScoped<IValidator<UpdateTimetablePeriodRequest>, UpdateTimetablePeriodRequestValidator>();
 builder.Services.AddScoped<IValidator<SaveTimetableCellsRequest>, SaveTimetableCellsRequestValidator>();
+builder.Services.AddScoped<IValidator<CreateAcademicYearRequest>, CreateAcademicYearRequestValidator>();
+builder.Services.AddScoped<IValidator<UpdateAcademicYearRequest>, UpdateAcademicYearRequestValidator>();
+builder.Services.AddScoped<IValidator<SetCurrentAcademicYearRequest>, SetCurrentAcademicYearRequestValidator>();
+builder.Services.AddScoped<IValidator<CloseAcademicYearRequest>, CloseAcademicYearRequestValidator>();
 
 builder.Services.AddScoped<IValidator<LoginRequest>, LoginRequestValidator>();
 builder.Services.AddScoped<IValidator<ChangePasswordRequest>, ChangePasswordRequestValidator>();

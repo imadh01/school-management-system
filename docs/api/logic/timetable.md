@@ -14,7 +14,7 @@ Written for a developer with about two years of experience who is learning this 
 
 | # | Method + URL | Permission needed | Called by (React) |
 |---|---|---|---|
-| 1 | `GET /api/academic-years` | `Timetable.View` | `TimetablePage` year drop-down |
+| 1 | `GET /api/academic-years` | any signed-in user | `TimetablePage` year drop-down |
 | 2 | `GET /api/timetable/periods?academicYearId=` | `Timetable.View` | Periods tab, grids |
 | 3 | `POST /api/timetable/periods` | `Timetable.ManagePeriods` | `PeriodDialog` (new) |
 | 4 | `PUT /api/timetable/periods/{id}` | `Timetable.ManagePeriods` | `PeriodDialog` (edit) |
@@ -53,7 +53,7 @@ Only periods carry `rowVersion`. A stale version fails at SaveChanges with `DbUp
 
 ## 1. `GET /api/academic-years`
 
-Read-only list of academic years for the year drop-down. Needs `Timetable.View` only because the Academic Years module is not built yet (see `docs/design/academic-years.md`). Returns `AcademicYearResponse[]`. 401/403 only. No paging.
+The list of academic years for the year drop-down. It belongs to the Academic Years module (see `docs/api/logic/academic-years.md`) and is open to any signed-in user. Returns `AcademicYearResponse[]`. 401 only. No paging.
 
 ## 2. `GET /api/timetable/periods`
 
@@ -170,7 +170,7 @@ Read-only list of academic years for the year drop-down. Needs `Timetable.View` 
 ### Should fix
 1. **Settings gap**: a lesson saved at the exact moment a working day is removed can slip through the Settings check (it is not under the timetable lock). The grid still shows any day that holds a lesson, so nothing is hidden. Low risk.
 2. **Lessons have no row version**: concurrent edits of the same cell: last save wins (the lock only prevents clashes, not overwrites).
-3. **`GET /api/academic-years` is guarded by `Timetable.View`** as a stopgap; move it to its own permission when the Academic Years module is built.
+3. **A Closed academic year** refuses every Timetable write (periods, lessons, Copy From) with 409.
 
 ### Question
 1. **Different Friday times** (UAE, possibly India): shared periods cannot express them. Planned: a `TimetablePeriodDayOverrides` table (period, day, start, end) and switching the clash check to time overlap. Needs a decision before it is built.

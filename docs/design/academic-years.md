@@ -1,6 +1,6 @@
 # Academic Years: design (not built)
 
-Status: design only. No code, no migration. Written 19 Oct 2026.
+Status: **built** on 20 Oct 2026 (see "Decisions made" at the end and `docs/api/logic/academic-years.md`). Originally written 19 Oct 2026 as design only.
 Builds on: `AcademicYears` (exists, one seeded row `2026-2027`, current). Needed by: Timetable (periods per year), Exams, Fees, promotion.
 
 ## 1. What exists today
@@ -98,3 +98,22 @@ Create overlap refused; start before end; name unique among live rows; set-curre
 7. **Roll-over helpers:** should "create new year" also offer copying classes/sections and subjects from the previous year (large, needs its own design), or only periods now (this doc)?
 8. **Names and dates:** is `YYYY-YYYY` the required name format, and may the year start in August/September (UAE) with an end in June/July? Confirm the real dates for 2026-2027 (seed) and 2027-2028.
 9. **Seed row:** confirm its `Status` value in the database before the migration is written (section 1).
+
+
+## Decisions made (20 Oct 2026)
+
+1. **Statuses:** `Upcoming / Current / Closed` plus `IsCurrent` as a guarded mirror, enforced by the filtered unique index and a CHECK.
+2. **A fourth state, `Ended`:** setting a new current year ends the old one without changing its data. The confirm dialog names both years; an audit row is written for each.
+3. **The current year cannot be closed directly.** Only an Ended year can be closed.
+4. **No reopen for now.** The Close confirm requires typing the year name.
+5. **Read access:** the list is a plain signed-in endpoint, like Countries. `AcademicYears.View` opens the management page and one year's detail. View, Create, Edit, Set Current, Close, Delete and Copy Periods are held by Admin only (no role is granted them).
+6. **Promotion** is the next module after this one and must exist before March 2027.
+7. **Copy periods only** (no classes or subjects) when preparing a new year.
+8. **Dates and names:** the school will send the real dates; the seed stays as it is. A no-overlap rule (both ends inclusive) and a start-before-end rule apply to year dates. No name format rule yet.
+9. **Seed row status** was `Active` in the database; the migration maps it to `Current`.
+
+### Built differently from section 5 above
+- Set Current takes `expectedCurrentYearId` so a stale confirm cannot switch the wrong year. Only an Upcoming year can be made current.
+- Close requires an **Ended** year (not "any non-current").
+- Delete requires Upcoming (no class sections, no periods); exams and fees do not exist yet.
+- A Closed year refuses edits, new classes and every Timetable write.

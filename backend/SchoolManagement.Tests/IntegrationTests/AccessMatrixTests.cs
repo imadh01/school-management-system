@@ -193,7 +193,16 @@ public class AccessMatrixTests
 
         // Timetable. A teacher with only Timetable.ViewScoped passes authorization on the teacher's-week endpoint and
         // is then answered 404 for any teacher that is not themselves (999999 here); that is "allowed" for this table.
-        new("GET",    "/api/academic-years", P(Permissions.TimetableView)),
+        // Academic years: the list is reference data for every dropdown (any signed-in user, like Countries);
+        // every other action has its own AcademicYears.* permission, held only by Admin.
+        new("GET",    "/api/academic-years", SignedIn),
+        new("GET",    $"/api/academic-years/{Missing}", P(Permissions.AcademicYearsView)),
+        new("POST",   "/api/academic-years", P(Permissions.AcademicYearsCreate), HasBody: true),
+        new("PUT",    $"/api/academic-years/{Missing}", P(Permissions.AcademicYearsEdit), HasBody: true),
+        new("POST",   $"/api/academic-years/{Missing}/set-current", P(Permissions.AcademicYearsSetCurrent), HasBody: true),
+        new("POST",   $"/api/academic-years/{Missing}/close", P(Permissions.AcademicYearsClose), HasBody: true),
+        new("POST",   $"/api/academic-years/{Missing}/copy-periods?fromId=999998", P(Permissions.AcademicYearsCopyPeriods)),
+        new("DELETE", $"/api/academic-years/{Missing}", P(Permissions.AcademicYearsDelete)),
         new("GET",    "/api/timetable/periods", P(Permissions.TimetableView)),
         new("POST",   "/api/timetable/periods", P(Permissions.TimetableManagePeriods), HasBody: true),
         new("PUT",    $"/api/timetable/periods/{Missing}", P(Permissions.TimetableManagePeriods), HasBody: true),

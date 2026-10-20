@@ -119,6 +119,24 @@ public static class Permissions
     /// <summary>Create, change and delete the periods (time slots) of the school day.</summary>
     public const string TimetableManagePeriods = "Timetable.ManagePeriods";
 
+    // ── Academic years ─────────────────────────────────────────────────
+    // The year LIST is reference data for every dropdown, so (like Countries) any signed-in user may read it.
+    // These permissions guard the Academic Years page and every change. Only Admin holds them by default.
+    /// <summary>Open the Academic Years page and see one year with its counts.</summary>
+    public const string AcademicYearsView = "AcademicYears.View";
+    /// <summary>Add an academic year.</summary>
+    public const string AcademicYearsCreate = "AcademicYears.Create";
+    /// <summary>Change a year's name and dates (within the rules of its status).</summary>
+    public const string AcademicYearsEdit = "AcademicYears.Edit";
+    /// <summary>Make an Upcoming year current; the old current year becomes Ended. Changes what teachers see.</summary>
+    public const string AcademicYearsSetCurrent = "AcademicYears.SetCurrent";
+    /// <summary>Close an Ended year for good. It cannot be reopened.</summary>
+    public const string AcademicYearsClose = "AcademicYears.Close";
+    /// <summary>Delete an Upcoming year that has no classes or periods.</summary>
+    public const string AcademicYearsDelete = "AcademicYears.Delete";
+    /// <summary>Copy the timetable periods of one year into another.</summary>
+    public const string AcademicYearsCopyPeriods = "AcademicYears.CopyPeriods";
+
     /// <summary>The catalog, in display order (grouped by module).</summary>
     public static readonly IReadOnlyList<PermissionDefinition> Definitions = new PermissionDefinition[]
     {
@@ -189,6 +207,15 @@ public static class Permissions
         new(TimetableViewScoped, "Timetable", "See only your own teaching timetable."),
         new(TimetableEdit, "Timetable", "Add, change and clear lessons on a class timetable, and copy a timetable from another class."),
         new(TimetableManagePeriods, "Timetable", "Create, change and delete the periods (time slots) of the school day."),
+
+        new(AcademicYearsView, "AcademicYears", "Open the Academic Years page and see each year with its counts."),
+        new(AcademicYearsCreate, "AcademicYears", "Add an academic year."),
+        new(AcademicYearsEdit, "AcademicYears", "Change an academic year's name and dates."),
+        new(AcademicYearsSetCurrent, "AcademicYears",
+            "Make an Upcoming year the current year. The old current year becomes Ended; teachers then see the new year's classes."),
+        new(AcademicYearsClose, "AcademicYears", "Close an Ended academic year permanently (it cannot be reopened)."),
+        new(AcademicYearsDelete, "AcademicYears", "Delete an Upcoming academic year that has no classes or periods."),
+        new(AcademicYearsCopyPeriods, "AcademicYears", "Copy the timetable periods of one academic year into another."),
     };
 
     /// <summary>Every permission name in the catalog. Admin holds all of these in code.</summary>

@@ -67,6 +67,14 @@ export const Permission = {
   TimetableViewScoped: "Timetable.ViewScoped",
   TimetableEdit: "Timetable.Edit",
   TimetableManagePeriods: "Timetable.ManagePeriods",
+
+  AcademicYearsView: "AcademicYears.View",
+  AcademicYearsCreate: "AcademicYears.Create",
+  AcademicYearsEdit: "AcademicYears.Edit",
+  AcademicYearsSetCurrent: "AcademicYears.SetCurrent",
+  AcademicYearsClose: "AcademicYears.Close",
+  AcademicYearsDelete: "AcademicYears.Delete",
+  AcademicYearsCopyPeriods: "AcademicYears.CopyPeriods",
 } as const;
 
 /**
@@ -90,6 +98,7 @@ export const PAGE_PERMISSIONS: Readonly<Record<string, readonly string[]>> = {
   "/attendance": [Permission.AttendanceView, Permission.AttendanceViewScoped],
   "/documents": [Permission.DocumentsView],
   "/timetable": [Permission.TimetableView, Permission.TimetableViewScoped],
+  "/academic-years": [Permission.AcademicYearsView],
   "/users-staff": [Permission.UsersView],
   "/roles-permissions": [Permission.RolesView],
   "/settings": [Permission.SettingsView],
